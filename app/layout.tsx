@@ -4,6 +4,8 @@ import { Inter } from "next/font/google"
 import { Suspense } from "react"
 import { ThemeProvider } from "@/components/theme-provider"
 import "./globals.css"
+import { Toaster } from "react-hot-toast";
+import { Providers } from "@/components/providers";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -30,8 +32,13 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <Suspense fallback={null}>{children}</Suspense>
+          <Providers>
+            <Suspense fallback={null}>{children}</Suspense>
+            <Toaster position="top-right" />
+          </Providers>
         </ThemeProvider>
+          
+        
       </body>
     </html>
   )

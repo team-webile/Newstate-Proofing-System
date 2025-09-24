@@ -1,34 +1,57 @@
-"use client"
+'use client'
 
-import type React from "react"
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { Eye, EyeOff, Mail, Lock, LogIn } from 'lucide-react'
+import { authApi } from '@/lib/api-client'
+import { useAuth } from '@/lib/auth-context'
+import { Button } from '@/components/ui/button'
+import { Icons } from '@/components/icons'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
+import { Logo } from '@/components/logo'
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Logo } from "@/components/logo"
-import { Icons } from "@/components/icons"
-
-export default function AdminLogin() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
+export default function LoginPage() {
+  const router = useRouter()
+  const { login } = useAuth()
+  const [formData, setFormData] = useState({
+    email: '',
+    password: ''
+  })
   const [showPassword, setShowPassword] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
+    setLoading(true)
+    setError('')
 
-    // TODO: Implement actual authentication
-    setTimeout(() => {
-      console.log("Login attempt:", { email, password })
-      setIsLoading(false)
-      // Redirect to admin dashboard
-      window.location.href = "/admin/dashboard"
-    }, 1000)
+    try {
+      const response = await authApi.login(formData.email, formData.password)
+
+      if (response.status === 'success') {
+        // Use auth context login method which handles localStorage and redirects
+        login(response.data.user, response.data.token)
+        
+        console.log('Login successful, user role:', response.data.user.role)
+      } else {
+        setError(response.message || 'Login failed')
+      }
+    } catch (error) {
+      setError('An error occurred during login')
+    } finally {
+      setLoading(false)
+    }
   }
 
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({
+      ...prev,
+      [e.target.name]: e.target.value
+    }))
+  }
   const handleBack = () => {
     window.history.back()
   }
@@ -69,12 +92,13 @@ export default function AdminLogin() {
                   Email
                 </Label>
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="admin@newstatebranding.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
+                 id="email"
+                 name="email"
+                 type="email"
+                 autoComplete="email"
+                 required
+                 value={formData.email}
+                 onChange={handleChange}
                   className="bg-input border-border text-foreground placeholder:text-muted-foreground"
                 />
               </div>
@@ -86,11 +110,12 @@ export default function AdminLogin() {
                 <div className="relative">
                   <Input
                     id="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
                     required
+                    value={formData.password}
+                    onChange={handleChange}
                     className="bg-input border-border text-foreground placeholder:text-muted-foreground pr-10"
                   />
                   <Button
@@ -108,9 +133,9 @@ export default function AdminLogin() {
               <Button
                 type="submit"
                 className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                disabled={isLoading}
+                disabled={loading}
               >
-                {isLoading ? "Signing in..." : "Sign In"}
+                {loading ? "Signing in..." : "Sign In"}
               </Button>
             </form>
           </CardContent>

@@ -1,0 +1,189 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String     @id @default(cuid())
+  email     String     @unique
+  password  String
+  name      String
+  role      UserRole   @default(ADMIN)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  projects  Project[]
+  settings  Settings[]
+
+  @@map("users")
+}
+
+model Client {
+  id        String    @id @default(cuid())
+  name      String
+  email     String    @unique
+  phone     String?
+  company   String?
+  address   String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  projects  Project[]
+
+  @@map("clients")
+}
+
+model Project {
+  id              String        @id @default(cuid())
+  title           String
+  description     String?
+  status          ProjectStatus @default(ACTIVE)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  userId          String
+  clientId        String
+  downloadEnabled Boolean       @default(true)
+  approvals       Approval[]
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client          Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  reviews         Review[]
+
+  @@map("projects")
+}
+
+model Review {
+  id          String       @id @default(cuid())
+  description String?
+  status      ReviewStatus @default(PENDING)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime
+  projectId   String
+  reviewName  String
+  shareLink   String       @unique
+  elements    Element[]
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("reviews")
+}
+
+model Element {
+  id          String           @id @default(cuid())
+  status      ElementStatus    @default(PENDING)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  reviewId    String
+  elementName String
+  filePath    String
+  version     Int              @default(1)
+  approvals   Approval[]
+  comments    Comment[]
+  versions    ElementVersion[]
+  review      Review           @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@map("elements")
+}
+
+model ElementVersion {
+  id        String   @id @default(cuid())
+  version   Int
+  filename  String
+  filePath  String
+  fileSize  Int
+  mimeType  String
+  createdAt DateTime @default(now())
+  elementId String
+  element   Element  @relation(fields: [elementId], references: [id], onDelete: Cascade)
+
+  @@unique([elementId, version])
+  @@map("element_versions")
+}
+
+model Comment {
+  id          String        @id @default(cuid())
+  type        CommentType   @default(GENERAL)
+  status      CommentStatus @default(ACTIVE)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  elementId   String
+  commentText String
+  coordinates String?
+  userName    String
+  parentId    String?
+  element     Element       @relation(fields: [elementId], references: [id], onDelete: Cascade)
+  parent      Comment?      @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies     Comment[]     @relation("CommentReplies")
+
+  @@map("comments")
+}
+
+model Approval {
+  id         String       @id @default(cuid())
+  type       ApprovalType
+  elementId  String?
+  projectId  String?
+  approvedAt DateTime     @default(now())
+  signature  String
+  userName   String
+  element    Element?     @relation(fields: [elementId], references: [id], onDelete: Cascade)
+  project    Project?     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("approvals")
+}
+
+model Settings {
+  id               String   @id @default(cuid())
+  approvalMessage  String   @default("Thank you for your approval!")
+  signatureMessage String   @default("By signing below, I approve this design element.")
+  companyName      String   @default("New State Branding")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("settings")
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum ProjectStatus {
+  ACTIVE
+  ARCHIVED
+  COMPLETED
+}
+
+enum ReviewStatus {
+  PENDING
+  IN_PROGRESS
+  APPROVED
+  REJECTED
+}
+
+enum ElementStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  NEEDS_REVISION
+}
+
+enum CommentType {
+  GENERAL
+  ANNOTATION
+  APPROVAL_REQUEST
+  ADMIN_REPLY
+}
+
+enum CommentStatus {
+  ACTIVE
+  RESOLVED
+  ARCHIVED
+}
+
+enum ApprovalType {
+  ELEMENT
+  PROJECT
+}

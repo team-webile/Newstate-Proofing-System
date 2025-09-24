@@ -1,0 +1,101 @@
+# Cursor Rules for Client Proofing System
+
+## Project Structure Guidelines
+
+### Folder Organization
+- `models/` - Separate model files for each Prisma model
+- `api/` - API routes organized by feature
+- `components/` - Reusable React components
+- `lib/` - Utility functions and configurations
+- `types/` - TypeScript type definitions
+- `prisma/` - Database schema and migrations
+
+### Code Standards
+
+#### Database & Prisma
+- Always use Prisma for database operations
+- Create separate model files in `models/` folder
+- Use proper TypeScript types for all database models
+- Always create migration files when changing schema
+- Use Neon PostgreSQL database
+
+#### API Routes
+- Organize API routes by feature in separate folders
+- Use proper HTTP status codes
+- Implement proper error handling
+- Use TypeScript for all API routes
+- Validate input data
+
+#### Components
+- Use functional components with TypeScript
+- Implement proper prop types
+- Use Tailwind CSS for styling
+- Create reusable components
+- Follow React best practices
+
+#### File Naming
+- Use kebab-case for file names
+- Use PascalCase for component names
+- Use camelCase for function and variable names
+- Use UPPER_CASE for constants
+
+### Database Models Structure
+Each model should have its own file in `models/` folder:
+- `models/User.ts`
+- `models/Project.ts`
+- `models/Review.ts`
+- `models/Element.ts`
+- `models/Comment.ts`
+- `models/Approval.ts`
+
+### API Structure
+Organize API routes by feature:
+- `api/auth/` - Authentication routes
+- `api/projects/` - Project management routes
+- `api/reviews/` - Review management routes
+- `api/elements/` - Element management routes
+- `api/comments/` - Comment management routes
+- `api/approvals/` - Approval management routes
+
+### Migration Guidelines
+- Always create migration files for schema changes
+- Use descriptive migration names
+- Test migrations on development database first
+- Document breaking changes
+
+### Environment Variables
+- Use `.env.local` for local development
+- Use `.env.example` as template
+- Never commit sensitive environment variables
+- Use Neon database URL format
+
+### TypeScript
+- Use strict TypeScript configuration
+- Define proper interfaces for all data structures
+- Use Prisma generated types
+- Avoid `any` type usage
+
+### Security
+- Implement proper authentication
+- Validate all inputs
+- Use environment variables for secrets
+- Implement proper CORS policies
+- Use HTTPS in production
+
+### Performance
+- Use Prisma connection pooling
+- Implement proper caching strategies
+- Optimize database queries
+- Use Next.js optimization features
+
+### Testing
+- Write unit tests for utility functions
+- Test API endpoints
+- Test database operations
+- Use proper test data
+
+### Documentation
+- Document all API endpoints
+- Document database schema changes
+- Keep README updated
+- Document environment setup
