@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ProjectModel, UpdateProjectData } from '@/models/Project'
+import { ProjectStatus } from '@prisma/client'
 
 // PUT - Update project
 export async function PUT(
@@ -9,13 +10,16 @@ export async function PUT(
   try {
     const { id } = await params
     const body = await req.json()
-    const { title, description, status, downloadEnabled } = body
+    const { title, description, status, downloadEnabled, clientId, emailNotifications } = body
 
     const updateData: UpdateProjectData = {
       title,
       description,
-      status,
-      downloadEnabled
+      status: status as ProjectStatus,
+      downloadEnabled,
+      clientId,
+      emailNotifications,
+      lastActivity: new Date()
     }
 
     const project = await ProjectModel.update(id, updateData)

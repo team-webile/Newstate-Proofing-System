@@ -27,6 +27,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 
+interface Client {
+  id: string
+  name: string
+  email: string
+  company?: string
+}
+
 interface ProjectFile {
   id: string
   name: string
@@ -45,7 +52,7 @@ interface Project {
   allowDownloads: boolean
   emailNotifications: boolean
   publicLink: string
-  status: "draft" | "pending" | "approved" | "revisions"
+  status: "draft" | "pending" | "approved" | "revisions" | "active" | "archived" | "completed"
   createdAt: string
   lastActivity: string
 }
@@ -62,57 +69,86 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
   const [showFileDialog, setShowFileDialog] = useState(false)
   const [newFile, setNewFile] = useState<File | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isCopied, setIsCopied] = useState(false)
+  const [clients, setClients] = useState<Client[]>([])
+  const [clientsLoading, setClientsLoading] = useState(true)
+  const [clientsError, setClientsError] = useState<string | null>(null)
 
-  // Mock clients data - will be replaced with real data
-  const clients = [
-    { id: "1", name: "Atlantic Wellness" },
-    { id: "2", name: "Provectus Corp" },
-    { id: "3", name: "Health Plus" },
-    { id: "4", name: "Woody's Restaurant" },
-  ]
-
-  // Mock project data - will be replaced with real data fetching
-  const mockProject: Project = {
-    id: params.projectId,
-    name: "Atlantic Spa",
-    clientId: "1",
-    description: "Spa branding and interior design concepts",
-    files: [
-      {
-        id: "1",
-        name: "spa-logo-design.psd",
-        url: "/professional-tent-canopy-design-with-river-s-life-.jpg",
-        type: "image/psd",
-        size: 2048576,
-        uploadedAt: "2024-01-15T10:00:00Z",
-      },
-      {
-        id: "2",
-        name: "interior-mockup.jpg",
-        url: "/blue-tent-canopy-design.jpg",
-        type: "image/jpeg",
-        size: 1024768,
-        uploadedAt: "2024-01-15T11:30:00Z",
-      },
-    ],
-    allowDownloads: true,
-    emailNotifications: true,
-    publicLink: "", // Will be set in useEffect
-    status: "pending",
-    createdAt: "2024-01-15T09:00:00Z",
-    lastActivity: "2 days ago",
+  const fetchClients = async () => {
+    try {
+      setClientsLoading(true)
+      setClientsError(null)
+      
+      const response = await fetch('/api/clients')
+      const data = await response.json()
+      
+      if (data.status === 'success') {
+        setClients(data.data.clients || [])
+      } else {
+        setClientsError(data.message || 'Failed to fetch clients')
+      }
+    } catch (err) {
+      setClientsError('Failed to fetch clients')
+    } finally {
+      setClientsLoading(false)
+    }
   }
 
+
   useEffect(() => {
-    // Simulate loading project data
-    setTimeout(() => {
-      const projectWithLink = {
-        ...mockProject,
-        publicLink: `${window.location.origin}/review/${params.projectId}-atlantic-spa`
+    const fetchData = async () => {
+      try {
+        setIsLoading(true)
+        
+        // Fetch both project and clients in parallel
+        const [projectResponse, clientsResponse] = await Promise.all([
+          fetch(`/api/projects/${params.projectId}`),
+          fetch('/api/clients')
+        ])
+        
+        const [projectData, clientsData] = await Promise.all([
+          projectResponse.json(),
+          clientsResponse.json()
+        ])
+        
+        // Handle project data
+        if (projectData.status === 'success') {
+          const projectInfo = projectData.data
+          const projectWithLink = {
+            id: projectInfo.id,
+            name: projectInfo.title,
+            clientId: projectInfo.clientId,
+            description: projectInfo.description || "",
+            files: [], // Files will be handled separately
+            allowDownloads: projectInfo.downloadEnabled,
+            emailNotifications: projectInfo.emailNotifications ?? true,
+            publicLink: `${window.location.origin}/client/${projectInfo.clientId}?project=${projectInfo.id}`,
+            status: projectInfo.status.toLowerCase(),
+            createdAt: projectInfo.createdAt,
+            lastActivity: projectInfo.lastActivity ? new Date(projectInfo.lastActivity).toLocaleDateString() : "Unknown",
+          }
+          setProject(projectWithLink)
+        } else {
+          console.error('Failed to fetch project:', projectData.message)
+        }
+        
+        // Handle clients data
+        if (clientsData.status === 'success') {
+          setClients(clientsData.data.clients || [])
+        } else {
+          setClientsError(clientsData.message || 'Failed to fetch clients')
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error)
+        setClientsError('Failed to fetch data')
+      } finally {
+        setIsLoading(false)
+        setClientsLoading(false)
       }
-      setProject(projectWithLink)
-      setIsLoading(false)
-    }, 1000)
+    }
+    
+    fetchData()
   }, [params.projectId])
 
   const handleFileUpload = async (file: File) => {
@@ -120,50 +156,139 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
     
     setIsUploading(true)
     
-    // Simulate file upload - in real implementation, upload to your server
-    const uploadedFile: ProjectFile = {
-      id: Date.now().toString(),
-      name: file.name,
-      url: URL.createObjectURL(file), // In real app, this would be server URL
-      type: file.type,
-      size: file.size,
-      uploadedAt: new Date().toISOString(),
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('version', 'V1')
+      
+      const response = await fetch(`/api/projects/${project.id}/files`, {
+        method: 'POST',
+        body: formData,
+      })
+      
+      const data = await response.json()
+      
+      if (data.status === 'success') {
+        const uploadedFile: ProjectFile = {
+          id: data.data.id,
+          name: data.data.name,
+          url: data.data.url,
+          type: data.data.type,
+          size: data.data.size,
+          uploadedAt: data.data.uploadedAt,
+        }
+
+        setProject(prev => prev ? {
+          ...prev,
+          files: [...prev.files, uploadedFile]
+        } : null)
+        
+        alert('File uploaded successfully!')
+      } else {
+        alert(`Error: ${data.message}`)
+      }
+    } catch (error) {
+      console.error('Upload error:', error)
+      alert('Failed to upload file. Please try again.')
+    } finally {
+      setIsUploading(false)
+      setNewFile(null)
+      setShowFileDialog(false)
     }
-
-    setProject(prev => prev ? {
-      ...prev,
-      files: [...prev.files, uploadedFile]
-    } : null)
-    
-    setIsUploading(false)
-    setNewFile(null)
-    setShowFileDialog(false)
   }
 
-  const handleFileRemove = (fileId: string) => {
+  const handleFileRemove = async (fileId: string) => {
     if (!project) return
     
-    setProject(prev => prev ? {
-      ...prev,
-      files: prev.files.filter(file => file.id !== fileId)
-    } : null)
+    try {
+      // Find the file to get its name
+      const fileToDelete = project.files.find(file => file.id === fileId)
+      
+      if (!fileToDelete) {
+        alert('File not found')
+        return
+      }
+      
+      // Extract filename from URL (e.g., "/uploads/projects/.../filename.jpg" -> "filename.jpg")
+      const fileName = fileToDelete.url.split('/').pop()
+      
+      if (!fileName) {
+        alert('Invalid file name')
+        return
+      }
+      
+      // Call delete API
+      const response = await fetch(`/api/projects/${project.id}/files?fileName=${encodeURIComponent(fileName)}`, {
+        method: 'DELETE',
+      })
+      
+      const data = await response.json()
+      
+      if (data.status === 'success') {
+        // Remove file from frontend state
+        setProject(prev => prev ? {
+          ...prev,
+          files: prev.files.filter(file => file.id !== fileId)
+        } : null)
+        alert('File deleted successfully!')
+      } else {
+        alert(`Error: ${data.message}`)
+      }
+    } catch (error) {
+      console.error('Delete error:', error)
+      alert('Failed to delete file. Please try again.')
+    }
   }
 
-  const handleSaveProject = () => {
+  const handleSaveProject = async () => {
     if (!project) return
     
-    // Here you would typically save to your backend
-    console.log("Saving project:", project)
-    
-    // Show success message
-    alert("Project updated successfully!")
+    try {
+      setIsSaving(true)
+      
+      const response = await fetch(`/api/projects/${project.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: project.name,
+          description: project.description,
+          status: project.status.toUpperCase(),
+          downloadEnabled: project.allowDownloads,
+          clientId: project.clientId,
+          emailNotifications: project.emailNotifications,
+        }),
+      })
+      
+      const data = await response.json()
+      
+      if (data.status === 'success') {
+        alert("Project updated successfully!")
+        // Optionally redirect back to projects list
+        // window.location.href = '/admin/projects'
+      } else {
+        alert(`Error: ${data.message || 'Failed to update project'}`)
+      }
+    } catch (error) {
+      console.error('Error updating project:', error)
+      alert('Failed to update project. Please try again.')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
-  const handleCopyLink = () => {
+  const handleCopyLink = async () => {
     if (!project) return
     
-    navigator.clipboard.writeText(project.publicLink)
-    alert("Shareable link copied to clipboard!")
+    try {
+      await navigator.clipboard.writeText(project.publicLink)
+      setIsCopied(true)
+      setTimeout(() => setIsCopied(false), 2000) // Reset after 2 seconds
+    } catch (error) {
+      console.error('Failed to copy:', error)
+      alert("Failed to copy link. Please try again.")
+    }
   }
 
   const formatFileSize = (bytes: number) => {
@@ -237,10 +362,20 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
           <div className="flex items-center gap-4">
             <Button
               onClick={handleSaveProject}
+              disabled={isSaving}
               className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
-              <Icons.Save />
-              <span className="ml-2">Save Changes</span>
+              {isSaving ? (
+                <>
+                  <Icons.Loader2 />
+                  <span className="ml-2">Saving...</span>
+                </>
+              ) : (
+                <>
+                  <Icons.Save />
+                  <span className="ml-2">Save Changes</span>
+                </>
+              )}
             </Button>
           </div>
         </div>
@@ -253,15 +388,28 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-3xl font-bold text-foreground mb-2">
-                  {project.id} - {project.name}
+                   {project.name}
                 </h1>
                 <p className="text-muted-foreground">Edit project details and manage files</p>
               </div>
               <div className="flex items-center gap-2">
                 <Badge className={getStatusColor(project.status)}>{project.status}</Badge>
-                <Button variant="outline" onClick={handleCopyLink}>
-                  <Icons.Copy />
-                  <span className="ml-2">Copy Link</span>
+                <Button 
+                  variant="outline" 
+                  onClick={handleCopyLink}
+                  className={isCopied ? "bg-green-100 text-green-700 border-green-300" : ""}
+                >
+                  {isCopied ? (
+                    <>
+                      <div className="h-4 w-4 flex items-center"><Icons.CheckCircle /></div>
+                      <span className="ml-2">Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <Icons.Copy />
+                      <span className="ml-2">Copy Link</span>
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
@@ -288,21 +436,40 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
                   
                   <div>
                     <Label htmlFor="client">Client</Label>
-                    <Select 
-                      value={project.clientId} 
-                      onValueChange={(value) => setProject(prev => prev ? { ...prev, clientId: value } : null)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {clients.map((client) => (
-                          <SelectItem key={client.id} value={client.id}>
-                            {client.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {clientsLoading ? (
+                      <div className="flex items-center gap-2">
+                        <Icons.Loader2 />
+                        <span className="text-sm text-muted-foreground">Loading clients...</span>
+                      </div>
+                    ) : clientsError ? (
+                      <div className="text-sm text-destructive">
+                        {clientsError}
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={fetchClients}
+                          className="ml-2"
+                        >
+                          Retry
+                        </Button>
+                      </div>
+                    ) : (
+                      <Select 
+                        value={project.clientId} 
+                        onValueChange={(value) => setProject(prev => prev ? { ...prev, clientId: value } : null)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a client" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {clients.map((client) => (
+                            <SelectItem key={client.id} value={client.id}>
+                              {client.name} {client.company && `(${client.company})`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
 
                   <div>
@@ -313,6 +480,23 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
                       onChange={(e) => setProject(prev => prev ? { ...prev, description: e.target.value } : null)}
                       rows={4}
                     />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="status">Project Status</Label>
+                    <Select 
+                      value={project.status} 
+                      onValueChange={(value) => setProject(prev => prev ? { ...prev, status: value as "active" | "archived" | "completed" } : null)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="archived">Archived</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </CardContent>
               </Card>
@@ -476,7 +660,7 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
                   
                   <div>
                     <Label className="text-sm font-medium">Last Activity</Label>
-                    <p className="text-sm text-muted-foreground">{project.lastActivity}</p>
+                    <p className="text-sm text-muted-foreground">{new Date(project.lastActivity).toLocaleDateString()}</p>
                   </div>
                   
                   <div>
@@ -497,9 +681,23 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
                     <p className="text-sm font-mono break-all">{project.publicLink}</p>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={handleCopyLink} className="flex-1">
-                      <Icons.Copy />
-                      <span className="ml-2">Copy Link</span>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handleCopyLink} 
+                      className={`flex-1 ${isCopied ? "bg-green-100 text-green-700 border-green-300" : ""}`}
+                    >
+                      {isCopied ? (
+                        <>
+                          <div className="h-4 w-4 flex items-center"><Icons.CheckCircle /></div>
+                          <span className="ml-2">Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Icons.Copy />
+                          <span className="ml-2">Copy Link</span>
+                        </>
+                      )}
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => window.open(project.publicLink, '_blank')}>
                       <Icons.ExternalLink />

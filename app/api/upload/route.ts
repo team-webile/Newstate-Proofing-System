@@ -45,8 +45,8 @@ async function handler(req: NextRequest, user: AuthUser) {
 
     const nextVersion = (latestVersion?.version || 0) + 1
 
-    // Create upload directory
-    const uploadDir = join(process.cwd(), 'uploads', elementId)
+    // Create upload directory in public folder
+    const uploadDir = join(process.cwd(), 'public', 'uploads', 'elements', elementId)
     await mkdir(uploadDir, { recursive: true })
 
     // Generate unique filename
@@ -64,7 +64,7 @@ async function handler(req: NextRequest, user: AuthUser) {
       data: {
         version: nextVersion,
         filename: file.name,
-        filePath: `/uploads/${elementId}/${filename}`,
+        filePath: `/uploads/elements/${elementId}/${filename}`,
         fileSize: file.size,
         mimeType: file.type,
         elementId

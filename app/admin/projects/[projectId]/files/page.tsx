@@ -12,6 +12,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { LogoutButton } from "@/components/logout-button"
+import { Eye, MessageSquare, PenTool, X } from "lucide-react"
+import io from 'socket.io-client'
 import {
   Select,
   SelectContent,
@@ -67,9 +69,15 @@ interface Project {
   allowDownloads: boolean
   emailNotifications: boolean
   publicLink: string
-  status: "draft" | "pending" | "approved" | "revisions"
+  status: "draft" | "pending" | "approved" | "revisions" | "active" | "archived" | "completed"
   createdAt: string
   lastActivity: string
+}
+
+interface Client {
+  id: string
+  name: string
+  company?: string
 }
 
 interface ProjectFilesPageProps {
@@ -96,43 +104,192 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
   const [newFile, setNewFile] = useState<File | null>(null)
   const [newVersionName, setNewVersionName] = useState("")
   const [isLoading, setIsLoading] = useState(true)
+  const [clients, setClients] = useState<Client[]>([])
+  const [clientsLoading, setClientsLoading] = useState(true)
+  const [clientsError, setClientsError] = useState<string | null>(null)
+  const [showAnnotationModal, setShowAnnotationModal] = useState(false)
+  const [selectedImage, setSelectedImage] = useState<ProjectFile | null>(null)
+  const [annotations, setAnnotations] = useState<{ [key: string]: string[] }>({})
+  const [showViewDetailsModal, setShowViewDetailsModal] = useState(false)
+  const [selectedFileForDetails, setSelectedFileForDetails] = useState<ProjectFile | null>(null)
+  const [socket, setSocket] = useState<any>(null)
+  const [chatMessages, setChatMessages] = useState<Array<{id: string, type: 'annotation' | 'status', message: string, timestamp: string, addedBy?: string, senderName?: string, isFromAdmin?: boolean}>>([])
 
-  // Mock clients data - will be replaced with real data
-  const clients = [
-    { id: "1", name: "Atlantic Wellness" },
-    { id: "2", name: "Provectus Corp" },
-    { id: "3", name: "Health Plus" },
-    { id: "4", name: "Woody's Restaurant" },
-  ]
-
-  // Mock project data - will be replaced with real data fetching
-  const mockProject: Project = {
-    id: params.projectId,
-    name: "Atlantic Spa",
-    clientId: "1",
-    description: "Spa branding and interior design concepts",
-    allowDownloads: true,
-    emailNotifications: true,
-    publicLink: "", // Will be set in useEffect
-    status: "draft",
-    createdAt: "2024-01-15T09:00:00Z",
-    lastActivity: "2 days ago",
+  // Fetch clients data
+  const fetchClients = async () => {
+    try {
+      setClientsLoading(true)
+      const response = await fetch('/api/clients')
+      const data = await response.json()
+      
+      if (data.status === 'success') {
+        console.log('Clients data:', data.data)
+        setClients(Array.isArray(data.data) ? data.data : [])
+      } else {
+        setClientsError(data.message || 'Failed to fetch clients')
+        setClients([]) // Ensure clients is always an array
+      }
+    } catch (error) {
+      console.error('Error fetching clients:', error)
+      setClientsError('Failed to fetch clients')
+      setClients([]) // Ensure clients is always an array
+    } finally {
+      setClientsLoading(false)
+    }
   }
 
-  useEffect(() => {
-    // Simulate loading project data
-    setTimeout(() => {
-      if (typeof window !== 'undefined') {
+  // Fetch project data
+  const fetchProject = async () => {
+    try {
+      const response = await fetch(`/api/projects/${params.projectId}`)
+      const data = await response.json()
+      
+      if (data.status === 'success') {
+        const projectInfo = data.data
         const projectWithLink = {
-          ...mockProject,
-          publicLink: `${window.location.origin}/review/${params.projectId}-atlantic-spa`
+          id: projectInfo.id,
+          name: projectInfo.title,
+          clientId: projectInfo.clientId,
+          description: projectInfo.description || '',
+          allowDownloads: projectInfo.downloadEnabled,
+          emailNotifications: projectInfo.emailNotifications ?? true,
+          publicLink: `${window.location.origin}/client/${projectInfo.clientId}?project=${projectInfo.id}`,
+          status: projectInfo.status.toLowerCase(),
+          createdAt: projectInfo.createdAt,
+          lastActivity: projectInfo.lastActivity ? new Date(projectInfo.lastActivity).toLocaleDateString() : "Unknown",
         }
         setProject(projectWithLink)
       } else {
-        setProject(mockProject)
+        console.error('Failed to fetch project:', data.message)
       }
+    } catch (error) {
+      console.error('Error fetching project:', error)
+    }
+  }
+
+  // Fetch project files
+  const fetchProjectFiles = async () => {
+    try {
+      const response = await fetch(`/api/projects/${params.projectId}/files`)
+      const data = await response.json()
+      
+      if (data.status === 'success') {
+        console.log('Project files:', data.data)
+        
+        // If we have files, update the versions with real data
+        if (data.data.files && Array.isArray(data.data.files)) {
+          const files = data.data.files.map((file: any) => ({
+            id: file.id || Date.now().toString(),
+            name: file.name,
+            url: file.url,
+            type: file.type,
+            size: file.size,
+            uploadedAt: file.uploadedAt,
+            version: file.version || 'V1'
+          }))
+          
+          // Update the current version with the fetched files
+          setVersions(prev => prev.map(v => 
+            v.version === currentVersion 
+              ? { ...v, files: files }
+              : v
+          ))
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching project files:', error)
+    }
+  }
+
+  // Fetch annotations from database
+  const fetchAnnotations = async () => {
+    try {
+      const response = await fetch(`/api/annotations?projectId=${params.projectId}`)
+      const data = await response.json()
+      
+      if (data.status === 'success') {
+        // Group annotations by fileId
+        const annotationsByFile: { [key: string]: string[] } = {}
+        data.data.forEach((annotation: any) => {
+          if (!annotationsByFile[annotation.fileId]) {
+            annotationsByFile[annotation.fileId] = []
+          }
+          annotationsByFile[annotation.fileId].push(annotation.content)
+        })
+        setAnnotations(annotationsByFile)
+      }
+    } catch (error) {
+      console.error('Error fetching annotations:', error)
+    }
+  }
+
+  useEffect(() => {
+    const fetchData = async () => {
+      await Promise.all([
+        fetchProject(),
+        fetchClients(),
+        fetchProjectFiles(),
+        fetchAnnotations()
+      ])
       setIsLoading(false)
-    }, 1000)
+    }
+    
+    fetchData()
+  }, [params.projectId])
+
+  // Initialize Socket.io
+  useEffect(() => {
+    if (params.projectId) {
+      const newSocket = io('http://localhost:3000', {
+        path: '/api/socketio',
+        transports: ['websocket', 'polling']
+      })
+      
+      setSocket(newSocket)
+      
+      // Join project room
+      newSocket.emit('join-project', params.projectId)
+      
+      // Listen for annotation updates
+      newSocket.on('annotationAdded', (data: { fileId: string, annotation: string, timestamp: string, addedBy?: string, addedByName?: string }) => {
+        setAnnotations(prev => ({
+          ...prev,
+          [data.fileId]: [...(prev[data.fileId] || []), data.annotation]
+        }))
+        
+        // Add to chat messages with sender/receiver info
+        const senderName = data.addedByName || data.addedBy || 'Unknown'
+        const isFromAdmin = senderName.includes('Admin') || senderName === 'Admin User'
+        const messageText = isFromAdmin 
+          ? `You sent: "${data.annotation}"`
+          : `Received from ${senderName}: "${data.annotation}"`
+        
+        setChatMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          type: 'annotation',
+          message: messageText,
+          timestamp: data.timestamp,
+          addedBy: senderName,
+          senderName: senderName,
+          isFromAdmin: isFromAdmin
+        }])
+      })
+      
+      // Listen for status changes
+      newSocket.on('statusChanged', (data: { status: string, message: string, timestamp: string }) => {
+        setChatMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          type: 'status',
+          message: data.message,
+          timestamp: data.timestamp
+        }])
+      })
+      
+      return () => {
+        newSocket.emit('leave-project', params.projectId)
+        newSocket.close()
+      }
+    }
   }, [params.projectId])
 
   const handleFileUpload = async (file: File) => {
@@ -140,15 +297,27 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
     
     setIsUploading(true)
     
-    // Simulate file upload - in real implementation, upload to your server
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('version', currentVersion)
+      
+      const response = await fetch(`/api/projects/${project.id}/files`, {
+        method: 'POST',
+        body: formData,
+      })
+      
+      const data = await response.json()
+      
+      if (data.status === 'success') {
     const uploadedFile: ProjectFile = {
-      id: Date.now().toString(),
-      name: file.name,
-      url: URL.createObjectURL(file), // In real app, this would be server URL
-      type: file.type,
-      size: file.size,
-      uploadedAt: new Date().toISOString(),
-      version: currentVersion,
+          id: data.data.id,
+          name: data.data.name,
+          url: data.data.url,
+          type: data.data.type,
+          size: data.data.size,
+          uploadedAt: data.data.uploadedAt,
+          version: data.data.version,
     }
 
     setVersions(prev => prev.map(v => 
@@ -157,17 +326,70 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
         : v
     ))
     
+        // Show success message
+        alert('File uploaded successfully!')
+        
+        // Refresh files after successful upload
+        await fetchProjectFiles()
+      } else {
+        alert(`Error: ${data.message}`)
+      }
+    } catch (error) {
+      console.error('Upload error:', error)
+      alert('Failed to upload file. Please try again.')
+    } finally {
     setIsUploading(false)
     setNewFile(null)
     setShowFileDialog(false)
   }
+  }
 
-  const handleFileRemove = (fileId: string) => {
+  const handleFileRemove = async (fileId: string) => {
+    if (!project) return
+    
+    try {
+      // Find the file to get its name
+      const currentVersionData = versions.find(v => v.version === currentVersion)
+      const fileToDelete = currentVersionData?.files.find(file => file.id === fileId)
+      
+      if (!fileToDelete) {
+        alert('File not found')
+        return
+      }
+      
+      // Extract filename from URL (e.g., "/uploads/projects/.../filename.jpg" -> "filename.jpg")
+      const fileName = fileToDelete.url.split('/').pop()
+      
+      if (!fileName) {
+        alert('Invalid file name')
+        return
+      }
+      
+      // Call delete API
+      const response = await fetch(`/api/projects/${project.id}/files?fileName=${encodeURIComponent(fileName)}`, {
+        method: 'DELETE',
+      })
+      
+      const data = await response.json()
+      
+      if (data.status === 'success') {
+        // Remove file from frontend state
     setVersions(prev => prev.map(v => 
       v.version === currentVersion 
         ? { ...v, files: v.files.filter(file => file.id !== fileId) }
         : v
     ))
+        alert('File deleted successfully!')
+        
+        // Refresh files after successful deletion
+        await fetchProjectFiles()
+      } else {
+        alert(`Error: ${data.message}`)
+      }
+    } catch (error) {
+      console.error('Delete error:', error)
+      alert('Failed to delete file. Please try again.')
+    }
   }
 
   const handleCreateVersion = () => {
@@ -207,14 +429,33 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
     alert("Version published for client review!")
   }
 
-  const handleSaveProject = () => {
+  const handleSaveProject = async () => {
     if (!project) return
     
-    // Here you would typically save to your backend
-    console.log("Saving project:", project)
-    console.log("Saving versions:", versions)
-    
-    alert("Project updated successfully!")
+    try {
+      const response = await fetch(`/api/projects/${project.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: project.name,
+          description: project.description,
+          status: project.status.toUpperCase(),
+          downloadEnabled: project.allowDownloads,
+          clientId: project.clientId,
+          emailNotifications: project.emailNotifications,
+        }),
+      })
+      
+      const data = await response.json()
+      if (data.status === 'success') {
+        alert("Project settings saved successfully!")
+      } else {
+        alert(`Error: ${data.message || 'Failed to save project'}`)
+      }
+    } catch (error) {
+      console.error('Error saving project:', error)
+      alert('Failed to save project. Please try again.')
+    }
   }
 
   const handleCopyLink = () => {
@@ -230,6 +471,79 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
     const sizes = ['Bytes', 'KB', 'MB', 'GB']
     const i = Math.floor(Math.log(bytes) / Math.log(k))
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  }
+
+  const isImageFile = (file: ProjectFile) => {
+    return file.type.startsWith('image/')
+  }
+
+  const openAnnotationModal = (file: ProjectFile) => {
+    setSelectedImage(file)
+    setShowAnnotationModal(true)
+  }
+
+  const openViewDetailsModal = (file: ProjectFile) => {
+    setSelectedFileForDetails(file)
+    setShowViewDetailsModal(true)
+  }
+
+  const addAnnotation = async (fileId: string, annotation: string) => {
+    if (!annotation.trim()) return
+    
+    try {
+      // Get current user info (you can implement proper auth later)
+      const currentUser = {
+        name: 'Admin User', // This should come from authentication context
+        role: 'Admin'
+      }
+      
+      // Save to database
+      const response = await fetch('/api/annotations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: annotation,
+          fileId,
+          projectId: params.projectId,
+          addedBy: currentUser.role,
+          addedByName: currentUser.name
+        })
+      })
+      
+      const data = await response.json()
+      
+      if (data.status === 'success') {
+        // Update local state
+        setAnnotations(prev => ({
+          ...prev,
+          [fileId]: [...(prev[fileId] || []), annotation]
+        }))
+        
+        // Emit to Socket.io
+        if (socket && params.projectId) {
+          socket.emit('addAnnotation', {
+            projectId: params.projectId,
+            fileId,
+            annotation,
+            addedBy: currentUser.role,
+            addedByName: currentUser.name
+          })
+        }
+      } else {
+        console.error('Failed to save annotation:', data.message)
+        alert('Failed to save annotation. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error saving annotation:', error)
+      alert('Failed to save annotation. Please try again.')
+    }
+  }
+
+  const removeAnnotation = (fileId: string, index: number) => {
+    setAnnotations(prev => ({
+      ...prev,
+      [fileId]: prev[fileId]?.filter((_, i) => i !== index) || []
+    }))
   }
 
   const getStatusColor = (status: string) => {
@@ -338,7 +652,7 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-3xl font-bold text-foreground mb-2">
-                  {project.id} - {project.name}
+                  {project.name}
                 </h1>
                 <p className="text-muted-foreground">Manage files and versions for client review</p>
               </div>
@@ -466,7 +780,7 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                           </DialogFooter>
                         </DialogContent>
                       </Dialog>
-                      {currentVersionData?.files.length > 0 && (
+                      {currentVersionData?.files && currentVersionData.files.length > 0 && (
                         <Button 
                           onClick={handlePublishVersion}
                           className="bg-green-600 hover:bg-green-700"
@@ -483,36 +797,91 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                 </CardHeader>
                 <CardContent>
                   {currentVersionData && currentVersionData.files.length > 0 ? (
-                    <div className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {currentVersionData.files.map((file) => (
-                        <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-muted rounded flex items-center justify-center">
+                        <div key={file.id} className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow">
+                          {/* Image Thumbnail or File Icon */}
+                          <div className="relative aspect-[4/3] bg-muted">
+                            {isImageFile(file) ? (
+                              <img
+                                src={file.url}
+                                alt={file.name}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none'
+                                  e.currentTarget.nextElementSibling?.classList.remove('hidden')
+                                }}
+                              />
+                            ) : null}
+                            <div className={`absolute inset-0 flex items-center justify-center ${isImageFile(file) ? 'hidden' : ''}`}>
+                              <div className="h-12 w-12 text-muted-foreground flex items-center justify-center">
                               <Icons.FolderOpen />
+                              </div>
                             </div>
-                            <div>
-                              <p className="font-medium">{file.name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {formatFileSize(file.size)} • {new Date(file.uploadedAt).toLocaleDateString()}
-                              </p>
+                            
+                            {/* Overlay with actions */}
+                            <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 hover:opacity-100">
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => window.open(file.url, '_blank')}
+                                >
+                                  <Eye className="h-4 w-4 mr-1" />
+                                  View
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => openViewDetailsModal(file)}
+                                >
+                                  <MessageSquare className="h-4 w-4 mr-1" />
+                                  Details
+                                </Button>
+                                {isImageFile(file) && (
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => openAnnotationModal(file)}
+                                  >
+                                    <PenTool className="h-4 w-4 mr-1" />
+                                    Annotate
+                                  </Button>
+                                )}
+                              </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => window.open(file.url, '_blank')}
-                            >
-                              <Icons.ExternalLink />
-                            </Button>
+                          
+                          {/* File Info */}
+                          <div className="p-3">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm truncate" title={file.name}>
+                                  {file.name}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatFileSize(file.size)} • {new Date(file.uploadedAt).toLocaleDateString()}
+                                </p>
+                                {annotations[file.id] && annotations[file.id].length > 0 && (
+                                  <div className="mt-2 flex items-center gap-1">
+                                    <MessageSquare className="h-3 w-3 text-blue-500" />
+                                    <span className="text-xs text-blue-500">
+                                      {annotations[file.id].length} annotation{annotations[file.id].length !== 1 ? 's' : ''}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => handleFileRemove(file.id)}
-                              className="text-destructive hover:text-destructive"
+                                className="text-destructive hover:text-destructive ml-2"
                             >
+                                <div className="h-4 w-4 flex items-center justify-center">
                               <Icons.Trash />
+                                </div>
                             </Button>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -550,7 +919,7 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                   <div>
                     <Label className="text-sm font-medium">Client</Label>
                     <p className="text-sm text-muted-foreground">
-                      {clients.find(c => c.id === project.clientId)?.name}
+                      {clientsLoading ? 'Loading...' : (Array.isArray(clients) ? clients.find(c => c.id === project.clientId)?.name : 'Unknown Client') || 'Unknown Client'}
                     </p>
                   </div>
                   
@@ -620,6 +989,253 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
           </div>
         </div>
       </main>
+
+      {/* Chat Messages */}
+      {chatMessages.length > 0 && (
+        <div className="fixed bottom-4 right-4 w-80 max-h-96 bg-card border rounded-lg shadow-lg z-50">
+          <div className="p-4 border-b">
+            <h3 className="font-medium flex items-center gap-2">
+              <MessageSquare className="h-4 w-4" />
+              Real-time Updates
+            </h3>
+          </div>
+          <div className="p-4 max-h-80 overflow-y-auto">
+            <div className="space-y-3">
+              {chatMessages.slice(-10).map((message) => (
+                <div key={message.id} className={`p-3 rounded-lg text-sm ${
+                  message.type === 'status' 
+                    ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800' 
+                    : 'bg-gray-50 dark:bg-gray-800'
+                }`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Badge variant={message.type === 'status' ? 'default' : 'secondary'} className="text-xs">
+                      {message.type === 'status' ? 'Status' : 'Annotation'}
+                    </Badge>
+                    {message.senderName && (
+                      <div className="flex items-center gap-1">
+                        <div className={`w-2 h-2 rounded-full ${
+                          message.isFromAdmin ? 'bg-blue-500' : 'bg-green-500'
+                        }`}></div>
+                        <span className="text-xs font-medium text-foreground">
+                          {message.isFromAdmin ? 'You' : message.senderName}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {message.isFromAdmin ? 'sent' : 'received'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-sm">{message.message}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {new Date(message.timestamp).toLocaleString()}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Annotation Modal */}
+      <Dialog open={showAnnotationModal} onOpenChange={setShowAnnotationModal}>
+        <DialogContent className="max-w-5xl max-h-[95vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <PenTool className="h-5 w-5" />
+              Annotate Image
+            </DialogTitle>
+            <DialogDescription>
+              Add annotations and feedback for {selectedImage?.name}
+            </DialogDescription>
+          </DialogHeader> 
+          
+          {selectedImage && (
+            <div className="flex-1 flex flex-col space-y-4 min-h-0">
+              {/* Image Display */}
+              <div className="relative bg-muted rounded-lg overflow-hidden flex-shrink-0">
+                <img
+                  src={selectedImage.url}
+                  alt={selectedImage.name}
+                  className="w-full h-auto max-h-[300px] object-contain"
+                />
+              </div>
+              
+              {/* Annotations List with Scroll */}
+              <div className="flex-1 flex flex-col space-y-3 min-h-0">
+                <h4 className="font-medium flex-shrink-0">Annotations</h4>
+                {annotations[selectedImage.id] && annotations[selectedImage.id].length > 0 ? (
+                  <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+                    {annotations[selectedImage.id].map((annotation, index) => (
+                      <div key={index} className="flex items-start gap-2 p-3 bg-muted rounded-lg">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                            <span className="text-xs font-medium text-blue-600">Admin User</span>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date().toLocaleTimeString()}
+                            </span>
+                          </div>
+                          <p className="text-sm">{annotation}</p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeAnnotation(selectedImage.id, index)}
+                          className="text-destructive hover:text-destructive flex-shrink-0"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center">
+                    <p className="text-sm text-muted-foreground">No annotations yet</p>
+                  </div>
+                )}
+              </div>
+              
+              {/* Add New Annotation - Fixed at bottom */}
+              <div className="space-y-2 flex-shrink-0 border-t pt-4">
+                <Label htmlFor="newAnnotation">Add Annotation</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="newAnnotation"
+                    placeholder="Enter your annotation or feedback..."
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                        addAnnotation(selectedImage.id, e.currentTarget.value.trim())
+                        e.currentTarget.value = ''
+                      }
+                    }}
+                  />
+                  <Button
+                    onClick={(e) => {
+                      const input = e.currentTarget.previousElementSibling as HTMLInputElement
+                      if (input.value.trim()) {
+                        addAnnotation(selectedImage.id, input.value.trim())
+                        input.value = ''
+                      }
+                    }}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAnnotationModal(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Details Modal */}
+      <Dialog open={showViewDetailsModal} onOpenChange={setShowViewDetailsModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5" />
+              File Details & Annotations
+            </DialogTitle>
+            <DialogDescription>
+              View file details and annotations for {selectedFileForDetails?.name}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedFileForDetails && (
+            <div className="space-y-4">
+              {/* File Preview */}
+              <div className="relative bg-muted rounded-lg overflow-hidden">
+                {isImageFile(selectedFileForDetails) ? (
+                  <img
+                    src={selectedFileForDetails.url}
+                    alt={selectedFileForDetails.name}
+                    className="w-full h-auto max-h-[300px] object-contain"
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-48">
+                    <div className="h-16 w-16 text-muted-foreground flex items-center justify-center">
+                      <Icons.FolderOpen />
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* File Information */}
+              <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
+                <div>
+                  <Label className="text-sm font-medium">File Name</Label>
+                  <p className="text-sm text-muted-foreground">{selectedFileForDetails.name}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">File Size</Label>
+                  <p className="text-sm text-muted-foreground">{formatFileSize(selectedFileForDetails.size)}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Upload Date</Label>
+                  <p className="text-sm text-muted-foreground">{new Date(selectedFileForDetails.uploadedAt).toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">File Type</Label>
+                  <p className="text-sm text-muted-foreground">{selectedFileForDetails.type}</p>
+                </div>
+              </div>
+              
+              {/* Annotations List */}
+              <div className="space-y-3">
+                <h4 className="font-medium">Annotations & Feedback</h4>
+                {annotations[selectedFileForDetails.id] && annotations[selectedFileForDetails.id].length > 0 ? (
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {annotations[selectedFileForDetails.id].map((annotation, index) => (
+                      <div key={index} className="flex items-start gap-2 p-3 bg-muted rounded-lg">
+                        <div className="flex-1">
+                          <p className="text-sm">{annotation}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Added {new Date().toLocaleDateString()}
+                          </p>
+                        </div>
+                        {/* <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeAnnotation(selectedFileForDetails.id, index)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button> */}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p>No annotations yet</p>
+                    <p className="text-sm">Add annotations using the "Annotate" button</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowViewDetailsModal(false)}>
+              Close
+            </Button>
+            {selectedFileForDetails && isImageFile(selectedFileForDetails) && (
+              <Button onClick={() => {
+                setShowViewDetailsModal(false)
+                openAnnotationModal(selectedFileForDetails)
+              }}>
+                <PenTool className="h-4 w-4 mr-2" />
+                Add Annotation
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

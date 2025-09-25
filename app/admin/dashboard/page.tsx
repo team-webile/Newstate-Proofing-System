@@ -8,50 +8,48 @@ import { Icons } from "@/components/icons"
 import { Input } from "@/components/ui/input"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { LogoutButton } from "@/components/logout-button"
+import { useDashboardData } from "@/lib/use-dashboard-data"
+import { DashboardSkeleton } from "@/components/dashboard-skeleton"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useToast } from "@/hooks/use-toast"
 
 export default function AdminDashboard() {
-  // Mock data - will be replaced with real data later
-  const stats = {
-    totalClients: 24,
-    totalProjects: 156,
-    pendingProjects: 8,
-    activeProjects: 12,
+  const { data, loading, error, refreshData } = useDashboardData()
+  const { toast } = useToast()
+ 
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background mx-16 flex items-center justify-center">
+        <div className="text-center">
+          <Alert>
+            <Icons.AlertCircle />
+            <AlertDescription>
+              {error}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="ml-4"
+                onClick={refreshData}
+              >
+                Try Again
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
+      </div>
+    )
   }
 
-  const recentProjects = [
-    {
-      id: "16994",
-      name: "Atlantic Spa",
-      client: "Atlantic Wellness",
-      status: "pending",
-      daysAgo: 2,
-      thumbnail: "https://placehold.co/200x150/1e40af/ffffff?text=Atlantic+Spa",
-    },
-    {
-      id: "18395",
-      name: "Provectus",
-      client: "Provectus Corp",
-      status: "approved",
-      daysAgo: 1,
-      thumbnail: "https://placehold.co/200x150/059669/ffffff?text=Provectus",
-    },
-    {
-      id: "18996",
-      name: "Chiropractic",
-      client: "Health Plus",
-      status: "revisions",
-      daysAgo: 3,
-      thumbnail: "https://placehold.co/200x150/ea580c/ffffff?text=Chiropractic",
-    },
-    {
-      id: "16997",
-      name: "Woody's",
-      client: "Woody's Restaurant",
-      status: "pending",
-      daysAgo: 1,
-      thumbnail: "https://placehold.co/200x150/1e40af/ffffff?text=Woodys",
-    },
-  ]
+  // Use real data or fallback to empty state
+  const stats = data?.stats || {
+    totalClients: 0,
+    totalProjects: 0,
+    pendingProjects: 0,
+    activeProjects: 0,
+  }
+
+  const recentProjects = data?.recentProjects || []
+  const systemStatus = data?.systemStatus
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -73,22 +71,23 @@ export default function AdminDashboard() {
         <div className="flex h-16 items-center justify-between px-6">
           <Logo />
           <div className="flex items-center gap-4">
-            <div className="relative">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                <Icons.Search />
-              </div>
-              <Input placeholder="Search projects..." className="w-64 pl-9 bg-input border-border" />
-            </div>
+             
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={refreshData}
+              disabled={loading}
+            >
+              <Icons.Refresh />
+            </Button>
             <ThemeToggle />
             <LogoutButton />
-            <Button variant="ghost" size="sm">
-              <Icons.Settings />
-            </Button>
+             
           </div>
         </div>
       </header>
-
-      {/* Main Content */}
+   {loading && <DashboardSkeleton />}
+   {!loading && (
       <main className="p-6 mx-16">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground mb-2">Dashboard</h1>
@@ -208,10 +207,21 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-green-500"></div>
-              <span className="text-sm text-card-foreground">All systems operational</span>
+              <div className={`h-2 w-2 rounded-full ${
+                systemStatus?.status === 'operational' ? 'bg-green-500' :
+                systemStatus?.status === 'warning' ? 'bg-yellow-500' :
+                'bg-red-500'
+              }`}></div>
+              <span className="text-sm text-card-foreground">
+                {systemStatus?.message || 'Checking system status...'}
+              </span>
             </div>
-            <div className="mt-2 text-xs text-muted-foreground">Last updated: 2 minutes ago</div>
+            <div className="mt-2 text-xs text-muted-foreground">
+              Last updated: {systemStatus?.lastUpdated ? 
+                new Date(systemStatus.lastUpdated).toLocaleString() : 
+                'Unknown'
+              }
+            </div>
           </CardContent>
         </Card>
 
@@ -224,40 +234,53 @@ export default function AdminDashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {recentProjects.map((project) => (
-                <div
-                  key={project.id}
-                  className="flex items-center justify-between p-4 rounded-lg border border-border bg-accent/50"
+            {recentProjects.length > 0 ? (
+              <div className="space-y-4">
+                {recentProjects.map((project) => (
+                  <div
+                    key={project.id}
+                    className="flex items-center justify-between p-4 rounded-lg border border-border bg-accent/50"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="h-12 w-16 rounded-lg overflow-hidden bg-muted flex items-center justify-center">
+                        <img
+                          src={project.thumbnail || "/placeholder.svg"}
+                          alt={project.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div>
+                        <h4 className="font-medium text-card-foreground">
+                          {project.name}
+                        </h4>
+                        <p className="text-sm text-muted-foreground">{project.client}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <Badge className={getStatusColor(project.status)}>{project.status}</Badge>
+                      <span className="text-sm text-muted-foreground">{project.daysAgo}d ago</span>
+                      <Button variant="ghost" size="sm">
+                        View
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Icons.FolderOpen />
+                <p className="text-muted-foreground">No projects found</p>
+                <Button 
+                  onClick={() => (window.location.href = "/admin/projects/new")}
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="h-12 w-16 rounded-lg overflow-hidden bg-muted flex items-center justify-center">
-                      <img
-                        src={project.thumbnail || "/placeholder.svg"}
-                        alt={project.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-card-foreground">
-                        {project.id} - {project.name}
-                      </h4>
-                      <p className="text-sm text-muted-foreground">{project.client}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <Badge className={getStatusColor(project.status)}>{project.status}</Badge>
-                    <span className="text-sm text-muted-foreground">{project.daysAgo}d ago</span>
-                    <Button variant="ghost" size="sm">
-                      View
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                  Create Your First Project
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </main>
+      )}
     </div>
   )
 }

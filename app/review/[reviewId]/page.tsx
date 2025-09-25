@@ -9,6 +9,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Icons } from "@/components/icons"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { PenTool, X, CheckCircle, AlertCircle, MessageCircle } from "lucide-react"
+import ImageAnnotation from "@/components/ImageAnnotation"
+import { useRealtimeComments } from "@/hooks/use-realtime-comments"
+import io from 'socket.io-client'
 import {
   Dialog,
   DialogContent,
@@ -60,7 +64,7 @@ interface Version {
   id: string
   version: string
   files: ProjectFile[]
-  status: "draft" | "pending_review" | "approved" | "rejected"
+  status: "draft" | "pending_review" | "approved" | "rejected" | "in_revision"
   createdAt: string
   annotations: Annotation[]
   revisionNotes?: string
@@ -89,59 +93,13 @@ interface ReviewPageProps {
 export default function ReviewPage({ params }: ReviewPageProps) {
   const [annotations, setAnnotations] = useState<Annotation[]>([])
   const [revisions, setRevisions] = useState<Revision[]>([])
-  const [versions, setVersions] = useState<Version[]>([
-    {
-      id: "1",
-      version: "V1",
-      files: [
-        {
-          id: "1",
-          name: "spa-logo-design.psd",
-          url: "/professional-tent-canopy-design-with-river-s-life-.jpg",
-          type: "image/psd",
-          size: 2048576,
-          uploadedAt: "2024-01-15T10:00:00Z",
-        },
-        {
-          id: "2",
-          name: "interior-mockup.jpg",
-          url: "/blue-tent-canopy-design.jpg",
-          type: "image/jpeg",
-          size: 1024768,
-          uploadedAt: "2024-01-15T11:30:00Z",
-        },
-      ],
-      status: "pending_review",
-      createdAt: "2024-01-10T10:00:00Z",
-      annotations: [],
-    },
-    {
-      id: "2", 
-      version: "V2",
-      files: [
-        {
-          id: "3",
-          name: "spa-logo-design-v2.psd",
-          url: "/professional-tent-canopy-design-with-river-s-life-.jpg",
-          type: "image/psd",
-          size: 2048576,
-          uploadedAt: "2024-01-12T14:30:00Z",
-        },
-        {
-          id: "4",
-          name: "interior-mockup-v2.jpg",
-          url: "/blue-tent-canopy-design.jpg",
-          type: "image/jpeg",
-          size: 1024768,
-          uploadedAt: "2024-01-12T15:00:00Z",
-        },
-      ],
-      status: "draft",
-      createdAt: "2024-01-12T14:30:00Z",
-      annotations: [],
-    }
-  ])
-  const [currentVersion, setCurrentVersion] = useState("V1")
+  const [fileAnnotations, setFileAnnotations] = useState<{ [key: string]: string[] }>({})
+  const [showAnnotationModal, setShowAnnotationModal] = useState(false)
+  const [selectedImage, setSelectedImage] = useState<ProjectFile | null>(null)
+  const [socket, setSocket] = useState<any>(null)
+  const [chatMessages, setChatMessages] = useState<Array<{id: string, type: 'annotation' | 'status', message: string, timestamp: string, addedBy?: string, senderName?: string, isFromClient?: boolean}>>([])
+  const [versions, setVersions] = useState<Version[]>([])
+  const [currentVersion, setCurrentVersion] = useState("")
   const [currentFile, setCurrentFile] = useState<string>("")
   const [newComment, setNewComment] = useState("")
   const [isAddingAnnotation, setIsAddingAnnotation] = useState(false)
@@ -153,22 +111,200 @@ export default function ReviewPage({ params }: ReviewPageProps) {
   const [revisionComments, setRevisionComments] = useState("")
   const [showVersionComparison, setShowVersionComparison] = useState(false)
   const [compareVersion, setCompareVersion] = useState("")
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [reviewData, setReviewData] = useState<any>(null)
   const imageRef = useRef<HTMLDivElement>(null)
-
-  // Mock data - will be replaced with real data fetching
-  const reviewData = {
-    id: params.reviewId,
-    projectName: "Atlantic Spa",
-    clientName: "Atlantic Wellness",
-    status: "pending",
-    description: "Spa branding and interior design concepts",
-    deadline: "2024-01-15",
-    notes: "Please review the design files and provide feedback. Click on any area of the design to add annotations.",
-    allowDownloads: true,
-  }
 
   const currentVersionData = versions.find(v => v.version === currentVersion)
   const currentFileData = currentVersionData?.files.find(f => f.id === currentFile) || currentVersionData?.files[0]
+
+  // Client user info - no authentication required
+  const currentUser = {
+    name: 'Client',
+    role: 'Client'
+  }
+
+  // Use real-time comments hook
+  const {
+    comments: realtimeComments,
+    annotations: realtimeAnnotations,
+    isLoading: commentsLoading,
+    error: commentsError,
+    isConnected,
+    addComment: addRealtimeComment,
+    addAnnotation: addRealtimeAnnotation,
+    resolveAnnotation: resolveRealtimeAnnotation,
+    updateElementStatus: updateRealtimeElementStatus
+  } = useRealtimeComments({
+    projectId: reviewData?.project?.id || '',
+    elementId: currentFileData?.id,
+    fileId: currentFileData?.id,
+    currentUser
+  })
+
+  // Fetch review data
+  const fetchReviewData = async () => {
+    try {
+      setIsLoading(true)
+      
+      // Check if we have a file parameter in URL
+      const urlParams = new URLSearchParams(window.location.search)
+      const fileId = urlParams.get('file')
+      
+      // First try to get the review
+      const reviewResponse = await fetch(`/api/reviews/${params.reviewId}`)
+      const reviewData = await reviewResponse.json()
+      
+      if (reviewData.status === 'success') {
+        setReviewData(reviewData.data)
+        
+        // Transform elements to versions
+        if (reviewData.data.elements) {
+          const transformedVersions = reviewData.data.elements.map((element: any, index: number) => ({
+            id: element.id,
+            version: `V${index + 1}`,
+            files: element.versions?.map((version: any) => ({
+              id: version.id,
+              name: version.fileName || element.elementName,
+              url: version.filePath,
+              type: version.fileType || 'image/jpeg',
+              size: version.fileSize || 0,
+              uploadedAt: version.createdAt
+            })) || [],
+            status: (element.status?.toLowerCase() as any) || 'pending_review',
+            createdAt: element.createdAt,
+            annotations: []
+          }))
+          setVersions(transformedVersions as any)
+          
+          // Set first version as current
+          if (transformedVersions.length > 0) {
+            setCurrentVersion(transformedVersions[0].version)
+            
+            // If we have a file ID from URL, try to select that file
+            if (fileId) {
+              // Find the file in any version
+              for (const version of transformedVersions) {
+                const file = version.files.find((f: any) => f.id === fileId)
+                if (file) {
+                  setCurrentFile(fileId)
+                  break
+                }
+              }
+            } else if (transformedVersions[0].files.length > 0) {
+              setCurrentFile(transformedVersions[0].files[0].id)
+            }
+          }
+        }
+      } else if (reviewData.status === 'error' && reviewData.message === 'Review not found') {
+        // If review not found, get project data directly
+        const projectId = params.reviewId.replace('review-', '')
+        await fetchProjectData(projectId)
+      } else {
+        setError(reviewData.message || 'Failed to load review data')
+      }
+    } catch (error) {
+      console.error('Error fetching review data:', error)
+      setError('Failed to load review data')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Fetch project data directly if review doesn't exist
+  const fetchProjectData = async (projectId: string) => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}`)
+      const data = await response.json()
+      
+      if (data.status === 'success') {
+        // Create mock review data from project
+        const mockReviewData = {
+          id: `review-${projectId}`,
+          reviewName: data.data.title,
+          description: data.data.description,
+          status: 'IN_PROGRESS',
+          project: data.data,
+          elements: []
+        }
+        
+        setReviewData(mockReviewData)
+        
+        // Create mock versions from project files if any
+        const mockVersions = [{
+          id: '1',
+          version: 'V1',
+          files: [],
+          status: 'pending_review',
+          createdAt: data.data.createdAt,
+          annotations: []
+        }]
+        
+        setVersions(mockVersions as any)
+        setCurrentVersion('V1')
+      } else {
+        setError('Failed to load project data')
+      }
+    } catch (error) {
+      console.error('Error fetching project data:', error)
+      setError('Failed to load project data')
+    }
+  }
+
+  // Create review for project if it doesn't exist
+  const createReviewForProject = async (projectId: string) => {
+    try {
+      const response = await fetch('/api/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Project Review',
+          description: 'Review for project',
+          projectId: projectId
+        })
+      })
+      
+      const data = await response.json()
+      
+      if (data.status === 'success') {
+        // Retry fetching the review data
+        await fetchReviewData()
+      } else {
+        setError('Failed to create review')
+      }
+    } catch (error) {
+      console.error('Error creating review:', error)
+      setError('Failed to create review')
+    }
+  }
+
+  // Fetch annotations
+  const fetchAnnotations = async () => {
+    try {
+      const response = await fetch(`/api/annotations?projectId=${params.reviewId}`)
+      const data = await response.json()
+      
+      if (data.status === 'success') {
+        // Group annotations by fileId
+        const annotationsByFile: { [key: string]: string[] } = {}
+        data.data.forEach((annotation: any) => {
+          if (!annotationsByFile[annotation.fileId]) {
+            annotationsByFile[annotation.fileId] = []
+          }
+          annotationsByFile[annotation.fileId].push(annotation.content)
+        })
+        setFileAnnotations(annotationsByFile)
+      }
+    } catch (error) {
+      console.error('Error fetching annotations:', error)
+    }
+  }
+
+  useEffect(() => {
+    fetchReviewData()
+    fetchAnnotations()
+  }, [params.reviewId])
 
   useEffect(() => {
     if (currentVersionData?.files.length && !currentFile) {
@@ -343,6 +479,147 @@ export default function ReviewPage({ params }: ReviewPageProps) {
 
   const currentFileAnnotations = annotations.filter(a => a.fileId === currentFile)
 
+  // Initialize Socket.io
+  useEffect(() => {
+    const newSocket = io('http://localhost:3000', {
+      path: '/api/socketio',
+      transports: ['websocket', 'polling']
+    })
+    
+    setSocket(newSocket)
+    
+    // Join project room
+    newSocket.emit('join-project', params.reviewId)
+    
+    // Listen for annotation updates
+    newSocket.on('annotationAdded', (data: { fileId: string, annotation: string, timestamp: string, addedBy?: string, addedByName?: string }) => {
+      setFileAnnotations(prev => ({
+        ...prev,
+        [data.fileId]: [...(prev[data.fileId] || []), data.annotation]
+      }))
+      
+      // Add to chat messages with sender/receiver info
+      const senderName = data.addedByName || data.addedBy || 'Unknown'
+      const isFromClient = senderName.includes('Client') || senderName === reviewData?.project?.client?.name
+      const messageText = isFromClient 
+        ? `You sent: "${data.annotation}"`
+        : `Received from ${senderName}: "${data.annotation}"`
+      
+      setChatMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        type: 'annotation',
+        message: messageText,
+        timestamp: data.timestamp,
+        addedBy: senderName,
+        senderName: senderName,
+        isFromClient: isFromClient
+      }])
+    })
+    
+    return () => {
+      newSocket.emit('leave-project', params.reviewId)
+      newSocket.close()
+    }
+  }, [params.reviewId])
+
+  // Helper functions
+  const isImageFile = (file: ProjectFile) => {
+    return file.type.startsWith('image/')
+  }
+
+  const openAnnotationModal = (file: ProjectFile) => {
+    setSelectedImage(file)
+    setShowAnnotationModal(true)
+  }
+
+  const addAnnotation = async (fileId: string, annotation: string) => {
+    if (!annotation.trim()) return
+    
+    try {
+      // Get current client info
+      const currentClient = {
+        name: reviewData?.project?.client?.name || 'Client',
+        role: 'Client'
+      }
+      
+      // Save to database
+      const response = await fetch('/api/annotations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: annotation,
+          fileId,
+          projectId: params.reviewId,
+          addedBy: currentClient.role,
+          addedByName: currentClient.name
+        })
+      })
+      
+      const data = await response.json()
+      
+      if (data.status === 'success') {
+        // Update local state
+        setFileAnnotations(prev => ({
+          ...prev,
+          [fileId]: [...(prev[fileId] || []), annotation]
+        }))
+        
+        // Emit to socket
+        if (socket && params.reviewId) {
+          socket.emit('addAnnotation', {
+            projectId: params.reviewId,
+            fileId,
+            annotation,
+            addedBy: currentClient.role,
+            addedByName: currentClient.name
+          })
+        }
+      } else {
+        console.error('Failed to save annotation:', data.message)
+        alert('Failed to save annotation. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error saving annotation:', error)
+      alert('Failed to save annotation. Please try again.')
+    }
+  }
+
+  const removeAnnotation = (fileId: string, index: number) => {
+    setFileAnnotations(prev => ({
+      ...prev,
+      [fileId]: prev[fileId]?.filter((_, i) => i !== index) || []
+    }))
+  }
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading review...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Error state
+  if (error || !reviewData) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-foreground mb-2">Review Not Found</h1>
+          <p className="text-muted-foreground mb-4">
+            {error || 'The review you are looking for does not exist or you do not have access to it.'}
+          </p>
+          <Button onClick={() => window.history.back()}>
+            Go Back
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -359,16 +636,22 @@ export default function ReviewPage({ params }: ReviewPageProps) {
               <span className="ml-2">Back to Projects</span>
             </Button>
             <div>
-              <h1 className="text-xl font-semibold">{reviewData.projectName}</h1>
-              <p className="text-sm text-muted-foreground">{reviewData.clientName}</p>
+              <h1 className="text-xl font-semibold">{reviewData.reviewName || reviewData.project?.title}</h1>
+              <p className="text-sm te xt-muted-foreground">Client Review Portal</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
+            <Badge variant="outline">
+              Client Access
+            </Badge>
             <Badge
-              variant={reviewData.status === "approved" ? "default" : "secondary"}
+              variant={reviewData.status === "APPROVED" ? "default" : "secondary"}
               className="capitalize"
             >
-              {reviewData.status}
+              {reviewData.status?.toLowerCase()}
+            </Badge>
+            <Badge variant={isConnected ? "default" : "secondary"}>
+              {isConnected ? "Live" : "Offline"}
             </Badge>
             <Badge variant="outline">
               {currentVersion}
@@ -452,24 +735,38 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {currentVersionData.files.map((file) => (
-                        <Button
-                          key={file.id}
-                          variant={currentFile === file.id ? "default" : "outline"}
-                          className="h-auto p-4 justify-start"
-                          onClick={() => handleFileChange(file.id)}
-                        >
-                          <div className="flex items-center gap-3 w-full">
+                        <div key={file.id} className="relative">
+                          <Button
+                            variant={currentFile === file.id ? "default" : "outline"}
+                            className="h-auto p-4 justify-start w-full"
+                            onClick={() => handleFileChange(file.id)}
+                          >
+                            <div className="flex items-center gap-3 w-full">
                             <div className="w-8 h-8 bg-muted rounded flex items-center justify-center">
                               <Icons.FolderOpen />
                             </div>
-                            <div className="text-left flex-1">
-                              <p className="font-medium">{file.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {formatFileSize(file.size)}
-                              </p>
+                              <div className="text-left flex-1">
+                                <p className="font-medium">{file.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatFileSize(file.size)}
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                        </Button>
+                          </Button>
+                          {isImageFile(file) && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="absolute top-2 right-2"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                openAnnotationModal(file)
+                              }}
+                            >
+                              <PenTool className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       ))}
                     </div>
                   </CardContent>
@@ -482,125 +779,112 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                   <CardTitle className="flex items-center justify-between">
                     Design Review - {currentFileData?.name || "No file selected"}
                     <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setIsAddingAnnotation(!isAddingAnnotation)}
-                        className={isAddingAnnotation ? "bg-primary text-primary-foreground" : ""}
-                      >
-                        <Icons.Plus />
-                        {isAddingAnnotation ? "Cancel Annotation" : "Add Annotation"}
-                      </Button>
+                      <Badge variant={isConnected ? "default" : "secondary"}>
+                        {isConnected ? "Connected" : "Disconnected"}
+                      </Badge>
                     </div>
                   </CardTitle>
                   <CardDescription>
-                    {isAddingAnnotation
-                      ? "Click anywhere on the design to add an annotation"
-                      : reviewData.notes}
+                    Click anywhere on the design to add annotations and feedback
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="relative">
-                    <div
-                      ref={imageRef}
-                      className="relative cursor-crosshair bg-muted rounded-lg overflow-hidden"
-                      onClick={handleImageClick}
-                    >
-                      {currentFileData ? (
-                        <img
-                          src={currentFileData.url}
-                          alt={currentFileData.name}
-                          className="w-full h-auto"
-                          draggable={false}
-                        />
-                      ) : (
-                        <div className="w-full h-64 flex items-center justify-center text-muted-foreground">
-                          <div className="text-center">
-                            <Icons.FolderOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                            <p>No file selected</p>
-                          </div>
+                  {currentFileData && isImageFile(currentFileData) ? (
+                    <ImageAnnotation
+                      imageUrl={currentFileData.url}
+                      imageAlt={currentFileData.name}
+                      fileId={currentFileData.id}
+                      projectId={reviewData?.project?.id || ''}
+                      annotations={realtimeAnnotations}
+                      onAnnotationAdd={addRealtimeAnnotation}
+                      onAnnotationResolve={resolveRealtimeAnnotation}
+                      isAdmin={false}
+                      currentUser={currentUser}
+                    />
+                  ) : currentFileData ? (
+                    <div className="relative bg-muted rounded-lg overflow-hidden border-2 border-border">
+                      <div className="w-full h-64 flex items-center justify-center text-muted-foreground">
+                        <div className="text-center">
+                          <Icons.FolderOpen />
+                          <p className="text-lg font-medium">{currentFileData.name}</p>
+                          <p className="text-sm">This file type cannot be annotated</p>
                         </div>
-                      )}
-                      
-                      {/* Render annotations for current file */}
-                      {currentFileAnnotations.map((annotation) => (
-                        <div
-                          key={annotation.id}
-                          className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer"
-                          style={{
-                            left: `${annotation.x}%`,
-                            top: `${annotation.y}%`,
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setSelectedAnnotation(annotation)
-                          }}
-                        >
-                          <div
-                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                              annotation.resolved
-                                ? "bg-green-500 border-green-600"
-                                : "bg-red-500 border-red-600"
-                            }`}
-                          >
-                            <Icons.MessageCircle />
-                          </div>
-                        </div>
-                      ))}
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="w-full h-64 flex items-center justify-center text-muted-foreground">
+                      <div className="text-center">
+                        <Icons.FolderOpen />
+                        <p className="text-lg font-medium">No file selected</p>
+                        <p className="text-sm">Choose a file from the list above to start reviewing</p>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
-              {/* Annotations List */}
-              {currentFileAnnotations.length > 0 && (
+              {/* Comments & Annotations */}
+              {(realtimeComments.length > 0 || realtimeAnnotations.length > 0) && (
                 <Card className="mt-6">
                   <CardHeader>
-                    <CardTitle>Annotations ({currentFileAnnotations.length})</CardTitle>
+                    <CardTitle className="flex items-center gap-2">
+                      <MessageCircle className="h-5 w-5" />
+                      Comments & Annotations ({realtimeComments.length + realtimeAnnotations.length})
+                    </CardTitle>
+                    <CardDescription>All feedback and annotations for this file</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {currentFileAnnotations.map((annotation) => (
-                        <div
-                          key={annotation.id}
-                          className={`p-4 border rounded-lg ${
-                            annotation.resolved ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"
-                          }`}
-                        >
+                      {/* Comments */}
+                      {realtimeComments.map((comment) => (
+                        <div key={comment.id} className="p-4 border rounded-lg">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-2">
-                                <div
-                                  className={`w-3 h-3 rounded-full ${
-                                    annotation.resolved ? "bg-green-500" : "bg-red-500"
-                                  }`}
-                                />
-                                <span className="text-sm text-muted-foreground">
-                                  Position: {annotation.x.toFixed(1)}%, {annotation.y.toFixed(1)}%
-                                </span>
-                                <span className="text-sm text-muted-foreground">
-                                  {new Date(annotation.timestamp).toLocaleString()}
+                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                <span className="text-sm font-medium">{comment.userName}</span>
+                                <Badge variant="secondary" className="text-xs">
+                                  {comment.type}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(comment.createdAt).toLocaleString()}
                                 </span>
                               </div>
-                              {annotation.comment ? (
-                                <p className="text-sm">{annotation.comment}</p>
-                              ) : (
-                                <p className="text-sm text-muted-foreground italic">
-                                  Click to add annotation
+                              <p className="text-sm">{comment.commentText}</p>
+                              {comment.coordinates && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Position: {comment.coordinates}
                                 </p>
                               )}
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleAnnotationResolve(annotation.id)}
-                            >
-                              {annotation.resolved ? (
-                                <Icons.CheckCircle />
-                              ) : (
-                                <Icons.AlertCircle />
-                              )}
-                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                      
+                      {/* Annotations */}
+                      {realtimeAnnotations.map((annotation) => (
+                        <div key={annotation.id} className="p-4 border rounded-lg">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className={`w-3 h-3 rounded-full ${
+                                  annotation.resolved ? "bg-green-500" : "bg-red-500"
+                                }`} />
+                                <span className="text-sm font-medium">
+                                  {(annotation as any).addedByName || (annotation as any).addedBy || 'Unknown'}
+                                </span>
+                                <Badge variant={annotation.resolved ? "default" : "destructive"} className="text-xs">
+                                  {annotation.resolved ? "Resolved" : "Pending"}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(annotation.timestamp).toLocaleString()}
+                                </span>
+                              </div>
+                              <p className="text-sm">{annotation.comment}</p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Position: {annotation.x.toFixed(1)}%, {annotation.y.toFixed(1)}%
+                              </p>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -663,7 +947,13 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                                   Requested by {revision.requestedBy}
                                 </span>
                                 <span className="text-sm text-muted-foreground">
-                                  {new Date(revision.requestedAt).toLocaleString()}
+                                  {new Date(revision.requestedAt).toLocaleString('en-US', {
+                                    year: 'numeric',
+                                    month: '2-digit',
+                                    day: '2-digit',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
                                 </span>
                               </div>
                               <p className="text-sm">{revision.comments}</p>
@@ -674,7 +964,13 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                               )}
                               {revision.completedAt && (
                                 <p className="text-xs text-muted-foreground mt-1">
-                                  Completed: {new Date(revision.completedAt).toLocaleString()}
+                                  Completed: {new Date(revision.completedAt).toLocaleString('en-US', {
+                                    year: 'numeric',
+                                    month: '2-digit',
+                                    day: '2-digit',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
                                 </p>
                               )}
                             </div>
@@ -697,11 +993,11 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                 <CardContent className="space-y-4">
                   <div>
                     <Label className="text-sm font-medium">Project Name</Label>
-                    <p className="text-sm text-muted-foreground">{reviewData.projectName}</p>
+                    <p className="text-sm text-muted-foreground">{reviewData.project?.title || reviewData.reviewName}</p>
                   </div>
                   <div>
                     <Label className="text-sm font-medium">Client</Label>
-                    <p className="text-sm text-muted-foreground">{reviewData.clientName}</p>
+                    <p className="text-sm text-muted-foreground">{reviewData.project?.client?.name}</p>
                   </div>
                   <div>
                     <Label className="text-sm font-medium">Current Version</Label>
@@ -728,16 +1024,30 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                     </Badge>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium">Deadline</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {new Date(reviewData.deadline).toLocaleDateString()}
-                    </p>
+                    <Label className="text-sm font-medium">Review Status</Label>
+                    <Badge
+                      variant={
+                        reviewData.status === "APPROVED" 
+                          ? "default" 
+                          : reviewData.status === "REJECTED"
+                          ? "destructive"
+                          : reviewData.status === "IN_PROGRESS"
+                          ? "secondary"
+                          : "outline"
+                      }
+                    >
+                      {reviewData.status?.toLowerCase()}
+                    </Badge>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium">Downloads</Label>
-                    <Badge variant={reviewData.allowDownloads ? "default" : "secondary"}>
-                      {reviewData.allowDownloads ? "Allowed" : "Disabled"}
-                    </Badge>
+                    <Label className="text-sm font-medium">Created</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {new Date(reviewData.createdAt).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit'
+                      })}
+                    </p>
                   </div>
                 </CardContent>
               </Card>
@@ -946,6 +1256,105 @@ export default function ReviewPage({ params }: ReviewPageProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Annotation Modal */}
+      <Dialog open={showAnnotationModal} onOpenChange={setShowAnnotationModal}>
+        <DialogContent className="max-w-5xl max-h-[95vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <PenTool className="h-5 w-5" />
+              Annotate Image
+            </DialogTitle>
+            <DialogDescription>
+              Add annotations and feedback for {selectedImage?.name}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedImage && (
+            <div className="flex-1 flex flex-col space-y-4 min-h-0">
+              {/* Image Display */}
+              <div className="relative bg-muted rounded-lg overflow-hidden flex-shrink-0">
+                <img 
+                  src={selectedImage.url}
+                  alt={selectedImage.name}
+                  className="w-full h-auto max-h-[300px] object-contain"
+                />
+              </div>
+              
+              {/* Annotations List with Scroll */}
+              <div className="flex-1 flex flex-col space-y-3 min-h-0">
+                <h4 className="font-medium flex-shrink-0">Annotations</h4>
+                {fileAnnotations[selectedImage.id] && fileAnnotations[selectedImage.id].length > 0 ? (
+                  <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+                    {fileAnnotations[selectedImage.id].map((annotation, index) => (
+                      <div key={index} className="flex items-start gap-2 p-3 bg-muted rounded-lg">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                            <span className="text-xs font-medium text-green-600">
+                              {reviewData?.project?.client?.name || 'Client'}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date().toLocaleTimeString()}
+                            </span>
+                          </div>
+                          <p className="text-sm">{annotation}</p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeAnnotation(selectedImage.id, index)}
+                          className="text-destructive hover:text-destructive flex-shrink-0"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center">
+                    <p className="text-sm text-muted-foreground">No annotations yet</p>
+                  </div>
+                )}
+              </div>
+              
+              {/* Add New Annotation - Fixed at bottom */}
+              <div className="space-y-2 flex-shrink-0 border-t pt-4">
+                <Label htmlFor="newAnnotation">Add Annotation</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="newAnnotation"
+                    placeholder="Enter your annotation or feedback..."
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                        addAnnotation(selectedImage.id, e.currentTarget.value.trim())
+                        e.currentTarget.value = ''
+                      }
+                    }}
+                  />
+                  <Button
+                    onClick={(e) => {
+                      const input = e.currentTarget.previousElementSibling as HTMLInputElement
+                      if (input.value.trim()) {
+                        addAnnotation(selectedImage.id, input.value.trim())
+                        input.value = ''
+                      }
+                    }}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAnnotationModal(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

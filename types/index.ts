@@ -105,3 +105,27 @@ export interface CreateApprovalData {
   elementId?: string
   projectId?: string
 }
+
+export interface ThemeSettings {
+  themeMode: string
+  primaryColor?: string
+  secondaryColor?: string
+  accentColor?: string
+  borderRadius: string
+  fontFamily: string
+  logoUrl?: string
+  faviconUrl?: string
+  customCss?: string
+}
+
+export interface UpdateThemeData {
+  themeMode?: string
+  primaryColor?: string
+  secondaryColor?: string
+  accentColor?: string
+  borderRadius?: string
+  fontFamily?: string
+  logoUrl?: string
+  faviconUrl?: string
+  customCss?: string
+}

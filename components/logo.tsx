@@ -21,10 +21,7 @@ export function Logo({ className = "", size = "md" }: LogoProps) {
         height={40}
         className={sizeClasses[size]}
       />
-      <span className="text-xl font-bold text-foreground">
-        NEWSTATE
-        <span className="block text-xs font-normal text-muted-foreground tracking-wider">BRANDING CO.</span>
-      </span>
+   
     </div>
   )
 }

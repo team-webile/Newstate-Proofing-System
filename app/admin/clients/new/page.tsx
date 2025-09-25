@@ -1,53 +1,104 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Logo } from "@/components/logo"
-import { ArrowLeft, Save } from "lucide-react"
+import { Icons } from "@/components/icons"
+import { useToast } from "@/hooks/use-toast"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function NewClient() {
+  const router = useRouter()
+  const { toast } = useToast()
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  
   const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    company: "",
-    address: "",
-    notes: "",
+    name: '',
+    email: '',
+    phone: '',
+    company: '',
+    address: '',
+    notes: ''
   })
-  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsSubmitting(true)
+    
+    if (!formData.name || !formData.email) {
+      toast({
+        title: "Validation Error",
+        description: "Name and email are required fields",
+        variant: "destructive"
+      })
+      return
+    }
 
-    // TODO: Implement actual client creation
-    setTimeout(() => {
-      console.log("Creating client:", formData)
-      setIsSubmitting(false)
-      // Redirect to clients list or dashboard
-      window.location.href = "/admin/dashboard"
-    }, 1000)
+    try {
+      setSaving(true)
+      setError(null)
+      
+      const response = await fetch('/api/clients', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      })
+      
+      const data = await response.json()
+      
+      if (data.status === 'success') {
+        toast({
+          title: "Client Created",
+          description: "Client has been created successfully.",
+        })
+        router.push('/admin/clients')
+      } else {
+        toast({
+          title: "Error",
+          description: data.message || "Failed to create client",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create client",
+        variant: "destructive"
+      })
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }))
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background mx-16">
       {/* Header */}
       <header className="border-b border-border bg-card">
         <div className="flex h-16 items-center justify-between px-6">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => window.history.back()}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.back()}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <Icons.ArrowLeft />
+              <span className="ml-2">Back</span>
             </Button>
             <Logo />
           </div>
@@ -56,131 +107,117 @@ export default function NewClient() {
 
       {/* Main Content */}
       <main className="p-6">
-        <div className="max-w-2xl mx-auto">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-foreground mb-2">Add New Client</h1>
-            <p className="text-muted-foreground">Create a new client profile to start managing their projects</p>
-          </div>
-
-          <Card className="border-border bg-card">
-            <CardHeader>
-              <CardTitle className="text-card-foreground">Client Information</CardTitle>
-              <CardDescription className="text-muted-foreground">Enter the client's details below</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name" className="text-card-foreground">
-                      Client Name *
-                    </Label>
-                    <Input
-                      id="name"
-                      type="text"
-                      placeholder="John Doe"
-                      value={formData.name}
-                      onChange={(e) => handleInputChange("name", e.target.value)}
-                      required
-                      className="bg-input border-border text-foreground placeholder:text-muted-foreground"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="text-card-foreground">
-                      Email Address *
-                    </Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="john@example.com"
-                      value={formData.email}
-                      onChange={(e) => handleInputChange("email", e.target.value)}
-                      required
-                      className="bg-input border-border text-foreground placeholder:text-muted-foreground"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="phone" className="text-card-foreground">
-                      Phone Number
-                    </Label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="+1 (555) 123-4567"
-                      value={formData.phone}
-                      onChange={(e) => handleInputChange("phone", e.target.value)}
-                      className="bg-input border-border text-foreground placeholder:text-muted-foreground"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="company" className="text-card-foreground">
-                      Company Name
-                    </Label>
-                    <Input
-                      id="company"
-                      type="text"
-                      placeholder="Atlantic Wellness"
-                      value={formData.company}
-                      onChange={(e) => handleInputChange("company", e.target.value)}
-                      className="bg-input border-border text-foreground placeholder:text-muted-foreground"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="address" className="text-card-foreground">
-                    Address
-                  </Label>
-                  <Textarea
-                    id="address"
-                    placeholder="123 Main St, City, State 12345"
-                    value={formData.address}
-                    onChange={(e) => handleInputChange("address", e.target.value)}
-                    className="bg-input border-border text-foreground placeholder:text-muted-foreground"
-                    rows={3}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="notes" className="text-card-foreground">
-                    Notes
-                  </Label>
-                  <Textarea
-                    id="notes"
-                    placeholder="Additional notes about this client..."
-                    value={formData.notes}
-                    onChange={(e) => handleInputChange("notes", e.target.value)}
-                    className="bg-input border-border text-foreground placeholder:text-muted-foreground"
-                    rows={4}
-                  />
-                </div>
-
-                <div className="flex gap-4 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => window.history.back()}
-                    className="flex-1 border-border text-foreground"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
-                  >
-                    <Save className="h-4 w-4 mr-2" />
-                    {isSubmitting ? "Creating..." : "Create Client"}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-foreground mb-2">Add New Client</h1>
+          <p className="text-muted-foreground">Create a new client profile</p>
         </div>
+
+        <Card className="border-border bg-card">
+          <CardHeader>
+            <CardTitle>Client Information</CardTitle>
+            <CardDescription>
+              Enter the client's details and preferences
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Name *</Label>
+                  <Input
+                    id="name"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    placeholder="Client name"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email *</Label>
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    placeholder="client@example.com"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone</Label>
+                  <Input
+                    id="phone"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    placeholder="+1 (555) 123-4567"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company">Company</Label>
+                  <Input
+                    id="company"
+                    name="company"
+                    value={formData.company}
+                    onChange={handleInputChange}
+                    placeholder="Company name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="address">Address</Label>
+                  <Input
+                    id="address"
+                    name="address"
+                    value={formData.address}
+                    onChange={handleInputChange}
+                    placeholder="123 Main St, City, State"
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="notes">Notes</Label>
+                <Textarea
+                  id="notes"
+                  name="notes"
+                  value={formData.notes}
+                  onChange={handleInputChange}
+                  placeholder="Additional notes about the client..."
+                  rows={4}
+                />
+              </div>
+
+              <div className="flex items-center gap-4 pt-6">
+                <Button
+                  type="submit"
+                  disabled={saving}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  {saving ? (
+                    <>
+                      <Icons.Loader2 />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Icons.Save />
+                      <span className="ml-2">Create Client</span>
+                    </>
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => router.back()}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
       </main>
     </div>
   )

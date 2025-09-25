@@ -59,6 +59,42 @@ app.prepare().then(() => {
       console.log(`Client ${socket.id} joined element ${elementId}`)
     })
 
+    // Handle annotation additions
+    socket.on('addAnnotation', (data) => {
+      console.log('Annotation added:', data)
+      // Broadcast to all clients in the project room
+      socket.to(`project-${data.projectId}`).emit('annotationAdded', {
+        fileId: data.fileId,
+        annotation: data.annotation,
+        timestamp: new Date().toISOString(),
+        addedBy: data.addedBy || 'Admin',
+        addedByName: data.addedByName || data.addedBy || 'Unknown'
+      })
+    })
+
+    // Handle status changes
+    socket.on('statusChanged', (data) => {
+      console.log('Status changed:', data)
+      // Broadcast to all clients in the project room
+      socket.to(`project-${data.projectId}`).emit('statusChanged', {
+        status: data.status,
+        message: data.message,
+        timestamp: new Date().toISOString()
+      })
+    })
+
+    // Handle new comments
+    socket.on('newComment', (data) => {
+      console.log('New comment:', data)
+      // Broadcast to all clients in the project room
+      socket.to(`project-${data.projectId}`).emit('commentAdded', {
+        elementId: data.elementId,
+        comment: data.comment,
+        timestamp: new Date().toISOString(),
+        addedBy: data.addedBy || 'Admin'
+      })
+    })
+
     // Leave project room
     socket.on('leave-project', (projectId) => {
       socket.leave(`project-${projectId}`)

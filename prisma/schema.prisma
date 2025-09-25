@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -28,6 +28,11 @@ model Client {
   phone     String?
   company   String?
   address   String?
+  notes     String?   // Additional notes about the client
+  // Theme customization fields
+  logoUrl   String?   // Custom client logo
+  brandColor String?  // Client's brand color (hex)
+  themeMode  String   @default("system") // Client's preferred theme
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   projects  Project[]
@@ -45,7 +50,17 @@ model Project {
   userId          String
   clientId        String
   downloadEnabled Boolean       @default(true)
+  emailNotifications Boolean   @default(true)
+  lastActivity       DateTime  @default(now())
+  // Theme customization fields
+  primaryColor    String?       // Project-specific primary color
+  secondaryColor  String?       // Project-specific secondary color
+  accentColor     String?       // Project-specific accent color
+  customCss       String?       // Project-specific CSS overrides
+  logoUrl         String?       // Project-specific logo
+  themeMode       String        @default("system") // Project theme preference
   approvals       Approval[]
+  annotations     Annotation[]
   user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   client          Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
   reviews         Review[]
@@ -137,12 +152,37 @@ model Settings {
   approvalMessage  String   @default("Thank you for your approval!")
   signatureMessage String   @default("By signing below, I approve this design element.")
   companyName      String   @default("New State Branding")
+  // Theme customization fields
+  themeMode        String   @default("system") // "light", "dark", "system"
+  primaryColor     String?  // Custom primary color (hex)
+  secondaryColor   String?  // Custom secondary color (hex)
+  accentColor      String?  // Custom accent color (hex)
+  borderRadius     String   @default("0.625rem") // Border radius preference
+  fontFamily       String   @default("Inter") // Font family preference
+  logoUrl          String?  // Custom logo URL
+  faviconUrl       String?  // Custom favicon URL
+  customCss        String?  // Custom CSS overrides
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   userId           String
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("settings")
+}
+
+model Annotation {
+  id          String   @id @default(cuid())
+  content     String
+  fileId      String   // File identifier (from project files)
+  projectId   String
+  addedBy     String   // "Admin" or "Client"
+  addedByName String?  // Optional name of the person who added it
+  coordinates String?  // Optional coordinates for image annotations
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("annotations")
 }
 
 enum UserRole {

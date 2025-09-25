@@ -24,84 +24,46 @@ interface ClientDetailPageProps {
 export default function ClientDetailPage({ params }: ClientDetailPageProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [client, setClient] = useState<any>(null)
-
-  // Mock data - will be replaced with real data fetching
-  const mockClients = {
-    "1": {
-      id: "1",
-      name: "Atlantic Wellness",
-      email: "contact@atlanticwellness.com",
-      phone: "+1 (555) 123-4567",
-      company: "Atlantic Wellness",
-      address: "123 Ocean Drive, Miami, FL 33139",
-      notes: "Premium wellness center focusing on holistic health approaches.",
-      projectsCount: 3,
-      activeProjects: 1,
-      lastActivity: "2 days ago",
-      projects: [
-        { id: "16994", name: "Atlantic Spa", status: "pending", description: "Complete spa branding package", createdAt: "2024-01-15" },
-        { id: "17001", name: "Wellness Center", status: "approved", description: "Wellness center interior design", createdAt: "2024-01-10" },
-        { id: "17002", name: "Therapy Rooms", status: "revisions", description: "Therapy room signage and branding", createdAt: "2024-01-20" },
-      ],
-    },
-    "2": {
-      id: "2",
-      name: "Provectus Corp",
-      email: "info@provectus.com",
-      phone: "+1 (555) 987-6543",
-      company: "Provectus Corp",
-      address: "456 Business Blvd, New York, NY 10001",
-      notes: "Technology consulting firm specializing in digital transformation.",
-      projectsCount: 2,
-      activeProjects: 1,
-      lastActivity: "1 day ago",
-      projects: [
-        { id: "18395", name: "Provectus", status: "approved", description: "Corporate identity and branding", createdAt: "2024-01-12" },
-        { id: "18400", name: "Corporate Branding", status: "pending", description: "Complete corporate rebrand", createdAt: "2024-01-18" },
-      ],
-    },
-    "3": {
-      id: "3",
-      name: "Health Plus",
-      email: "admin@healthplus.com",
-      phone: "+1 (555) 456-7890",
-      company: "Health Plus",
-      address: "789 Medical Center Dr, Chicago, IL 60601",
-      notes: "Multi-specialty healthcare provider with focus on preventive care.",
-      projectsCount: 1,
-      activeProjects: 1,
-      lastActivity: "3 days ago",
-      projects: [
-        { id: "18996", name: "Chiropractic", status: "revisions", description: "Chiropractic clinic branding", createdAt: "2024-01-22" },
-      ],
-    },
-    "4": {
-      id: "4",
-      name: "Woody's Restaurant",
-      email: "manager@woodys.com",
-      phone: "+1 (555) 321-0987",
-      company: "Woody's Restaurant",
-      address: "321 Food Street, Austin, TX 78701",
-      notes: "Family-owned restaurant serving authentic American cuisine since 1985.",
-      projectsCount: 1,
-      activeProjects: 1,
-      lastActivity: "1 day ago",
-      projects: [
-        { id: "16997", name: "Woody's", status: "pending", description: "Restaurant branding and menu design", createdAt: "2024-01-25" },
-      ],
-    },
-  }
+  const [projects, setProjects] = useState<any[]>([])
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Simulate loading client data
-    setTimeout(() => {
-      const clientData = mockClients[params.clientId as keyof typeof mockClients]
-      if (clientData) {
-        setClient(clientData)
-      }
-      setIsLoading(false)
-    }, 500)
+    fetchClient()
+    fetchClientProjects()
   }, [params.clientId])
+
+  const fetchClient = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+      
+      const response = await fetch(`/api/clients/${params.clientId}`)
+      const data = await response.json()
+      
+      if (data.status === 'success') {
+        setClient(data.data)
+      } else {
+        setError(data.message || 'Failed to fetch client')
+      }
+    } catch (err) {
+      setError('Failed to fetch client')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const fetchClientProjects = async () => {
+    try {
+      const response = await fetch(`/api/projects?clientId=${params.clientId}`)
+      const data = await response.json()
+      
+      if (data.status === 'success') {
+        setProjects(data.data || [])
+      }
+    } catch (err) {
+      console.error('Failed to fetch client projects:', err)
+    }
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -127,11 +89,27 @@ export default function ClientDetailPage({ params }: ClientDetailPageProps) {
     )
   }
 
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Icons.AlertCircle />
+          <h3 className="text-lg font-medium text-foreground mb-2">Error</h3>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <Button onClick={() => (window.location.href = "/admin/clients")}>
+            <Icons.ArrowLeft />
+            <span className="ml-2">Back to Clients</span>
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   if (!client) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <Icons.Users className="h-12 w-12 text-muted-foreground mb-4 mx-auto" />
+          <Icons.Users />
           <h3 className="text-lg font-medium text-foreground mb-2">Client not found</h3>
           <p className="text-muted-foreground mb-4">The client you're looking for doesn't exist.</p>
           <Button onClick={() => (window.location.href = "/admin/clients")}>
@@ -163,6 +141,13 @@ export default function ClientDetailPage({ params }: ClientDetailPageProps) {
           <div className="flex items-center gap-4">
             <Button
               variant="outline"
+              onClick={() => (window.location.href = "/admin/projects/new")}
+            >
+              <Icons.Plus />
+              <span className="ml-2">Create Project</span>
+            </Button>
+            <Button
+              variant="outline"
               onClick={() => (window.location.href = `/admin/clients/${client.id}/edit`)}
             >
               <Icons.Edit />
@@ -179,7 +164,7 @@ export default function ClientDetailPage({ params }: ClientDetailPageProps) {
           <div className="mb-8">
             <div className="flex items-center gap-4 mb-4">
               <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <Icons.User className="h-8 w-8 text-primary" />
+                <Icons.User />
               </div>
               <div>
                 <h1 className="text-3xl font-bold text-foreground">{client.name}</h1>
@@ -211,7 +196,7 @@ export default function ClientDetailPage({ params }: ClientDetailPageProps) {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Last Activity</p>
-                    <p className="text-sm text-card-foreground">{client.lastActivity}</p>
+                    <p className="text-sm text-card-foreground">{new Date(client.updatedAt).toLocaleDateString()}</p>
                   </div>
                   {client.notes && (
                     <div>
@@ -229,53 +214,78 @@ export default function ClientDetailPage({ params }: ClientDetailPageProps) {
                 <CardHeader>
                   <CardTitle className="text-card-foreground">Projects</CardTitle>
                   <CardDescription className="text-muted-foreground">
-                    {client.projectsCount} project{client.projectsCount !== 1 ? "s" : ""} total
+                    {projects.length} project{projects.length !== 1 ? "s" : ""} total
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Project</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Created</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {client.projects.map((project: any) => (
-                        <TableRow key={project.id}>
-                          <TableCell>
-                            <div className="flex items-center gap-3">
-                              <div className="h-8 w-8 rounded bg-muted flex items-center justify-center">
-                                <Icons.FolderOpen className="h-4 w-4 text-muted-foreground" />
-                              </div>
-                              <div>
-                                <div className="font-medium text-foreground">{project.name}</div>
-                                <div className="text-xs text-muted-foreground">#{project.id}</div>
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-sm text-muted-foreground">{project.description}</div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={getStatusColor(project.status)}>{project.status}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-sm text-muted-foreground">{project.createdAt}</div>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button variant="outline" size="sm">
-                              <Icons.Eye />
-                              <span className="ml-2">View</span>
-                            </Button>
-                          </TableCell>
+                  {projects.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Project</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Created</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {projects.map((project) => (
+                          <TableRow key={project.id}>
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <div className="h-8 w-8 rounded bg-muted flex items-center justify-center">
+                                  <Icons.FolderOpen />
+                                </div>
+                                <div>
+                                  <div className="font-medium text-foreground">{project.title}</div>
+                                  <div className="text-xs text-muted-foreground">#{project.id}</div>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm text-muted-foreground">
+                                {project.description || "No description"}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={getStatusColor(project.status)}>
+                                {project.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm text-muted-foreground">
+                                {new Date(project.createdAt).toLocaleDateString()}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => (window.location.href = `/admin/projects/${project.id}`)}
+                              >
+                                <Icons.Eye />
+                                <span className="ml-2">View</span>
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Icons.FolderOpen />
+                      <h3 className="text-lg font-medium text-foreground mb-2">No projects yet</h3>
+                      <p className="text-muted-foreground mb-4">This client doesn't have any projects yet.</p>
+                      <Button
+                        onClick={() => (window.location.href = "/admin/projects/new")}
+                        className="bg-primary text-primary-foreground hover:bg-primary/90"
+                      >
+                        <Icons.Plus />
+                        <span className="ml-2">Create Project</span>
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
