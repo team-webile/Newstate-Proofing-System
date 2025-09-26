@@ -260,7 +260,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
           createdAt: annotation.createdAt,
           x: annotation.coordinates ? JSON.parse(annotation.coordinates).x : undefined,
           y: annotation.coordinates ? JSON.parse(annotation.coordinates).y : undefined,
-          status: annotation.status || 'OPEN',
+          status: project.status || 'OPEN',
           isResolved: annotation.isResolved || false,
           replies: annotation.replies || []
         }))
@@ -760,7 +760,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
     if (!selectedFile) return false;
     const fileAnnotations = getFileAnnotations(selectedFile.id);
     return fileAnnotations.every(annotation => 
-      annotation.status === 'COMPLETED' || annotation.status === 'REJECTED'
+      project.status === 'COMPLETED' || project.status === 'REJECTED'
     );
   };
 
@@ -1053,7 +1053,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
       </div>
     )
   }
-  
+    console.log(project,'annotations')
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -1086,6 +1086,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
               <Download className="h-4 w-4 mr-2" />
               Download
             </Button>
+            {project.status === 'PENDING' && (
             <Button
               variant="outline"
               size="sm"
@@ -1094,6 +1095,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
               <CheckCircle className="h-4 w-4 mr-2" />
               Approve/Reject
             </Button>
+            )}
           <Badge variant="outline">
             Admin Access
           </Badge>
@@ -1199,7 +1201,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                               src={selectedFile.url}
                               alt={selectedFile.name}
                               className={`w-full h-auto max-h-[500px] object-contain ${
-                                areAllAnnotationsResolved() ? 'cursor-not-allowed' : 'cursor-crosshair'
+                                areAllAnnotationsResolved() ? 'cursor-not-allowed pointer-events-none' : 'cursor-crosshair'
                               }`}
                               onClick={handleImageClick}
                             />
@@ -1210,7 +1212,9 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                                 return (
                                   <div
                                     key={annotation.id}
-                                    className="absolute transform -translate-x-1/2 -translate-y-1/2 z-10"
+                                    className={`absolute transform -translate-x-1/2 -translate-y-1/2 z-10 ${
+                                      project.status === 'COMPLETED' ? 'pointer-events-none opacity-50' : ''
+                                    }`}
                                     style={{
                                       left: `${annotation.x}%`,
                                       top: `${annotation.y}%`
@@ -1218,8 +1222,14 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                                   >
                                     {/* Main annotation pin */}
                                     <div 
-                                      className={`${getAnnotationStatusColor(annotation.status)} text-white text-xs px-2 py-1 rounded-full shadow-lg cursor-pointer hover:opacity-80 transition-colors group`}
-                                      onClick={() => handleAnnotationClick(annotation)}
+                                      className={`${getAnnotationStatusColor(project.status)} text-white text-xs px-2 py-1 rounded-full shadow-lg cursor-pointer hover:opacity-80 transition-colors group ${
+                                        project.status === 'COMPLETED' ? 'cursor-not-allowed' : ''
+                                      }`}
+                                      onClick={() => {
+                                        if (project.status !== 'COMPLETED') {
+                                          handleAnnotationClick(annotation)
+                                        }
+                                      }}
                                     >
                                       <MapPin className="h-3 w-3 inline mr-1" />
                                       {annotation.content.length > 15 ? annotation.content.substring(0, 15) + '...' : annotation.content}
@@ -1229,7 +1239,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                                         </span>
                                       )}
                                       {/* Status indicator */}
-                                      <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${getAnnotationStatusColor(annotation.status)} border-2 border-white`}></div>
+                                      <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${getAnnotationStatusColor(project.status)} border-2 border-white`}></div>
                                     </div>
                                     
                                     {/* Show replies directly on image */}
@@ -1258,31 +1268,31 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                                         variant="outline"
                                         className="text-xs bg-white border-blue-500 text-blue-500 hover:bg-blue-50"
                                         onClick={() => handleReplyClick(annotation)}
-                                        disabled={annotation.status === 'COMPLETED' || annotation.status === 'REJECTED'}
+                                        disabled={project.status === 'COMPLETED' || project.status === 'REJECTED'}
                                       >
                                         <MessageSquare className="h-3 w-3 mr-1" />
                                         Reply
                                       </Button>
                                       
                                       {/* Status control buttons */}
-                                      {annotation.status === 'PENDING' && (
+                                      {project.status === 'PENDING' && (
                                         <Button
                                           size="sm"
                                           variant="outline"
                                           className="text-xs bg-white border-green-500 text-green-500 hover:bg-green-50"
-                                          onClick={() => updateAnnotationStatus(annotation.id, 'RESOLVED')}
+                                          onClick={() => updateAnnotationStatus(annotation.id, 'COMPLETED')}
                                         >
                                           <CheckCircle className="h-3 w-3 mr-1" />
                                           Resolve
                                         </Button>
                                       )}
                                       
-                                      {annotation.status === 'COMPLETED' && (
+                                      {project.status === 'COMPLETED' && (
                                         <Button
                                           size="sm"
                                           variant="outline"
                                           className="text-xs bg-white border-orange-500 text-orange-500 hover:bg-orange-50"
-                                          onClick={() => updateAnnotationStatus(annotation.id, 'OPEN')}
+                                          onClick={() => updateAnnotationStatus(annotation.id, 'PENDING')}
                                         >
                                           <AlertCircle className="h-3 w-3 mr-1" />
                                           Reopen
