@@ -20,9 +20,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify annotation exists
+    // Verify annotation exists and check review status
     const annotation = await prisma.annotation.findUnique({
       where: { id: annotationId },
+      include: {
+        project: {
+          include: {
+            reviews: {
+              where: { status: { in: ["APPROVED", "REJECTED"] } },
+              orderBy: { updatedAt: "desc" },
+              take: 1,
+            },
+          },
+        },
+      },
     });
 
     if (!annotation) {
@@ -30,6 +41,23 @@ export async function POST(request: NextRequest) {
         { status: "error", message: "Annotation not found" },
         { status: 404 }
       );
+    }
+
+    // Check if review is approved or rejected
+    if (annotation.project.reviews.length > 0) {
+      const latestReview = annotation.project.reviews[0];
+      if (
+        latestReview.status === "APPROVED" ||
+        latestReview.status === "REJECTED"
+      ) {
+        return NextResponse.json(
+          {
+            status: "error",
+            message: `Replies are disabled. Review status is ${latestReview.status}`,
+          },
+          { status: 403 }
+        );
+      }
     }
 
     // Create the reply in database
@@ -43,6 +71,16 @@ export async function POST(request: NextRequest) {
     });
 
     console.log("Reply created successfully:", reply);
+
+    // Emit socket event for real-time updates
+    try {
+      // Note: Socket emission would happen here in a real implementation
+      console.log(
+        `Annotation reply created: ${reply.id} for annotation ${annotationId}`
+      );
+    } catch (error) {
+      console.log("Socket emission skipped:", error);
+    }
 
     return NextResponse.json({
       status: "success",

@@ -26,6 +26,13 @@ interface Annotation {
   fileId: string;
   addedBy?: string;
   addedByName?: string;
+  replies?: {
+    id: string;
+    content: string;
+    addedBy: string;
+    addedByName?: string;
+    createdAt: string;
+  }[];
 }
 
 interface UseRealtimeCommentsProps {
@@ -48,6 +55,8 @@ export function useRealtimeComments({
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reviewStatus, setReviewStatus] = useState<string>("PENDING");
+  const [annotationsDisabled, setAnnotationsDisabled] = useState(false);
 
   const {
     socket,
@@ -371,6 +380,39 @@ export function useRealtimeComments({
       );
     });
 
+    // Listen for annotation reply events
+    socket.on("annotationReplyAdded", (data) => {
+      console.log("Received annotation reply:", data);
+      setAnnotations((prev) =>
+        prev.map((annotation) =>
+          annotation.id === data.annotationId
+            ? {
+                ...annotation,
+                replies: [
+                  ...(annotation.replies || []),
+                  {
+                    id: data.id,
+                    content: data.reply,
+                    addedBy: data.addedBy,
+                    addedByName: data.addedByName,
+                    createdAt: data.timestamp,
+                  },
+                ],
+              }
+            : annotation
+        )
+      );
+    });
+
+    // Listen for review status changes
+    socket.on("reviewStatusUpdated", (data) => {
+      console.log("Review status updated:", data);
+      setReviewStatus(data.status);
+      setAnnotationsDisabled(
+        data.status === "APPROVED" || data.status === "REJECTED"
+      );
+    });
+
     // Comment events
     onCommentAdded((data) => {
       if (data.elementId === elementId) {
@@ -419,6 +461,8 @@ export function useRealtimeComments({
     isLoading,
     error,
     isConnected: isConnected(),
+    reviewStatus,
+    annotationsDisabled,
     addComment,
     addAnnotation,
     addAnnotationReply,

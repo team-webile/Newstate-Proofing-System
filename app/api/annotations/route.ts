@@ -19,9 +19,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify project exists
+    // Verify project exists and check review status
     const project = await prisma.project.findUnique({
       where: { id: projectId },
+      include: {
+        reviews: {
+          where: { status: { in: ["APPROVED", "REJECTED"] } },
+          orderBy: { updatedAt: "desc" },
+          take: 1,
+        },
+      },
     });
 
     if (!project) {
@@ -32,6 +39,23 @@ export async function POST(req: NextRequest) {
         },
         { status: 404 }
       );
+    }
+
+    // Check if review is approved or rejected
+    if (project.reviews.length > 0) {
+      const latestReview = project.reviews[0];
+      if (
+        latestReview.status === "APPROVED" ||
+        latestReview.status === "REJECTED"
+      ) {
+        return NextResponse.json(
+          {
+            status: "error",
+            message: `Annotations are disabled. Review status is ${latestReview.status}`,
+          },
+          { status: 403 }
+        );
+      }
     }
 
     // Create annotation in database
@@ -110,7 +134,7 @@ export async function GET(req: NextRequest) {
     });
 
     // Parse coordinates for each annotation
-    const annotationsWithCoordinates = annotations.map((annotation) => ({
+    const annotationsWithCoordinates = annotations.map((annotation: any) => ({
       ...annotation,
       x: annotation.coordinates
         ? JSON.parse(annotation.coordinates).x

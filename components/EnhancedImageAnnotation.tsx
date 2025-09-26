@@ -32,6 +32,8 @@ export default function EnhancedImageAnnotation({
     isLoading,
     error,
     isConnected,
+    reviewStatus,
+    annotationsDisabled,
     addAnnotation: addRealtimeAnnotation,
     addAnnotationReply: addRealtimeAnnotationReply,
     resolveAnnotation: resolveRealtimeAnnotation,
@@ -113,6 +115,8 @@ export default function EnhancedImageAnnotation({
         onAnnotationReply={handleAnnotationReply}
         isAdmin={isAdmin}
         currentUser={currentUser}
+        annotationsDisabled={annotationsDisabled}
+        reviewStatus={reviewStatus}
       />
 
       {/* Annotation Summary */}
