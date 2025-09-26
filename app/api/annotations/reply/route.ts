@@ -74,12 +74,39 @@ export async function POST(request: NextRequest) {
 
     // Emit socket event for real-time updates
     try {
-      // Note: Socket emission would happen here in a real implementation
+      // Import socket.io server instance
+      const { Server } = require('socket.io');
+      const { createServer } = require('http');
+      
+      // Get the project ID from the annotation
+      const projectId = annotation.projectId;
+      
+      console.log("📝 Broadcasting annotationReplyAdded event for project:", projectId);
+      
+      // Emit to all clients in the project room
+      if (global.io) {
+        global.io.to(`project-${projectId}`).emit("annotationReplyAdded", {
+          projectId,
+          annotationId,
+          reply: {
+            id: reply.id,
+            content: reply.content,
+            addedBy: reply.addedBy,
+            addedByName: reply.addedByName,
+            createdAt: reply.createdAt,
+          },
+          timestamp: new Date().toISOString(),
+        });
+        console.log("📝 Broadcast sent successfully");
+      } else {
+        console.log("📝 Socket.io server not available for broadcasting");
+      }
+      
       console.log(
         `Annotation reply created: ${reply.id} for annotation ${annotationId}`
       );
     } catch (error) {
-      console.log("Socket emission skipped:", error);
+      console.log("Socket emission error:", error);
     }
 
     return NextResponse.json({

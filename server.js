@@ -34,6 +34,9 @@ app.prepare().then(() => {
     transports: ["websocket", "polling"],
   });
 
+  // Make io available globally for API routes
+  global.io = io;
+
   // Socket.IO event handlers
   io.on("connection", (socket) => {
     console.log("🔌 Client connected:", socket.id);
@@ -58,8 +61,8 @@ app.prepare().then(() => {
         "📝 Broadcasting to project room:",
         `project-${data.projectId}`
       );
-      // Broadcast to all clients in the project room
-      socket.to(`project-${data.projectId}`).emit("annotationAdded", {
+      // Broadcast to all clients in the project room (including sender)
+      io.to(`project-${data.projectId}`).emit("annotationAdded", {
         ...data,
         id: Date.now().toString(),
         timestamp: new Date().toISOString(),
@@ -71,7 +74,7 @@ app.prepare().then(() => {
     socket.on("resolveAnnotation", (data) => {
       console.log("✅ Annotation resolved:", data);
       // Broadcast to all clients in the project room
-      socket.to(`project-${data.projectId}`).emit("annotationResolved", {
+      io.to(`project-${data.projectId}`).emit("annotationResolved", {
         annotationId: data.annotationId,
         resolvedBy: data.resolvedBy,
         timestamp: new Date().toISOString(),
@@ -82,7 +85,7 @@ app.prepare().then(() => {
     socket.on("addComment", (data) => {
       console.log("💬 Comment added:", data);
       // Broadcast to all clients in the project room
-      socket.to(`project-${data.projectId}`).emit("commentAdded", {
+      io.to(`project-${data.projectId}`).emit("commentAdded", {
         ...data,
         id: Date.now().toString(),
         timestamp: new Date().toISOString(),
@@ -93,7 +96,7 @@ app.prepare().then(() => {
     socket.on("addAnnotationReply", (data) => {
       console.log("💬 Annotation reply added:", data);
       // Broadcast to all clients in the project room
-      socket.to(`project-${data.projectId}`).emit("annotationReplyAdded", {
+      io.to(`project-${data.projectId}`).emit("annotationReplyAdded", {
         ...data,
         id: Date.now().toString(),
         timestamp: new Date().toISOString(),
@@ -104,7 +107,7 @@ app.prepare().then(() => {
     socket.on("reviewStatusChanged", (data) => {
       console.log("📋 Review status changed:", data);
       // Broadcast to all clients in the project room
-      socket.to(`project-${data.projectId}`).emit("reviewStatusUpdated", {
+      io.to(`project-${data.projectId}`).emit("reviewStatusUpdated", {
         ...data,
         timestamp: new Date().toISOString(),
       });
@@ -114,7 +117,7 @@ app.prepare().then(() => {
     socket.on("annotationStatusChanged", (data) => {
       console.log("🔄 Annotation status changed:", data);
       // Broadcast to all clients in the project room
-      socket.to(`project-${data.projectId}`).emit("annotationStatusUpdated", {
+      io.to(`project-${data.projectId}`).emit("annotationStatusUpdated", {
         ...data,
         timestamp: new Date().toISOString(),
       });
@@ -124,7 +127,7 @@ app.prepare().then(() => {
     socket.on("annotationAssigned", (data) => {
       console.log("👤 Annotation assigned:", data);
       // Broadcast to all clients in the project room
-      socket.to(`project-${data.projectId}`).emit("annotationAssigned", {
+      io.to(`project-${data.projectId}`).emit("annotationAssigned", {
         ...data,
         timestamp: new Date().toISOString(),
       });
@@ -134,7 +137,7 @@ app.prepare().then(() => {
     socket.on("updateElementStatus", (data) => {
       console.log("📊 Element status updated:", data);
       // Broadcast to all clients in the project room
-      socket.to(`project-${data.projectId}`).emit("statusChanged", {
+      io.to(`project-${data.projectId}`).emit("statusChanged", {
         ...data,
         timestamp: new Date().toISOString(),
       });
@@ -144,7 +147,7 @@ app.prepare().then(() => {
     socket.on("projectStatusChanged", (data) => {
       console.log("📈 Project status changed:", data);
       // Broadcast to all clients in the project room
-      socket.to(`project-${data.projectId}`).emit("projectStatusChanged", {
+      io.to(`project-${data.projectId}`).emit("projectStatusChanged", {
         ...data,
         timestamp: new Date().toISOString(),
       });
@@ -154,9 +157,19 @@ app.prepare().then(() => {
     socket.on("fileUploaded", (data) => {
       console.log("📁 File uploaded:", data);
       // Broadcast to all clients in the project room
-      socket.to(`project-${data.projectId}`).emit("fileUploaded", {
+      io.to(`project-${data.projectId}`).emit("fileUploaded", {
         ...data,
         timestamp: new Date().toISOString(),
+      });
+    });
+
+    // Test connection handler
+    socket.on("test-connection", (data) => {
+      console.log("🧪 Server received test connection:", data);
+      socket.emit("test-response", { 
+        message: "Server received test", 
+        clientId: socket.id,
+        projectId: data.projectId 
       });
     });
 

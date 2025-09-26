@@ -171,17 +171,18 @@ model Settings {
 }
 
 model Annotation {
-  id          String   @id @default(cuid())
+  id          String           @id @default(cuid())
   content     String
-  fileId      String   // File identifier (from project files)
+  fileId      String           // File identifier (from project files)
   projectId   String
-  addedBy     String   // "Admin" or "Client"
-  addedByName String?  // Optional name of the person who added it
-  coordinates String?  // Optional coordinates for image annotations
-  isResolved  Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  addedBy     String           // "Admin" or "Client"
+  addedByName String?          // Optional name of the person who added it
+  coordinates String?          // Optional coordinates for image annotations
+  isResolved  Boolean          @default(false)
+  status      AnnotationStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
   replies     AnnotationReply[]
 
   @@map("annotations")
@@ -241,4 +242,10 @@ enum CommentStatus {
 enum ApprovalType {
   ELEMENT
   PROJECT
+}
+
+enum AnnotationStatus {
+  PENDING
+  COMPLETED
+  REJECTED
 }

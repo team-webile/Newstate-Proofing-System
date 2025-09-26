@@ -23,6 +23,7 @@ import {
   MessageCircle,
   MapPin,
   Eye,
+  MessageSquare,
 } from "lucide-react";
 // import ImageAnnotation from "@/components/ImageAnnotation"
 import { useRealtimeComments } from "@/hooks/use-realtime-comments";
@@ -64,7 +65,7 @@ interface ProjectAnnotation {
   createdAt: string;
   x?: number;
   y?: number;
-  status: "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
+  status: "PENDING" | "COMPLETED" | "REJECTED";
   isResolved: boolean;
   replies?: Array<{
     id: string;
@@ -88,7 +89,7 @@ interface Version {
   id: string;
   version: string;
   files: ProjectFile[];
-  status: "draft" | "pending_review" | "approved" | "rejected" | "in_revision";
+  status: "draft" | "pending_review" | "completed" | "rejected" | "in_revision";
   createdAt: string;
   annotations: ProjectAnnotation[];
   revisionNotes?: string;
@@ -97,7 +98,7 @@ interface Version {
 interface Revision {
   id: string;
   version: string;
-  status: "in_revision" | "pending_review" | "approved" | "rejected";
+  status: "in_revision" | "pending_review" | "completed" | "rejected";
   requestedBy: string;
   requestedAt: string;
   comments: string;
@@ -129,11 +130,16 @@ export default function ReviewPage({ params }: ReviewPageProps) {
       type: "annotation" | "status";
       message: string;
       timestamp: string;
+      createdAt?: string;
       addedBy?: string;
       senderName?: string;
       isFromClient?: boolean;
     }>
   >([]);
+
+  // Reply functionality state
+  const [showReplyInput, setShowReplyInput] = useState(false);
+  const [newReply, setNewReply] = useState("");
   const [versions, setVersions] = useState<Version[]>([]);
   const [currentVersion, setCurrentVersion] = useState("");
   const [currentFile, setCurrentFile] = useState<string>("");
@@ -147,8 +153,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
     y: number;
   } | null>(null);
   const [showReplyPopup, setShowReplyPopup] = useState(false);
-  const [selectedAnnotationForReply, setSelectedAnnotationForReply] =
-    useState<ProjectAnnotation | null>(null);
+  const [selectedAnnotationForReply, setSelectedAnnotationForReply] = useState<ProjectAnnotation | null>(null);
   const [replyText, setReplyText] = useState("");
   const [digitalSignature, setDigitalSignature] = useState({
     firstName: "",
@@ -164,6 +169,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [reviewData, setReviewData] = useState<any>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [lastUpdate, setLastUpdate] = useState<string | null>(null);
   const imageRef = useRef<HTMLDivElement>(null);
 
   const currentVersionData = versions.find((v) => v.version === currentVersion);
@@ -373,21 +379,57 @@ export default function ReviewPage({ params }: ReviewPageProps) {
   // Fetch annotations
   const fetchAnnotations = async () => {
     try {
+      console.log("🔄 Fetching annotations for project:", params.reviewId);
       const response = await fetch(
         `/api/annotations?projectId=${params.reviewId}`
       );
       const data = await response.json();
+      console.log("📝 Annotations API response:", data);
 
       if (data.status === "success") {
-        // Group annotations by fileId
-        const annotationsByFile: { [key: string]: string[] } = {};
+        console.log("📝 Raw annotations data:", data.data);
+
+        // Check for date issues
+        data.data.forEach((annotation: any, index: number) => {
+          console.log(`📝 Annotation ${index}:`, {
+            id: annotation.id,
+            content: annotation.content,
+            createdAt: annotation.createdAt,
+            addedBy: annotation.addedBy,
+            addedByName: annotation.addedByName,
+            replies: annotation.replies?.length || 0
+          });
+
+          if (annotation.replies) {
+            annotation.replies.forEach((reply: any, replyIndex: number) => {
+              console.log(`📝 Reply ${replyIndex} for annotation ${annotation.id}:`, {
+                id: reply.id,
+                content: reply.content,
+                createdAt: reply.createdAt,
+                addedBy: reply.addedBy,
+                addedByName: reply.addedByName
+              });
+            });
+          }
+        });
+
+        // Update the main annotations state for display
+        setAnnotations(data.data);
+        console.log("📝 Updated annotations state:", data.data);
+
+        // Also group annotations by fileId for other uses
+        const annotationsByFile: { [key: string]: any[] } = {};
         data.data.forEach((annotation: any) => {
           if (!annotationsByFile[annotation.fileId]) {
             annotationsByFile[annotation.fileId] = [];
           }
-          annotationsByFile[annotation.fileId].push(annotation.content);
+          annotationsByFile[annotation.fileId].push(annotation);
         });
+        console.log("📝 Grouped annotations by file:", annotationsByFile);
         setFileAnnotations(annotationsByFile);
+        console.log("📝 Updated fileAnnotations state");
+      } else {
+        console.log("📝 Annotations API error:", data.message);
       }
     } catch (error) {
       console.error("Error fetching annotations:", error);
@@ -407,6 +449,11 @@ export default function ReviewPage({ params }: ReviewPageProps) {
 
   const handleImageClick = (event: React.MouseEvent<HTMLImageElement>) => {
     if (!currentFileData) return;
+
+    // Don't allow adding annotations if all are resolved
+    if (areAllAnnotationsResolved()) {
+      return;
+    }
 
     const rect = event.currentTarget.getBoundingClientRect();
     const x = ((event.clientX - rect.left) / rect.width) * 100;
@@ -434,9 +481,16 @@ export default function ReviewPage({ params }: ReviewPageProps) {
     setShowAnnotationPopup(true);
   };
 
+  // Check if all annotations are completed or rejected
+  const areAllAnnotationsResolved = () => {
+    return currentFileAnnotations.every(annotation =>
+      annotation.status === 'COMPLETED' || annotation.status === 'REJECTED'
+    );
+  };
+
   const handleAnnotationClick = (annotation: any) => {
-    // Don't allow replies to resolved annotations
-    if (annotation.isResolved) {
+    // Don't allow replies to completed or rejected annotations
+    if (annotation.status === 'COMPLETED' || annotation.status === 'REJECTED') {
       return;
     }
 
@@ -468,18 +522,18 @@ export default function ReviewPage({ params }: ReviewPageProps) {
           prev.map((annotation) =>
             annotation.id === selectedAnnotationForReply.id
               ? {
-                  ...annotation,
-                  replies: [
-                    ...(annotation.replies || []),
-                    {
-                      id: data.data.id,
-                      content: replyText,
-                      addedBy: "Client",
-                      addedByName: currentUser?.name || "Client",
-                      createdAt: new Date().toISOString(),
-                    },
-                  ],
-                }
+                ...annotation,
+                replies: [
+                  ...(annotation.replies || []),
+                  {
+                    id: data.data.id,
+                    content: replyText,
+                    addedBy: "Client",
+                    addedByName: currentUser?.name || "Client",
+                    createdAt: new Date().toISOString(),
+                  },
+                ],
+              }
               : annotation
           )
         );
@@ -527,12 +581,12 @@ export default function ReviewPage({ params }: ReviewPageProps) {
     const updatedAnnotations = annotations.map((annotation) =>
       annotation.id === annotationId
         ? {
-            ...annotation,
-            isResolved: !annotation.isResolved,
-            status: annotation.isResolved
-              ? ("OPEN" as const)
-              : ("RESOLVED" as const),
-          }
+          ...annotation,
+          isResolved: !annotation.isResolved,
+          status: annotation.isResolved
+            ? ("PENDING" as const)
+            : ("COMPLETED" as const),
+        }
         : annotation
     );
     setAnnotations(updatedAnnotations);
@@ -562,18 +616,18 @@ export default function ReviewPage({ params }: ReviewPageProps) {
     const updatedRevisions = revisions.map((r) =>
       r.version === currentVersion
         ? {
-            ...r,
-            status: "approved" as const,
-            digitalSignature: digitalSignature,
-            completedAt: new Date().toISOString(),
-          }
+          ...r,
+          status: "completed" as const,
+          digitalSignature: digitalSignature,
+          completedAt: new Date().toISOString(),
+        }
         : r
     );
     setRevisions(updatedRevisions);
 
     // Update version status
     const updatedVersions = versions.map((v) =>
-      v.version === currentVersion ? { ...v, status: "approved" as const } : v
+      v.version === currentVersion ? { ...v, status: "completed" as const } : v
     );
     setVersions(updatedVersions);
 
@@ -589,7 +643,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "approved":
+      case "completed":
         return "bg-green-500";
       case "rejected":
         return "bg-red-500";
@@ -606,8 +660,8 @@ export default function ReviewPage({ params }: ReviewPageProps) {
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case "approved":
-        return "Approved";
+      case "completed":
+        return "completed";
       case "rejected":
         return "Rejected";
       case "in_revision":
@@ -638,39 +692,307 @@ export default function ReviewPage({ params }: ReviewPageProps) {
 
   // Initialize Socket.io for direct emit calls
   useEffect(() => {
-    const newSocket = io("http://localhost:3000", {
-      path: "/api/socketio",
-      transports: ["websocket", "polling"],
-    });
+    if (params.reviewId) {
+      const newSocket = io("http://localhost:3000", {
+        path: "/api/socketio",
+        transports: ["websocket", "polling"],
+      });
 
-    newSocket.on("connect", () => {
-      console.log("🔌 Client socket connected:", newSocket.id);
-    });
+      newSocket.on("connect", () => {
+        console.log("🔌 Client socket connected:", newSocket.id);
+        console.log("🔌 ReviewId from params:", params.reviewId);
+        // Join project room immediately when connected
+        newSocket.emit("join-project", params.reviewId);
+        console.log("🔗 Client joining project room:", params.reviewId);
 
-    newSocket.on("disconnect", () => {
-      console.log("🔌 Client socket disconnected");
-    });
+        // Test socket connection
+        newSocket.emit("test-connection", { message: "Client socket test", projectId: params.reviewId });
+      });
 
-    setSocket(newSocket);
+      newSocket.on("disconnect", () => {
+        console.log("🔌 Client socket disconnected");
+      });
 
-    return () => {
-      newSocket.disconnect();
-    };
-  }, []);
+      // Test event listener
+      newSocket.on("test-response", (data) => {
+        console.log("🧪 Client received test response:", data);
+      });
 
-  // Join project room when reviewData is loaded
+      // General event listener for debugging
+      newSocket.onAny((eventName, ...args) => {
+        console.log("🔍 Client received socket event:", eventName, args);
+      });
+
+      // Listen for real-time annotation events
+      newSocket.on("annotationAdded", (data) => {
+        console.log("📝 Client received annotationAdded event:", data);
+        console.log("📝 Current reviewId:", params.reviewId);
+        console.log("📝 Data projectId:", data.projectId);
+        console.log("📝 Project ID match:", data.projectId === params.reviewId);
+
+        if (data.projectId === params.reviewId) {
+          console.log("📝 Adding new annotation to local state immediately");
+
+          // Create new annotation object and add to local state immediately
+          const newAnnotation = {
+            id: Date.now().toString(),
+            content: data.annotation,
+            fileId: data.fileId,
+            addedBy: data.addedBy || 'Unknown',
+            addedByName: data.addedByName || 'Unknown',
+            createdAt: data.timestamp,
+            x: data.x,
+            y: data.y,
+            status: 'PENDING' as const,
+            isResolved: false,
+            replies: []
+          };
+
+          // Update annotations state immediately
+          setAnnotations(prev => [...prev, newAnnotation]);
+
+          // Update file annotations
+          setFileAnnotations(prev => ({
+            ...prev,
+            [data.fileId]: [...(prev[data.fileId] || []), data.annotation]
+          }));
+
+          // Add to chat messages
+          const senderName = data.addedByName || data.addedBy || 'Unknown';
+          const isFromClient = senderName.includes('Client') || senderName === 'Client';
+          const messageText = isFromClient
+            ? `You sent: "${data.annotation}"`
+            : `Received from ${senderName}: "${data.annotation}"`;
+
+          setChatMessages(prev => [...prev, {
+            id: Date.now().toString(),
+            type: 'annotation',
+            message: messageText,
+            timestamp: data.timestamp,
+            addedBy: senderName,
+            senderName: senderName,
+            isFromClient: isFromClient
+          }]);
+
+          // Show visual notification for new annotation from admin
+          if (!isFromClient) {
+            const notification = {
+              id: Date.now().toString(),
+              type: 'annotation',
+              title: 'New Annotation Added',
+              message: `${senderName} added a new annotation: "${data.annotation}"`,
+              timestamp: data.timestamp,
+              fileId: data.fileId,
+              x: data.x,
+              y: data.y
+            };
+            setNotifications(prev => [notification, ...prev.slice(0, 9)]); // Keep only last 10 notifications
+          }
+
+          setLastUpdate(data.timestamp);
+
+          // Also refresh from server to ensure consistency
+          setTimeout(() => {
+            fetchAnnotations();
+          }, 1000);
+        } else {
+          console.log("📝 Project ID mismatch, not refreshing");
+        }
+      });
+
+      newSocket.on("annotationReplyAdded", (data) => {
+        console.log("📝 Client received annotationReplyAdded event:", data);
+        console.log("📝 Current reviewId:", params.reviewId);
+        console.log("📝 Data projectId:", data.projectId);
+        console.log("📝 Project ID match:", data.projectId === params.reviewId);
+
+        if (data.projectId === params.reviewId) {
+          console.log("📝 Adding new reply to local state immediately");
+
+          // Update annotations state immediately with new reply
+          setAnnotations(prev => prev.map(annotation =>
+            annotation.id === data.annotationId
+              ? {
+                ...annotation,
+                replies: [...(annotation.replies || []), {
+                  id: Date.now().toString(),
+                  content: data.reply?.content || data.reply,
+                  addedBy: data.reply?.addedBy || data.addedBy || 'Unknown',
+                  addedByName: data.reply?.addedByName || data.addedByName || 'Unknown',
+                  createdAt: data.timestamp
+                }]
+              }
+              : annotation
+          ));
+
+          // Add to chat messages
+          const senderName = data.reply?.addedByName || data.addedByName || 'Unknown';
+          setChatMessages(prev => [...prev, {
+            id: Date.now().toString(),
+            type: 'annotation',
+            message: `Reply added by ${senderName}: ${data.reply?.content || data.reply}`,
+            timestamp: data.timestamp,
+            addedBy: data.reply?.addedBy || data.addedBy,
+            senderName: senderName,
+            isFromClient: data.reply?.addedBy === 'Client' || data.addedBy === 'Client'
+          }]);
+          setLastUpdate(data.timestamp);
+
+          // Also refresh from server to ensure consistency
+          setTimeout(() => {
+            fetchAnnotations();
+          }, 1000);
+        } else {
+          console.log("📝 Project ID mismatch for reply, not refreshing");
+        }
+      });
+
+      // Listen for project status changes
+      newSocket.on("projectStatusChanged", (data) => {
+        console.log("📈 Client received projectStatusChanged event:", data);
+        if (data.projectId === params.reviewId) {
+          console.log("📈 Project status changed, refreshing page");
+          // Refresh the page or update UI
+          window.location.reload();
+        }
+      });
+
+      // Listen for review status updates
+      newSocket.on("reviewStatusUpdated", (data) => {
+        console.log("📋 Client received reviewStatusUpdated event:", data);
+        if (data.projectId === params.reviewId) {
+          console.log("📋 Review status updated, refreshing page");
+          // Add to chat messages
+          setChatMessages(prev => [...prev, {
+            id: Date.now().toString(),
+            type: 'status',
+            message: `Review status updated: ${data.status}`,
+            timestamp: data.timestamp,
+            addedBy: data.updatedBy,
+            senderName: data.updatedByName || data.updatedBy || 'System',
+            isFromClient: false
+          }]);
+          setLastUpdate(data.timestamp);
+          // Refresh the page or update UI
+          window.location.reload();
+        }
+      });
+
+      // Listen for annotation status updates
+      newSocket.on("annotationStatusUpdated", (data) => {
+        console.log("📊 Client received annotationStatusUpdated event:", data);
+        if (data.projectId === params.reviewId) {
+          // Update local state immediately
+          setAnnotations(prev => prev.map(annotation =>
+            annotation.id === data.annotationId
+              ? {
+                ...annotation,
+                status: data.status as any,
+                isResolved: data.status === 'COMPLETED'
+              }
+              : annotation
+          ));
+
+          // Add to chat messages
+          const senderName = data.updatedByName || data.updatedBy || 'Unknown';
+          setChatMessages(prev => [...prev, {
+            id: Date.now().toString(),
+            type: 'status',
+            message: `Annotation status changed to ${data.status} by ${senderName}`,
+            timestamp: data.timestamp,
+            addedBy: data.updatedBy,
+            senderName: senderName,
+            isFromClient: data.updatedBy === 'Client'
+          }]);
+          setLastUpdate(data.timestamp);
+        }
+      });
+
+      // Listen for annotation assignments
+      newSocket.on("annotationAssigned", (data) => {
+        console.log("👤 Client received annotationAssigned event:", data);
+        if (data.projectId === params.reviewId) {
+          // Add to chat messages
+          const senderName = data.assignedByName || data.assignedBy || 'Unknown';
+          setChatMessages(prev => [...prev, {
+            id: Date.now().toString(),
+            type: 'status',
+            message: `Annotation assigned to ${data.assignedTo} by ${senderName}`,
+            timestamp: data.timestamp,
+            addedBy: data.assignedBy,
+            senderName: senderName,
+            isFromClient: data.assignedBy === 'Client'
+          }]);
+          setLastUpdate(data.timestamp);
+        }
+      });
+
+      // Listen for annotation resolved events
+      newSocket.on("annotationResolved", (data) => {
+        console.log("✅ Client received annotationResolved event:", data);
+        if (data.projectId === params.reviewId) {
+          // Update local state immediately
+          setAnnotations(prev => prev.map(annotation =>
+            annotation.id === data.annotationId
+              ? {
+                ...annotation,
+                status: 'COMPLETED' as any,
+                isResolved: true,
+                resolvedBy: data.resolvedBy,
+                resolvedAt: data.timestamp
+              }
+              : annotation
+          ));
+
+          // Add to chat messages
+          const senderName = data.resolvedByName || data.resolvedBy || 'Unknown';
+          setChatMessages(prev => [...prev, {
+            id: Date.now().toString(),
+            type: 'status',
+            message: `Annotation resolved by ${senderName}`,
+            timestamp: data.timestamp,
+            addedBy: data.resolvedBy,
+            senderName: senderName,
+            isFromClient: data.resolvedBy === 'Client'
+          }]);
+          setLastUpdate(data.timestamp);
+        }
+      });
+
+      // Listen for file uploads
+      newSocket.on("fileUploaded", (data) => {
+        console.log("📁 Client received fileUploaded event:", data);
+        if (data.projectId === params.reviewId) {
+          // Add to chat messages
+          const senderName = data.uploadedByName || data.uploadedBy || 'Unknown';
+          setChatMessages(prev => [...prev, {
+            id: Date.now().toString(),
+            type: 'status',
+            message: `File uploaded: ${data.fileName} by ${senderName}`,
+            timestamp: data.timestamp,
+            addedBy: data.uploadedBy,
+            senderName: senderName,
+            isFromClient: data.uploadedBy === 'Client'
+          }]);
+          setLastUpdate(data.timestamp);
+        }
+      });
+
+      setSocket(newSocket);
+
+      return () => {
+        newSocket.disconnect();
+      };
+    }
+  }, [params.reviewId]);
+
+  // Additional room joining when reviewData is loaded (backup)
   useEffect(() => {
-    if (socket && reviewData?.project?.id) {
-      console.log("🔗 Client joining project room:", reviewData.project.id);
+    if (socket && reviewData?.project?.id && reviewData.project.id !== params.reviewId) {
+      console.log("🔗 Client joining additional project room:", reviewData.project.id);
       socket.emit("join-project", reviewData.project.id);
     }
-
-    return () => {
-      if (socket && reviewData?.project?.id) {
-        socket.emit("leave-project", reviewData.project.id);
-      }
-    };
-  }, [socket, reviewData?.project?.id]);
+  }, [socket, reviewData?.project?.id, params.reviewId]);
 
   // Helper functions
   const isImageFile = (file: ProjectFile) => {
@@ -718,7 +1040,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
           createdAt: new Date().toISOString(),
           x: popupPosition?.x || 0,
           y: popupPosition?.y || 0,
-          status: "OPEN",
+          status: "PENDING",
           isResolved: false,
           replies: [],
         };
@@ -816,18 +1138,18 @@ export default function ReviewPage({ params }: ReviewPageProps) {
           prev.map((annotation) =>
             annotation.id === selectedAnnotation.id
               ? {
-                  ...annotation,
-                  replies: [
-                    ...(annotation.replies || []),
-                    {
-                      id: data.data.id,
-                      content: newComment,
-                      addedBy: "Client",
-                      addedByName: currentUser?.name || "Client",
-                      createdAt: new Date().toISOString(),
-                    },
-                  ],
-                }
+                ...annotation,
+                replies: [
+                  ...(annotation.replies || []),
+                  {
+                    id: data.data.id,
+                    content: newComment,
+                    addedBy: "Client",
+                    addedByName: currentUser?.name || "Client",
+                    createdAt: new Date().toISOString(),
+                  },
+                ],
+              }
               : annotation
           )
         );
@@ -901,14 +1223,14 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         // Update local state
         setReviewData((prev: any) => ({
           ...prev,
-          status: "APPROVED",
+          status: "completed",
         }));
 
         // Emit socket event
         if (socket) {
           socket.emit("projectStatusChanged", {
             projectId: params.reviewId,
-            status: "APPROVED",
+            status: "completed",
             updatedBy: "Client",
           });
         }
@@ -991,7 +1313,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
       </div>
     );
   }
-
+console.log(currentVersionData,'currentVersionData')
   // Error state
   if (error || !reviewData) {
     return (
@@ -1038,7 +1360,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
             <Badge variant="outline">Client Access</Badge>
             <Badge
               variant={
-                reviewData.status === "APPROVED" ? "default" : "secondary"
+                reviewData.status === "completed" ? "default" : "secondary"
               }
               className="capitalize"
             >
@@ -1047,6 +1369,11 @@ export default function ReviewPage({ params }: ReviewPageProps) {
             <Badge variant={isConnected ? "default" : "secondary"}>
               {isConnected ? "Live" : "Offline"}
             </Badge>
+            {lastUpdate && (
+              <Badge variant="outline" className="text-xs">
+                Last update: {new Date(lastUpdate).toLocaleTimeString()}
+              </Badge>
+            )}
             <Badge variant="outline">{currentVersion}</Badge>
             <ThemeToggle />
           </div>
@@ -1256,7 +1583,14 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                     </div>
                   </CardTitle>
                   <CardDescription>
-                    Click anywhere on the design to add annotations and feedback
+                    {areAllAnnotationsResolved() ? (
+                      <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                        <CheckCircle className="h-4 w-4" />
+                        All annotations have been completed or rejected. No further annotations can be added.
+                      </div>
+                    ) : (
+                      "Click anywhere on the design to add annotations and feedback"
+                    )}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -1265,12 +1599,19 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                       <img
                         src={currentFileData.url}
                         alt={currentFileData.name}
-                        className="w-full h-auto max-h-[500px] object-contain cursor-crosshair"
-                        onClick={handleImageClick}
+                        className={`w-full h-auto max-h-[500px] object-contain ${areAllAnnotationsResolved() || currentVersionData?.status !== 'pending' ? 'cursor-not-allowed' : 'cursor-crosshair'
+                          }`}
+                        onClick={(e) => {
+                          if (currentVersionData?.status !== 'pending') {
+                            e.preventDefault();
+                            return;
+                          }
+                          handleImageClick(e);
+                        }}
                       />
 
                       {/* Render existing annotations on image */}
-                      {annotations.map((annotation) => {
+                      {currentFileAnnotations.map((annotation) => {
                         if (
                           annotation.x !== undefined &&
                           annotation.y !== undefined
@@ -1286,11 +1627,10 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                             >
                               {/* Main annotation pin */}
                               <div
-                                className={`${
-                                  annotation.isResolved
+                                className={`${annotation.isResolved
                                     ? "bg-green-500"
                                     : "bg-red-500"
-                                } text-white text-xs px-2 py-1 rounded-full shadow-lg cursor-pointer hover:opacity-80 transition-colors group`}
+                                  } text-white text-xs px-2 py-1 rounded-full shadow-lg cursor-pointer hover:opacity-80 transition-colors group`}
                                 onClick={() =>
                                   handleAnnotationClick(annotation)
                                 }
@@ -1307,11 +1647,10 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                                   )}
                                 {/* Status indicator */}
                                 <div
-                                  className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${
-                                    annotation.isResolved
+                                  className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${annotation.isResolved
                                       ? "bg-green-500"
                                       : "bg-red-500"
-                                  } border-2 border-white`}
+                                    } border-2 border-white`}
                                 ></div>
                               </div>
 
@@ -1321,11 +1660,10 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                                   {/* Annotation header */}
                                   <div className="flex items-center gap-2 mb-2">
                                     <div
-                                      className={`w-2 h-2 rounded-full ${
-                                        annotation.isResolved
+                                      className={`w-2 h-2 rounded-full ${annotation.isResolved
                                           ? "bg-green-500"
                                           : "bg-red-500"
-                                      }`}
+                                        }`}
                                     ></div>
                                     <span className="text-sm font-medium">
                                       {annotation.addedByName ||
@@ -1333,9 +1671,9 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                                         "Unknown"}
                                     </span>
                                     <span className="text-xs text-gray-500">
-                                      {new Date(
-                                        annotation.createdAt
-                                      ).toLocaleString()}
+                                      {annotation.createdAt
+                                        ? new Date(annotation.createdAt).toLocaleString()
+                                        : 'Invalid Date'}
                                     </span>
                                   </div>
 
@@ -1370,9 +1708,9 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                                                     reply.addedBy}
                                                 </span>
                                                 <span className="text-xs text-gray-500">
-                                                  {new Date(
-                                                    reply.createdAt
-                                                  ).toLocaleString()}
+                                                  {reply.createdAt
+                                                    ? new Date(reply.createdAt).toLocaleString()
+                                                    : 'Invalid Date'}
                                                 </span>
                                               </div>
                                               <p className="text-xs text-gray-700 dark:text-gray-300">
@@ -1394,7 +1732,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                                         e.stopPropagation();
                                         handleAnnotationClick(annotation);
                                       }}
-                                      disabled={annotation.isResolved}
+                                      disabled={annotation.isResolved || currentVersionData?.status !== 'pending'}
                                     >
                                       <MessageCircle className="h-3 w-3 mr-1" />
                                       Reply
@@ -1443,20 +1781,22 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                                 )}
 
                               {/* Reply button on hover */}
-                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-xs bg-white border-blue-500 text-blue-500 hover:bg-blue-50"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleAnnotationClick(annotation);
-                                  }}
-                                >
-                                  <MessageCircle className="h-3 w-3 mr-1" />
-                                  Reply
-                                </Button>
-                              </div>
+                              {currentVersionData?.status === 'pending' && (
+                                <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-xs bg-white border-blue-500 text-blue-500 hover:bg-blue-50"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleAnnotationClick(annotation);
+                                    }}
+                                  >
+                                    <MessageCircle className="h-3 w-3 mr-1" />
+                                    Reply
+                                  </Button>
+                                </div>
+                              )}
                             </div>
                           );
                         }
@@ -1480,11 +1820,10 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                             >
                               {/* Main annotation pin */}
                               <div
-                                className={`${
-                                  annotation.resolved
+                                className={`${annotation.resolved
                                     ? "bg-green-500"
                                     : "bg-red-500"
-                                } text-white text-xs px-2 py-1 rounded-full shadow-lg cursor-pointer hover:opacity-80 transition-colors group`}
+                                  } text-white text-xs px-2 py-1 rounded-full shadow-lg cursor-pointer hover:opacity-80 transition-colors group`}
                                 onClick={() =>
                                   handleAnnotationClick(annotation)
                                 }
@@ -1495,11 +1834,10 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                                   : annotation.comment}
                                 {/* Status indicator */}
                                 <div
-                                  className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${
-                                    annotation.resolved
+                                  className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${annotation.resolved
                                       ? "bg-green-500"
                                       : "bg-red-500"
-                                  } border-2 border-white`}
+                                    } border-2 border-white`}
                                 ></div>
                               </div>
 
@@ -1509,11 +1847,10 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                                   {/* Annotation header */}
                                   <div className="flex items-center gap-2 mb-2">
                                     <div
-                                      className={`w-2 h-2 rounded-full ${
-                                        annotation.resolved
+                                      className={`w-2 h-2 rounded-full ${annotation.resolved
                                           ? "bg-green-500"
                                           : "bg-red-500"
-                                      }`}
+                                        }`}
                                     ></div>
                                     <span className="text-sm font-medium">
                                       {annotation.addedByName ||
@@ -1548,7 +1885,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                                         e.stopPropagation();
                                         handleAnnotationClick(annotation);
                                       }}
-                                      disabled={annotation.resolved}
+                                      disabled={annotation.resolved || currentVersionData?.status !== 'pending'}
                                     >
                                       <MessageCircle className="h-3 w-3 mr-1" />
                                       Reply
@@ -1570,20 +1907,22 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                               </div>
 
                               {/* Reply button on hover */}
-                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-xs bg-white border-blue-500 text-blue-500 hover:bg-blue-50"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleAnnotationClick(annotation);
-                                  }}
-                                >
-                                  <MessageCircle className="h-3 w-3 mr-1" />
-                                  Reply
-                                </Button>
-                              </div>
+                              {currentVersionData?.status === 'pending' && (
+                                <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-xs bg-white border-blue-500 text-blue-500 hover:bg-blue-50"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleAnnotationClick(annotation);
+                                    }}
+                                  >
+                                    <MessageCircle className="h-3 w-3 mr-1" />
+                                    Reply
+                                  </Button>
+                                </div>
+                              )}
                             </div>
                           );
                         }
@@ -1591,35 +1930,37 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                       })}
 
                       {/* Click to annotate badge */}
-                      <div className="absolute top-4 left-4">
-                        <Badge
-                          variant="outline"
-                          className="text-xs bg-white/90"
-                        >
-                          <MapPin className="h-3 w-3 mr-1" />
-                          Click to annotate
-                        </Badge>
-                      </div>
-
-                      {/* Annotation counter badge */}
-                      {(annotations.length > 0 ||
-                        realtimeAnnotations.length > 0) && (
-                        <div className="absolute top-4 right-4">
+                      {currentVersionData?.status === 'pending' && (
+                        <div className="absolute top-4 left-4">
                           <Badge
-                            variant="default"
-                            className="text-xs bg-blue-500 text-white"
+                            variant="outline"
+                            className="text-xs bg-white/90"
                           >
-                            <MessageCircle className="h-3 w-3 mr-1" />
-                            {annotations.length +
-                              realtimeAnnotations.length}{" "}
-                            annotation
-                            {annotations.length + realtimeAnnotations.length !==
-                            1
-                              ? "s"
-                              : ""}
+                            <MapPin className="h-3 w-3 mr-1" />
+                            Click to annotate
                           </Badge>
                         </div>
                       )}
+
+                      {/* Annotation counter badge */}
+                      {(currentFileAnnotations.length > 0 ||
+                        realtimeAnnotations.length > 0) && (
+                          <div className="absolute top-4 right-4">
+                            <Badge
+                              variant="default"
+                              className="text-xs bg-blue-500 text-white"
+                            >
+                              <MessageCircle className="h-3 w-3 mr-1" />
+                              {currentFileAnnotations.length +
+                                realtimeAnnotations.length}{" "}
+                              annotation
+                              {currentFileAnnotations.length + realtimeAnnotations.length !==
+                                1
+                                ? "s"
+                                : ""}
+                            </Badge>
+                          </div>
+                        )}
                     </div>
                   ) : currentFileData ? (
                     <div className="relative bg-muted rounded-lg overflow-hidden border-2 border-border">
@@ -1652,181 +1993,178 @@ export default function ReviewPage({ params }: ReviewPageProps) {
               {/* Comments & Annotations */}
               {(realtimeComments.length > 0 ||
                 realtimeAnnotations.length > 0 ||
-                annotations.length > 0) && (
-                <Card className="mt-6">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <MessageCircle className="h-5 w-5" />
-                      Comments & Annotations (
-                      {realtimeComments.length +
-                        realtimeAnnotations.length +
-                        annotations.length}
-                      )
-                    </CardTitle>
-                    <CardDescription>
-                      All feedback and annotations for this file
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {/* Comments */}
-                      {realtimeComments.map((comment) => (
-                        <div key={comment.id} className="p-4 border rounded-lg">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                                <span className="text-sm font-medium">
-                                  {comment.userName}
-                                </span>
-                                <Badge variant="secondary" className="text-xs">
-                                  {comment.type}
-                                </Badge>
-                                <span className="text-xs text-muted-foreground">
-                                  {new Date(comment.createdAt).toLocaleString()}
-                                </span>
-                              </div>
-                              <p className="text-sm">{comment.commentText}</p>
-                              {comment.coordinates && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Position: {comment.coordinates}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-
-                      {/* Real-time Annotations */}
-                      {realtimeAnnotations.map((annotation) => (
-                        <div
-                          key={annotation.id}
-                          className="p-4 border rounded-lg"
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <div
-                                  className={`w-3 h-3 rounded-full ${
-                                    annotation.resolved
-                                      ? "bg-green-500"
-                                      : "bg-red-500"
-                                  }`}
-                                />
-                                <span className="text-sm font-medium">
-                                  {annotation.addedByName ||
-                                    annotation.addedBy ||
-                                    "Unknown"}
-                                </span>
-                                <Badge
-                                  variant={
-                                    annotation.resolved
-                                      ? "default"
-                                      : "destructive"
-                                  }
-                                  className="text-xs"
-                                >
-                                  {annotation.resolved ? "Resolved" : "Pending"}
-                                </Badge>
-                                <span className="text-xs text-muted-foreground">
-                                  {new Date(
-                                    annotation.timestamp
-                                  ).toLocaleString()}
-                                </span>
-                              </div>
-                              <p className="text-sm">{annotation.comment}</p>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Position: {annotation.x?.toFixed(1) || 0}%,{" "}
-                                {annotation.y?.toFixed(1) || 0}%
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-
-                      {/* Regular Annotations */}
-                      {annotations.map((annotation) => (
-                        <div
-                          key={annotation.id}
-                          className="p-4 border rounded-lg"
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <div
-                                  className={`w-3 h-3 rounded-full ${
-                                    annotation.isResolved
-                                      ? "bg-green-500"
-                                      : "bg-red-500"
-                                  }`}
-                                />
-                                <span className="text-sm font-medium">
-                                  {annotation.addedByName ||
-                                    annotation.addedBy ||
-                                    "Unknown"}
-                                </span>
-                                <Badge
-                                  variant={
-                                    annotation.isResolved
-                                      ? "default"
-                                      : "destructive"
-                                  }
-                                  className="text-xs"
-                                >
-                                  {annotation.isResolved
-                                    ? "Resolved"
-                                    : "Pending"}
-                                </Badge>
-                                <span className="text-xs text-muted-foreground">
-                                  {new Date(
-                                    annotation.createdAt
-                                  ).toLocaleString()}
-                                </span>
-                              </div>
-                              <p className="text-sm">{annotation.content}</p>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Position: {annotation.x?.toFixed(1) || 0}%,{" "}
-                                {annotation.y?.toFixed(1) || 0}%
-                              </p>
-
-                              {/* Show replies if any */}
-                              {annotation.replies &&
-                                annotation.replies.length > 0 && (
-                                  <div className="mt-3 ml-4 space-y-2">
-                                    <div className="text-xs font-medium text-muted-foreground mb-2">
-                                      Replies ({annotation.replies.length})
-                                    </div>
-                                    {annotation.replies.map((reply) => (
-                                      <div
-                                        key={reply.id}
-                                        className="p-2 bg-gray-50 dark:bg-gray-800 rounded border-l-2 border-blue-500"
-                                      >
-                                        <div className="flex items-center gap-2 mb-1">
-                                          <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
-                                          <span className="text-xs font-medium">
-                                            {reply.addedByName || reply.addedBy}
-                                          </span>
-                                          <span className="text-xs text-muted-foreground">
-                                            {new Date(
-                                              reply.createdAt
-                                            ).toLocaleString()}
-                                          </span>
-                                        </div>
-                                        <p className="text-xs">
-                                          {reply.content}
-                                        </p>
-                                      </div>
-                                    ))}
-                                  </div>
+                currentFileAnnotations.length > 0) && (
+                  <Card className="mt-6">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <MessageCircle className="h-5 w-5" />
+                        Comments & Annotations (
+                        {realtimeComments.length +
+                          realtimeAnnotations.length +
+                          currentFileAnnotations.length}
+                        )
+                      </CardTitle>
+                      <CardDescription>
+                        All feedback and annotations for this file
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {/* Comments */}
+                        {realtimeComments.map((comment) => (
+                          <div key={comment.id} className="p-4 border rounded-lg">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                  <span className="text-sm font-medium">
+                                    {comment.userName}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {comment.createdAt
+                                      ? new Date(comment.createdAt).toLocaleString()
+                                      : 'Invalid Date'}
+                                  </span>
+                                </div>
+                                <p className="text-sm">{comment.commentText}</p>
+                                {comment.coordinates && (
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Position: {comment.coordinates}
+                                  </p>
                                 )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+                        ))}
+
+                        {/* Real-time Annotations */}
+                        {realtimeAnnotations.map((annotation) => (
+                          <div
+                            key={annotation.id}
+                            className="p-4 border rounded-lg"
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <div
+                                    className={`w-3 h-3 rounded-full ${annotation.resolved
+                                        ? "bg-green-500"
+                                        : "bg-red-500"
+                                      }`}
+                                  />
+                                  <span className="text-sm font-medium">
+                                    {annotation.addedByName ||
+                                      annotation.addedBy ||
+                                      "Unknown"}
+                                  </span>
+                                  <Badge
+                                    variant={
+                                      annotation.resolved
+                                        ? "default"
+                                        : "destructive"
+                                    }
+                                    className="text-xs"
+                                  >
+                                    {annotation.resolved ? "Resolved" : "Pending"}
+                                  </Badge>
+                                  <span className="text-xs text-muted-foreground">
+                                    {new Date(
+                                      annotation.timestamp
+                                    ).toLocaleString()}
+                                  </span>
+                                </div>
+                                <p className="text-sm">{annotation.comment}</p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Position: {annotation.x?.toFixed(1) || 0}%,{" "}
+                                  {annotation.y?.toFixed(1) || 0}%
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* Regular Annotations */}
+                        {currentFileAnnotations.map((annotation) => (
+                          <div
+                            key={annotation.id}
+                            className="p-4 border rounded-lg"
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <div
+                                    className={`w-3 h-3 rounded-full ${annotation.isResolved
+                                        ? "bg-green-500"
+                                        : "bg-red-500"
+                                      }`}
+                                  />
+                                  <span className="text-sm font-medium">
+                                    {annotation.addedByName ||
+                                      annotation.addedBy ||
+                                      "Unknown"}
+                                  </span>
+                                  <Badge
+                                    variant={
+                                      annotation.isResolved
+                                        ? "default"
+                                        : "destructive"
+                                    }
+                                    className="text-xs"
+                                  >
+                                    {annotation.isResolved
+                                      ? "Resolved"
+                                      : "Pending"}
+                                  </Badge>
+                                  <span className="text-xs text-muted-foreground">
+                                    {new Date(
+                                      annotation.createdAt
+                                    ).toLocaleString()}
+                                  </span>
+                                </div>
+                                <p className="text-sm">{annotation.content}</p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Position: {annotation.x?.toFixed(1) || 0}%,{" "}
+                                  {annotation.y?.toFixed(1) || 0}%
+                                </p>
+
+                                {/* Show replies if any */}
+                                {annotation.replies &&
+                                  annotation.replies.length > 0 && (
+                                    <div className="mt-3 ml-4 space-y-2">
+                                      <div className="text-xs font-medium text-muted-foreground mb-2">
+                                        Replies ({annotation.replies.length})
+                                      </div>
+                                      {annotation.replies.map((reply) => (
+                                        <div
+                                          key={reply.id}
+                                          className="p-2 bg-gray-50 dark:bg-gray-800 rounded border-l-2 border-blue-500"
+                                        >
+                                          <div className="flex items-center gap-2 mb-1">
+                                            <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                                            <span className="text-xs font-medium">
+                                              {reply.addedByName || reply.addedBy}
+                                            </span>
+                                            <span className="text-xs text-muted-foreground">
+                                              {new Date(
+                                                reply.createdAt
+                                              ).toLocaleString()}
+                                            </span>
+                                          </div>
+                                          <p className="text-xs">
+                                            {reply.content}
+                                          </p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
               {/* Revision History */}
               {revisions.length > 0 && (
@@ -1839,41 +2177,40 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                       {revisions.map((revision) => (
                         <div
                           key={revision.id}
-                          className={`p-4 border rounded-lg ${
-                            revision.status === "approved"
+                          className={`p-4 border rounded-lg ${revision.status === "completed"
                               ? "bg-green-50 border-green-200"
                               : revision.status === "rejected"
-                              ? "bg-red-50 border-red-200"
-                              : revision.status === "in_revision"
-                              ? "bg-yellow-50 border-yellow-200"
-                              : "bg-blue-50 border-blue-200"
-                          }`}
+                                ? "bg-red-50 border-red-200"
+                                : revision.status === "in_revision"
+                                  ? "bg-yellow-50 border-yellow-200"
+                                  : "bg-blue-50 border-blue-200"
+                            }`}
                         >
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-2">
                                 <Badge
                                   variant={
-                                    revision.status === "approved"
+                                    revision.status === "completed"
                                       ? "default"
                                       : revision.status === "rejected"
-                                      ? "destructive"
-                                      : revision.status === "in_revision"
-                                      ? "secondary"
-                                      : "outline"
+                                        ? "destructive"
+                                        : revision.status === "in_revision"
+                                          ? "secondary"
+                                          : "outline"
                                   }
                                 >
                                   {revision.version}
                                 </Badge>
                                 <Badge
                                   variant={
-                                    revision.status === "approved"
+                                    revision.status === "completed"
                                       ? "default"
                                       : revision.status === "rejected"
-                                      ? "destructive"
-                                      : revision.status === "in_revision"
-                                      ? "secondary"
-                                      : "outline"
+                                        ? "destructive"
+                                        : revision.status === "in_revision"
+                                          ? "secondary"
+                                          : "outline"
                                   }
                                 >
                                   {getStatusText(revision.status)}
@@ -1965,13 +2302,13 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                     </Label>
                     <Badge
                       variant={
-                        currentVersionData?.status === "approved"
+                        currentVersionData?.status === "completed"
                           ? "default"
                           : currentVersionData?.status === "rejected"
-                          ? "destructive"
-                          : currentVersionData?.status === "in_revision"
-                          ? "secondary"
-                          : "outline"
+                            ? "destructive"
+                            : currentVersionData?.status === "in_revision"
+                              ? "secondary"
+                              : "outline"
                       }
                     >
                       {getStatusText(currentVersionData?.status || "unknown")}
@@ -1981,13 +2318,13 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                     <Label className="text-sm font-medium">Review Status</Label>
                     <Badge
                       variant={
-                        reviewData.status === "APPROVED"
+                        reviewData.status === "completed"
                           ? "default"
                           : reviewData.status === "REJECTED"
-                          ? "destructive"
-                          : reviewData.status === "IN_PROGRESS"
-                          ? "secondary"
-                          : "outline"
+                            ? "destructive"
+                            : reviewData.status === "IN_PROGRESS"
+                              ? "secondary"
+                              : "outline"
                       }
                     >
                       {reviewData.status?.toLowerCase()}
@@ -2010,69 +2347,64 @@ export default function ReviewPage({ params }: ReviewPageProps) {
               </Card>
 
               {/* Review Actions */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Review Actions</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Button
-                    onClick={() => setShowSignatureDialog(true)}
-                    className="w-full bg-green-600 hover:bg-green-700"
-                    disabled={currentVersionData?.status === "approved"}
-                  >
-                    <Icons.CheckCircle />
-                    Approve {currentVersion}
-                  </Button>
-
-                  <Button
-                    onClick={handleRejection}
-                    variant="destructive"
-                    className="w-full"
-                    disabled={currentVersionData?.status === "in_revision"}
-                  >
-                    <Icons.X />
-                    Request Changes
-                  </Button>
-
-                  {reviewData.allowDownloads && (
-                    <Button variant="outline" className="w-full">
-                      <Icons.Download />
-                      Download Files
+              {currentVersionData?.status === "completed" ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Review Status</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-2 text-green-600">
+                      <Icons.CheckCircle />
+                      <p>This version has been approved</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : currentVersionData?.status === "rejected" ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Review Status</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-2 text-red-600">
+                      <Icons.X />
+                      <p>This version has been rejected</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Review Actions</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <Button
+                      onClick={() => setShowSignatureDialog(true)}
+                      className="w-full bg-green-600 hover:bg-green-700"
+                    >
+                      <Icons.CheckCircle />
+                      Approve {currentVersion}
                     </Button>
-                  )}
-                </CardContent>
-              </Card>
 
-              {/* Version Status */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Version Status</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {versions.map((version) => (
-                      <div
-                        key={version.id}
-                        className="flex items-center justify-between"
-                      >
-                        <span className="text-sm font-medium">
-                          {version.version}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <div
-                            className={`w-2 h-2 rounded-full ${getStatusColor(
-                              version.status
-                            )}`}
-                          />
-                          <span className="text-xs text-muted-foreground">
-                            {getStatusText(version.status)}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+                    <Button
+                      onClick={handleRejection}
+                      variant="destructive"
+                      className="w-full"
+                    >
+                      <Icons.X />
+                      Request Changes
+                    </Button>
+
+                    {reviewData.allowDownloads && (
+                      <Button variant="outline" className="w-full">
+                        <Icons.Download />
+                        Download Files
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+
 
               {/* Instructions */}
               <Card>
@@ -2096,6 +2428,66 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                     <p>• Click on annotation pins to add or edit comments</p>
                     <p>• Use "Request Changes" to submit revision requests</p>
                     <p>• Approve only when you're satisfied with all changes</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Right Sidebar - Chat Messages */}
+            <div className="lg:col-span-1">
+              <Card className="sticky top-6">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4" />
+                    Live Chat
+                    <Badge variant="outline" className="text-xs">
+                      {chatMessages.length} messages
+                    </Badge>
+                  </CardTitle>
+                  <CardDescription>
+                    Real-time communication with admin
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4 max-h-96 overflow-y-auto">
+                    {chatMessages.length > 0 ? (
+                      chatMessages.map((message) => (
+                        <div
+                          key={message.id}
+                          className={`p-3 rounded-lg ${message.isFromClient
+                              ? "bg-blue-50 dark:bg-blue-900/20 ml-4"
+                              : "bg-gray-50 dark:bg-gray-800 mr-4"
+                            }`}
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <div
+                              className={`w-2 h-2 rounded-full ${message.isFromClient
+                                  ? "bg-blue-500"
+                                  : "bg-gray-500"
+                                }`}
+                            ></div>
+                            <span className="text-xs font-medium">
+                              {message.senderName || message.addedBy || "Unknown"}
+                            </span>
+                            <Badge variant="secondary" className="text-xs">
+                              {message.type}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {message.timestamp
+                                ? new Date(message.timestamp).toLocaleTimeString()
+                                : 'Invalid Date'}
+                            </span>
+                          </div>
+                          <p className="text-sm">{message.message}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">No messages yet</p>
+                        <p className="text-xs">Start annotating to see live updates</p>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -2377,11 +2769,10 @@ export default function ReviewPage({ params }: ReviewPageProps) {
               <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
                 <div className="flex items-center gap-2 mb-2">
                   <div
-                    className={`w-3 h-3 rounded-full ${
-                      selectedAnnotationForReply.isResolved
+                    className={`w-3 h-3 rounded-full ${selectedAnnotationForReply.isResolved
                         ? "bg-green-500"
                         : "bg-red-500"
-                    }`}
+                      }`}
                   ></div>
                   <span className="text-sm font-medium">
                     {selectedAnnotationForReply.addedByName}
@@ -2400,13 +2791,13 @@ export default function ReviewPage({ params }: ReviewPageProps) {
 
             {/* Input Area */}
             <div className="p-4">
-              {selectedAnnotationForReply.isResolved ? (
+              {selectedAnnotationForReply.status === 'COMPLETED' || selectedAnnotationForReply.status === 'REJECTED' ? (
                 <div className="text-center py-4">
-                  <div className="text-green-500 mb-2">
+                  <div className={`mb-2 ${selectedAnnotationForReply.status === 'COMPLETED' ? 'text-green-500' : 'text-red-500'}`}>
                     <CheckCircle className="h-8 w-8 mx-auto" />
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    This annotation has been resolved and cannot be replied to.
+                    This annotation has been {selectedAnnotationForReply.status.toLowerCase()} and cannot be replied to.
                   </p>
                 </div>
               ) : (
@@ -2426,7 +2817,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
             </div>
 
             {/* Action Bar */}
-            {!selectedAnnotationForReply.isResolved && (
+            {selectedAnnotationForReply.status === 'PENDING' && (
               <div className="flex items-center justify-between p-4 border-t border-gray-200 dark:border-gray-700">
                 <div className="flex items-center gap-3">
                   {/* Emoji Button */}

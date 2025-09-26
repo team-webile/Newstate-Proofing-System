@@ -99,7 +99,7 @@ interface Annotation {
   createdAt: string
   x?: number
   y?: number
-  status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED'
+  status: 'PENDING' | 'COMPLETED' | 'REJECTED'
   assignedTo?: string
   fileVersion?: string
   isResolved: boolean
@@ -427,7 +427,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
           addedBy: data.addedBy || 'Unknown',
           addedByName: data.addedByName || 'Unknown',
           createdAt: data.timestamp,
-          status: 'OPEN',
+          status: 'PENDING',
           isResolved: false,
           x: data.x,
           y: data.y
@@ -523,7 +523,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
             ? { 
                 ...annotation, 
                 status: data.status as any,
-                isResolved: data.status === 'RESOLVED'
+                isResolved: data.status === 'COMPLETED'
               }
             : annotation
         ))
@@ -573,7 +573,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
           annotation.id === data.annotationId 
             ? { 
                 ...annotation, 
-                status: 'RESOLVED',
+                status: 'COMPLETED',
                 isResolved: true,
                 resolvedBy: data.resolvedBy,
                 resolvedAt: data.timestamp
@@ -674,7 +674,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
           createdAt: new Date().toISOString(),
           x: popupPosition?.x,
           y: popupPosition?.y,
-          status: 'OPEN',
+          status: 'PENDING',
           isResolved: false,
           replies: []
         }
@@ -755,8 +755,22 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
     return annotations.filter(ann => ann.fileId === fileId)
   }
 
+  // Check if all annotations are completed or rejected
+  const areAllAnnotationsResolved = () => {
+    if (!selectedFile) return false;
+    const fileAnnotations = getFileAnnotations(selectedFile.id);
+    return fileAnnotations.every(annotation => 
+      annotation.status === 'COMPLETED' || annotation.status === 'REJECTED'
+    );
+  };
+
   const handleImageClick = (event: React.MouseEvent<HTMLImageElement>) => {
     if (!isImageFile(selectedFile!)) return
+    
+    // Don't allow adding annotations if all are resolved
+    if (areAllAnnotationsResolved()) {
+      return;
+    }
     
     const rect = event.currentTarget.getBoundingClientRect()
     const x = ((event.clientX - rect.left) / rect.width) * 100
@@ -900,9 +914,9 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
             ? { 
                 ...annotation, 
                 status: status as any, 
-                isResolved: status === 'RESOLVED',
-                resolvedBy: status === 'RESOLVED' ? currentUser?.name || 'Admin' : annotation.resolvedBy,
-                resolvedAt: status === 'RESOLVED' ? new Date().toISOString() : annotation.resolvedAt
+                isResolved: status === 'COMPLETED',
+                resolvedBy: status === 'COMPLETED' ? currentUser?.name || 'Admin' : annotation.resolvedBy,
+                resolvedAt: status === 'COMPLETED' ? new Date().toISOString() : annotation.resolvedAt
               }
             : annotation
         ))
@@ -1063,14 +1077,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowVersionDialog(true)}
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              New Version
-            </Button>
+            
             <Button
               variant="outline"
               size="sm"
@@ -1090,12 +1097,8 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
           <Badge variant="outline">
             Admin Access
           </Badge>
-          <Badge variant="secondary">
-            {project.status}
-          </Badge>
-          <Badge variant="outline">
-            {files.length} Files
-          </Badge>
+           
+          
           <Badge variant={isConnected ? "default" : "destructive"}>
             {isConnected ? "🟢 Live" : "🔴 Offline"}
           </Badge>
@@ -1171,7 +1174,18 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                     File Preview
                   </CardTitle>
                   <CardDescription>
-                    {selectedFile ? `Previewing ${selectedFile.name}` : 'Select a file to preview'}
+                    {selectedFile ? (
+                      areAllAnnotationsResolved() ? (
+                        <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                          <CheckCircle className="h-4 w-4" />
+                          All annotations for {selectedFile.name} have been completed or rejected. No further annotations can be added.
+                        </div>
+                      ) : (
+                        `Previewing ${selectedFile.name} - Click to add annotations`
+                      )
+                    ) : (
+                      'Select a file to preview'
+                    )}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -1184,7 +1198,9 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                             <img
                               src={selectedFile.url}
                               alt={selectedFile.name}
-                              className="w-full h-auto max-h-[500px] object-contain cursor-crosshair"
+                              className={`w-full h-auto max-h-[500px] object-contain ${
+                                areAllAnnotationsResolved() ? 'cursor-not-allowed' : 'cursor-crosshair'
+                              }`}
                               onClick={handleImageClick}
                             />
                             
@@ -1242,14 +1258,14 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                                         variant="outline"
                                         className="text-xs bg-white border-blue-500 text-blue-500 hover:bg-blue-50"
                                         onClick={() => handleReplyClick(annotation)}
-                                        disabled={annotation.isResolved}
+                                        disabled={annotation.status === 'COMPLETED' || annotation.status === 'REJECTED'}
                                       >
                                         <MessageSquare className="h-3 w-3 mr-1" />
                                         Reply
                                       </Button>
                                       
                                       {/* Status control buttons */}
-                                      {!annotation.isResolved && (
+                                      {annotation.status === 'PENDING' && (
                                         <Button
                                           size="sm"
                                           variant="outline"
@@ -1261,7 +1277,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                                         </Button>
                                       )}
                                       
-                                      {annotation.isResolved && (
+                                      {annotation.status === 'COMPLETED' && (
                                         <Button
                                           size="sm"
                                           variant="outline"
@@ -1401,10 +1417,17 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                       {/* Click to annotate badge for images */}
                       {isImageFile(selectedFile) && (
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-xs dark:text-gray-100 dark:border-gray-700">
-                            <MapPin className="h-3 w-3 mr-1" />
-                            Click to annotate
-                          </Badge>
+                          {areAllAnnotationsResolved() ? (
+                            <Badge variant="outline" className="text-xs bg-green-50 text-green-600 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              All annotations resolved
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs dark:text-gray-100 dark:border-gray-700">
+                              <MapPin className="h-3 w-3 mr-1" />
+                              Click to annotate
+                            </Badge>
+                          )}
                         </div>
                       )}
                     </div>
@@ -1814,6 +1837,161 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                 </svg>
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reply Input Popup */}
+      {showReplyInput && selectedAnnotationForReply && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-md mx-4">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                Reply to Annotation
+              </h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCancelReply}
+                className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Original Annotation */}
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <div
+                    className={`w-3 h-3 rounded-full ${
+                      selectedAnnotationForReply.isResolved
+                        ? "bg-green-500"
+                        : "bg-red-500"
+                    }`}
+                  ></div>
+                  <span className="text-sm font-medium">
+                    {selectedAnnotationForReply.addedByName}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    {new Date(selectedAnnotationForReply.createdAt).toLocaleString()}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  {selectedAnnotationForReply.content}
+                </p>
+              </div>
+            </div>
+
+            {/* Input Area */}
+            <div className="p-4">
+              {selectedAnnotationForReply.isResolved ? (
+                <div className="text-center py-4">
+                  <div className="text-green-500 mb-2">
+                    <CheckCircle className="h-8 w-8 mx-auto" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    This annotation has been resolved and cannot be replied to.
+                  </p>
+                </div>
+              ) : (
+                <Input
+                  placeholder="Type your reply..."
+                  value={newReply}
+                  onChange={(e) => setNewReply(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === "Enter" && newReply.trim()) {
+                      addReply(selectedAnnotationForReply.id);
+                    }
+                  }}
+                  className="border-0 focus:ring-0 text-sm dark:bg-gray-800 dark:text-gray-100"
+                  autoFocus
+                />
+              )}
+            </div>
+
+            {/* Action Bar */}
+            {!selectedAnnotationForReply.isResolved && (
+              <div className="flex items-center justify-between p-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-3">
+                  {/* Emoji Button */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    onClick={() => {
+                      setNewReply((prev) => prev + "😊");
+                    }}
+                  >
+                    <span className="text-lg">😊</span>
+                  </Button>
+
+                  {/* Mention Button */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    onClick={() => {
+                      setNewReply((prev) => prev + "@");
+                    }}
+                  >
+                    <span className="text-sm font-bold dark:text-gray-100">
+                      @
+                    </span>
+                  </Button>
+
+                  {/* Attachment Button */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    onClick={() => {
+                      const input = document.createElement("input");
+                      input.type = "file";
+                      input.accept = "image/*";
+                      input.click();
+                    }}
+                  >
+                    <svg
+                      className="h-4 w-4 dark:text-gray-100"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
+                    </svg>
+                  </Button>
+                </div>
+
+                {/* Submit Button */}
+                <Button
+                  size="sm"
+                  onClick={() => addReply(selectedAnnotationForReply.id)}
+                  disabled={!newReply.trim()}
+                  className="h-8 w-8 p-0 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 rounded-full"
+                >
+                  <svg
+                    className="h-4 w-4 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                    />
+                  </svg>
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       )}
