@@ -57,8 +57,13 @@ export default function ClientDetailPage({ params }: ClientDetailPageProps) {
       const response = await fetch(`/api/projects?clientId=${params.clientId}`)
       const data = await response.json()
       
+      console.log('📊 Admin client projects response:', data)
+      
       if (data.status === 'success') {
-        setProjects(data.data || [])
+        // Handle the nested structure - projects are in data.data.projects
+        const projects = data.data.projects || []
+        console.log('📊 Projects found:', projects.length, projects)
+        setProjects(projects)
       }
     } catch (err) {
       console.error('Failed to fetch client projects:', err)
@@ -66,13 +71,18 @@ export default function ClientDetailPage({ params }: ClientDetailPageProps) {
   }
 
   const getStatusColor = (status: string) => {
-    switch (status) {
+    switch (status.toLowerCase()) {
       case "pending":
+      case "active":
         return "bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
       case "approved":
+      case "completed":
         return "bg-green-500/10 text-green-500 border-green-500/20"
       case "revisions":
+      case "revision":
         return "bg-orange-500/10 text-orange-500 border-orange-500/20"
+      case "archived":
+        return "bg-gray-500/10 text-gray-500 border-gray-500/20"
       default:
         return "bg-muted text-muted-foreground"
     }
@@ -218,6 +228,7 @@ export default function ClientDetailPage({ params }: ClientDetailPageProps) {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">
+                  {console.log('📊 Rendering projects:', projects.length, projects)}
                   {projects.length > 0 ? (
                     <Table>
                       <TableHeader>
@@ -262,7 +273,7 @@ export default function ClientDetailPage({ params }: ClientDetailPageProps) {
                               <Button 
                                 variant="outline" 
                                 size="sm"
-                                onClick={() => (window.location.href = `/admin/projects/${project.id}`)}
+                                onClick={() => (window.location.href = `/admin/projects/${project.id}/files`)}
                               >
                                 <Icons.Eye />
                                 <span className="ml-2">View</span>
