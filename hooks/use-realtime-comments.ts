@@ -64,10 +64,14 @@ export function useRealtimeComments({
     resolveAnnotation: socketResolveAnnotation,
     updateElementStatus: socketUpdateStatus,
     addComment: socketAddComment,
+    addAnnotationReply: socketAddAnnotationReply,
+    updateReviewStatus: socketUpdateReviewStatus,
     onAnnotationAdded,
     onAnnotationResolved,
     onStatusChanged,
     onCommentAdded,
+    onAnnotationReplyAdded,
+    onReviewStatusUpdated,
     removeAllListeners,
     isConnected,
   } = useSocket(projectId);
@@ -248,6 +252,15 @@ export function useRealtimeComments({
         const data = await response.json();
 
         if (data.status === "success") {
+          // Emit socket event for real-time updates
+          socketAddAnnotationReply({
+            projectId,
+            annotationId,
+            reply: reply,
+            addedBy: currentUser.role,
+            addedByName: currentUser.name,
+          });
+
           // Update local state with new reply
           setAnnotations((prev) =>
             prev.map((annotation) =>
@@ -381,7 +394,7 @@ export function useRealtimeComments({
     });
 
     // Listen for annotation reply events
-    socket.on("annotationReplyAdded", (data) => {
+    onAnnotationReplyAdded((data) => {
       console.log("Received annotation reply:", data);
       setAnnotations((prev) =>
         prev.map((annotation) =>
@@ -405,7 +418,7 @@ export function useRealtimeComments({
     });
 
     // Listen for review status changes
-    socket.on("reviewStatusUpdated", (data) => {
+    onReviewStatusUpdated((data) => {
       console.log("Review status updated:", data);
       setReviewStatus(data.status);
       setAnnotationsDisabled(
