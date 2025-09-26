@@ -9,8 +9,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Icons } from "@/components/icons"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { PenTool, X, CheckCircle, AlertCircle, MessageCircle } from "lucide-react"
-import ImageAnnotation from "@/components/ImageAnnotation"
+import { PenTool, X, CheckCircle, AlertCircle, MessageCircle, MapPin, Eye } from "lucide-react"
+// import ImageAnnotation from "@/components/ImageAnnotation"
 import { useRealtimeComments } from "@/hooks/use-realtime-comments"
 import io from 'socket.io-client'
 import {
@@ -41,14 +41,24 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-interface Annotation {
+interface ProjectAnnotation {
   id: string
-  x: number
-  y: number
-  comment: string
-  timestamp: string
-  resolved: boolean
+  content: string
   fileId: string
+  addedBy: string
+  addedByName: string
+  createdAt: string
+  x?: number
+  y?: number
+  status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED'
+  isResolved: boolean
+  replies?: Array<{
+    id: string
+    content: string
+    addedBy: string
+    addedByName: string
+    createdAt: string
+  }>
 }
 
 interface ProjectFile {
@@ -66,7 +76,7 @@ interface Version {
   files: ProjectFile[]
   status: "draft" | "pending_review" | "approved" | "rejected" | "in_revision"
   createdAt: string
-  annotations: Annotation[]
+  annotations: ProjectAnnotation[]
   revisionNotes?: string
 }
 
@@ -91,19 +101,24 @@ interface ReviewPageProps {
 }
 
 export default function ReviewPage({ params }: ReviewPageProps) {
-  const [annotations, setAnnotations] = useState<Annotation[]>([])
+  const [annotations, setAnnotations] = useState<ProjectAnnotation[]>([])
   const [revisions, setRevisions] = useState<Revision[]>([])
   const [fileAnnotations, setFileAnnotations] = useState<{ [key: string]: string[] }>({})
   const [showAnnotationModal, setShowAnnotationModal] = useState(false)
   const [selectedImage, setSelectedImage] = useState<ProjectFile | null>(null)
-  const [socket, setSocket] = useState<any>(null)
+  // Socket is handled by useRealtimeComments hook
   const [chatMessages, setChatMessages] = useState<Array<{id: string, type: 'annotation' | 'status', message: string, timestamp: string, addedBy?: string, senderName?: string, isFromClient?: boolean}>>([])
   const [versions, setVersions] = useState<Version[]>([])
   const [currentVersion, setCurrentVersion] = useState("")
   const [currentFile, setCurrentFile] = useState<string>("")
   const [newComment, setNewComment] = useState("")
   const [isAddingAnnotation, setIsAddingAnnotation] = useState(false)
-  const [selectedAnnotation, setSelectedAnnotation] = useState<Annotation | null>(null)
+  const [selectedAnnotation, setSelectedAnnotation] = useState<ProjectAnnotation | null>(null)
+  const [showAnnotationPopup, setShowAnnotationPopup] = useState(false)
+  const [popupPosition, setPopupPosition] = useState<{x: number, y: number} | null>(null)
+  const [showReplyPopup, setShowReplyPopup] = useState(false)
+  const [selectedAnnotationForReply, setSelectedAnnotationForReply] = useState<ProjectAnnotation | null>(null)
+  const [replyText, setReplyText] = useState("")
   const [digitalSignature, setDigitalSignature] = useState({ firstName: "", lastName: "" })
   const [showSignatureDialog, setShowSignatureDialog] = useState(false)
   const [showApprovalDialog, setShowApprovalDialog] = useState(false)
@@ -114,6 +129,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [reviewData, setReviewData] = useState<any>(null)
+  const [notifications, setNotifications] = useState<any[]>([])
   const imageRef = useRef<HTMLDivElement>(null)
 
   const currentVersionData = versions.find(v => v.version === currentVersion)
@@ -143,54 +159,78 @@ export default function ReviewPage({ params }: ReviewPageProps) {
     currentUser
   })
 
-  // Fetch review data
+  // Fetch project data
   const fetchReviewData = async () => {
     try {
       setIsLoading(true)
       
       // Check if we have a file parameter in URL
       const urlParams = new URLSearchParams(window.location.search)
-      const fileId = urlParams.get('file')
+      const fileId = urlParams.get('fileId')
       
-      // First try to get the review
-      const reviewResponse = await fetch(`/api/reviews/${params.reviewId}`)
-      const reviewData = await reviewResponse.json()
+      // Get project data using reviewId as projectId
+      const projectResponse = await fetch(`/api/projects/${params.reviewId}`)
+      const projectData = await projectResponse.json()
       
-      if (reviewData.status === 'success') {
-        setReviewData(reviewData.data)
+      if (projectData.status === 'success') {
+        // Get project files
+        const filesResponse = await fetch(`/api/projects/${params.reviewId}/files`)
+        const filesData = await filesResponse.json()
         
-        // Transform elements to versions
-        if (reviewData.data.elements) {
-          const transformedVersions = reviewData.data.elements.map((element: any, index: number) => ({
-            id: element.id,
-            version: `V${index + 1}`,
-            files: element.versions?.map((version: any) => ({
-              id: version.id,
-              name: version.fileName || element.elementName,
-              url: version.filePath,
-              type: version.fileType || 'image/jpeg',
-              size: version.fileSize || 0,
-              uploadedAt: version.createdAt
-            })) || [],
-            status: (element.status?.toLowerCase() as any) || 'pending_review',
-            createdAt: element.createdAt,
+        if (filesData.status === 'success') {
+          // Transform project data to review format
+          const transformedReviewData = {
+            id: projectData.data.id,
+            reviewName: projectData.data.title,
+            project: projectData.data,
+            status: projectData.data.status,
+            elements: [{
+              id: 'main',
+              elementName: 'Project Files',
+              status: projectData.data.status,
+              versions: filesData.data.files.map((file: any) => ({
+                id: file.id,
+                fileName: file.name,
+                filePath: file.url,
+                fileType: file.type,
+                fileSize: file.size,
+                createdAt: file.uploadedAt
+              }))
+            }]
+          }
+          
+          setReviewData(transformedReviewData)
+          
+          // Transform files to versions
+          const transformedVersions = [{
+            id: 'main',
+            version: 'V1',
+            files: filesData.data.files.map((file: any) => ({
+              id: file.id,
+              name: file.name,
+              url: file.url,
+              type: file.type,
+              size: file.size,
+              uploadedAt: file.uploadedAt
+            })),
+            status: projectData.data.status?.toLowerCase() || 'pending_review',
+            createdAt: projectData.data.createdAt,
             annotations: []
-          }))
+          }]
+          
           setVersions(transformedVersions as any)
           
           // Set first version as current
           if (transformedVersions.length > 0) {
             setCurrentVersion(transformedVersions[0].version)
             
-            // If we have a file ID from URL, try to select that file
+            // If we have a file ID from URL, select that file
             if (fileId) {
-              // Find the file in any version
-              for (const version of transformedVersions) {
-                const file = version.files.find((f: any) => f.id === fileId)
+              const file = transformedVersions[0].files.find((f: any) => f.id === fileId)
                 if (file) {
                   setCurrentFile(fileId)
-                  break
-                }
+              } else {
+                setCurrentFile(transformedVersions[0].files[0].id)
               }
             } else if (transformedVersions[0].files.length > 0) {
               setCurrentFile(transformedVersions[0].files[0].id)
@@ -312,81 +352,126 @@ export default function ReviewPage({ params }: ReviewPageProps) {
     }
   }, [currentVersionData, currentFile])
 
-  const handleImageClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!isAddingAnnotation || !currentFile) return
+  const handleImageClick = (event: React.MouseEvent<HTMLImageElement>) => {
+    if (!currentFileData) return
 
     const rect = event.currentTarget.getBoundingClientRect()
     const x = ((event.clientX - rect.left) / rect.width) * 100
     const y = ((event.clientY - rect.top) / rect.height) * 100
 
-    const newAnnotation: Annotation = {
-      id: Date.now().toString(),
-      x,
-      y,
-      comment: "",
-      timestamp: new Date().toISOString(),
-      resolved: false,
-      fileId: currentFile,
+    // Check if clicking on a resolved annotation
+    const clickedAnnotation = annotations.find(annotation => {
+      if (annotation.x !== undefined && annotation.y !== undefined) {
+        const distance = Math.sqrt(
+          Math.pow(annotation.x - x, 2) + Math.pow(annotation.y - y, 2)
+        )
+        return distance < 5 // Within 5% of the annotation position
+      }
+      return false
+    })
+    
+    // If clicking on a resolved annotation, don't show input
+    if (clickedAnnotation && clickedAnnotation.isResolved) {
+      return
     }
 
-    setAnnotations([...annotations, newAnnotation])
-    setSelectedAnnotation(newAnnotation)
-    setIsAddingAnnotation(false)
-  }
-
-  const handleAnnotationSubmit = () => {
-    if (!selectedAnnotation || !newComment.trim()) return
-
-    const updatedAnnotations = annotations.map((annotation) =>
-      annotation.id === selectedAnnotation.id
-        ? { ...annotation, comment: newComment }
-        : annotation
-    )
-
-    setAnnotations(updatedAnnotations)
+    // Show annotation popup
     setNewComment("")
-    setSelectedAnnotation(null)
+    setPopupPosition({ x, y })
+    setShowAnnotationPopup(true)
   }
+
+  const handleAnnotationClick = (annotation: any) => {
+    // Don't allow replies to resolved annotations
+    if (annotation.isResolved) {
+      return
+    }
+    
+    setSelectedAnnotationForReply(annotation)
+    setShowReplyPopup(true)
+    setReplyText("")
+  }
+
+  const handleReplySubmit = async () => {
+    if (!selectedAnnotationForReply || !replyText.trim()) return
+    
+    try {
+      const response = await fetch('/api/annotations/reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          annotationId: selectedAnnotationForReply.id,
+          content: replyText,
+          addedBy: 'Client',
+          addedByName: currentUser?.name || 'Client'
+        })
+      })
+      
+      const data = await response.json()
+      
+      if (data.status === 'success') {
+        // Update local state with new reply
+        setAnnotations(prev => prev.map(annotation => 
+          annotation.id === selectedAnnotationForReply.id 
+            ? { 
+                ...annotation, 
+                replies: [...(annotation.replies || []), {
+                  id: data.data.id,
+                  content: replyText,
+                  addedBy: 'Client',
+                  addedByName: currentUser?.name || 'Client',
+                  createdAt: new Date().toISOString()
+                }]
+              }
+            : annotation
+        ))
+        
+        // Add to chat messages for real-time updates
+        setChatMessages(prev => [...prev, {
+      id: Date.now().toString(),
+          type: 'annotation',
+          message: `You replied: "${replyText}"`,
+          timestamp: new Date().toISOString(),
+          addedBy: 'Client',
+          senderName: currentUser?.name || 'Client',
+          isFromClient: true
+        }])
+        
+        // Emit socket event for real-time updates
+        if (socket) {
+          socket.emit('addAnnotationReply', {
+            projectId: params.reviewId,
+            annotationId: selectedAnnotationForReply.id,
+            reply: replyText,
+      addedBy: 'Client',
+      addedByName: currentUser?.name || 'Client',
+            timestamp: new Date().toISOString()
+          })
+        }
+        
+        setReplyText('')
+        setShowReplyPopup(false)
+        setSelectedAnnotationForReply(null)
+      } else {
+        console.error('Failed to add reply:', data.message)
+        alert('Failed to add reply. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error submitting reply:', error)
+      alert('Failed to add reply. Please try again.')
+    }
+  }
+
 
   const handleAnnotationResolve = (annotationId: string) => {
     const updatedAnnotations = annotations.map((annotation) =>
       annotation.id === annotationId
-        ? { ...annotation, resolved: !annotation.resolved }
+        ? { ...annotation, isResolved: !annotation.isResolved, status: annotation.isResolved ? 'OPEN' as const : 'RESOLVED' as const }
         : annotation
     )
     setAnnotations(updatedAnnotations)
   }
 
-  const handleRequestRevision = () => {
-    if (!revisionComments.trim()) {
-      alert("Please provide comments for the revision request")
-      return
-    }
-
-    const newRevision: Revision = {
-      id: Date.now().toString(),
-      version: currentVersion,
-      status: "in_revision",
-      requestedBy: "Client",
-      requestedAt: new Date().toISOString(),
-      comments: revisionComments,
-    }
-
-    setRevisions([...revisions, newRevision])
-    
-    // Update version status to "in_revision"
-    const updatedVersions = versions.map(v => 
-      v.version === currentVersion 
-        ? { ...v, status: "in_revision" as const }
-        : v
-    )
-    setVersions(updatedVersions)
-    
-    setRevisionComments("")
-    setShowRevisionDialog(false)
-    
-    console.log("Revision requested:", newRevision)
-  }
 
   const handleVersionChange = (version: string) => {
     setCurrentVersion(version)
@@ -407,13 +492,6 @@ export default function ReviewPage({ params }: ReviewPageProps) {
     // You might want to update the display of annotations here
   }
 
-  const handleApproval = () => {
-    if (!digitalSignature.firstName.trim() || !digitalSignature.lastName.trim()) {
-      alert("Please enter both first and last name for digital signature")
-      return
-    }
-    setShowApprovalDialog(true)
-  }
 
   const confirmApproval = () => {
     // Update revision status
@@ -479,48 +557,44 @@ export default function ReviewPage({ params }: ReviewPageProps) {
 
   const currentFileAnnotations = annotations.filter(a => a.fileId === currentFile)
 
-  // Initialize Socket.io
+  // Socket connection for direct emit calls
+  const [socket, setSocket] = useState<any>(null)
+
+  // Initialize Socket.io for direct emit calls
   useEffect(() => {
     const newSocket = io('http://localhost:3000', {
       path: '/api/socketio',
       transports: ['websocket', 'polling']
     })
     
-    setSocket(newSocket)
-    
-    // Join project room
-    newSocket.emit('join-project', params.reviewId)
-    
-    // Listen for annotation updates
-    newSocket.on('annotationAdded', (data: { fileId: string, annotation: string, timestamp: string, addedBy?: string, addedByName?: string }) => {
-      setFileAnnotations(prev => ({
-        ...prev,
-        [data.fileId]: [...(prev[data.fileId] || []), data.annotation]
-      }))
-      
-      // Add to chat messages with sender/receiver info
-      const senderName = data.addedByName || data.addedBy || 'Unknown'
-      const isFromClient = senderName.includes('Client') || senderName === reviewData?.project?.client?.name
-      const messageText = isFromClient 
-        ? `You sent: "${data.annotation}"`
-        : `Received from ${senderName}: "${data.annotation}"`
-      
-      setChatMessages(prev => [...prev, {
-        id: Date.now().toString(),
-        type: 'annotation',
-        message: messageText,
-        timestamp: data.timestamp,
-        addedBy: senderName,
-        senderName: senderName,
-        isFromClient: isFromClient
-      }])
+    newSocket.on('connect', () => {
+      console.log('🔌 Client socket connected:', newSocket.id)
     })
     
+    newSocket.on('disconnect', () => {
+      console.log('🔌 Client socket disconnected')
+    })
+    
+    setSocket(newSocket)
+    
     return () => {
-      newSocket.emit('leave-project', params.reviewId)
-      newSocket.close()
+      newSocket.disconnect()
     }
-  }, [params.reviewId])
+  }, [])
+
+  // Join project room when reviewData is loaded
+  useEffect(() => {
+    if (socket && reviewData?.project?.id) {
+      console.log('🔗 Client joining project room:', reviewData.project.id)
+      socket.emit('join-project', reviewData.project.id)
+    }
+    
+    return () => {
+      if (socket && reviewData?.project?.id) {
+        socket.emit('leave-project', reviewData.project.id)
+      }
+    }
+  }, [socket, reviewData?.project?.id])
 
   // Helper functions
   const isImageFile = (file: ProjectFile) => {
@@ -532,8 +606,8 @@ export default function ReviewPage({ params }: ReviewPageProps) {
     setShowAnnotationModal(true)
   }
 
-  const addAnnotation = async (fileId: string, annotation: string) => {
-    if (!annotation.trim()) return
+  const addAnnotation = async () => {
+    if (!newComment.trim() || !currentFileData) return
     
     try {
       // Get current client info
@@ -547,33 +621,81 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          content: annotation,
-          fileId,
+          content: newComment,
+          fileId: currentFileData.id,
           projectId: params.reviewId,
           addedBy: currentClient.role,
-          addedByName: currentClient.name
+          addedByName: currentClient.name,
+          coordinates: popupPosition
         })
       })
       
       const data = await response.json()
       
       if (data.status === 'success') {
-        // Update local state
+        const newAnnotation: ProjectAnnotation = {
+          id: data.data.id,
+          content: newComment,
+          fileId: currentFileData.id,
+          addedBy: currentClient.role,
+          addedByName: currentClient.name,
+          createdAt: new Date().toISOString(),
+          x: popupPosition?.x || 0,
+          y: popupPosition?.y || 0,
+          status: 'OPEN',
+          isResolved: false,
+          replies: []
+        }
+        
+        // Add to annotations immediately
+        setAnnotations(prev => [...prev, newAnnotation])
+        
+        // Update file annotations
         setFileAnnotations(prev => ({
           ...prev,
-          [fileId]: [...(prev[fileId] || []), annotation]
+          [currentFileData.id]: [...(prev[currentFileData.id] || []), newComment]
         }))
+        
+        // Add to chat messages for real-time updates
+        setChatMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          type: 'annotation',
+          message: `You added annotation: "${newComment}"`,
+          timestamp: new Date().toISOString(),
+          addedBy: currentClient.role,
+          senderName: currentClient.name,
+          isFromClient: true
+        }])
         
         // Emit to socket
         if (socket && params.reviewId) {
+          console.log('🔌 Client emitting addAnnotation event:', {
+            projectId: params.reviewId,
+            fileId: currentFileData.id,
+            annotation: newComment,
+            addedBy: currentClient.role,
+            addedByName: currentClient.name,
+            x: popupPosition?.x,
+            y: popupPosition?.y,
+            timestamp: new Date().toISOString()
+          })
           socket.emit('addAnnotation', {
             projectId: params.reviewId,
-            fileId,
-            annotation,
+            fileId: currentFileData.id,
+            annotation: newComment,
             addedBy: currentClient.role,
-            addedByName: currentClient.name
+            addedByName: currentClient.name,
+            x: popupPosition?.x,
+            y: popupPosition?.y,
+            timestamp: new Date().toISOString()
           })
+        } else {
+          console.log('🔌 Socket not available or projectId missing:', { socket: !!socket, projectId: params.reviewId })
         }
+        
+        setNewComment("")
+        setShowAnnotationPopup(false)
+        setPopupPosition(null)
       } else {
         console.error('Failed to save annotation:', data.message)
         alert('Failed to save annotation. Please try again.')
@@ -581,6 +703,180 @@ export default function ReviewPage({ params }: ReviewPageProps) {
     } catch (error) {
       console.error('Error saving annotation:', error)
       alert('Failed to save annotation. Please try again.')
+    }
+  }
+
+  // Handle annotation submission (for replies)
+  const handleAnnotationSubmit = async () => {
+    if (!selectedAnnotation || !newComment.trim()) return
+    
+    try {
+      // Add reply to annotation
+      const response = await fetch('/api/annotations/reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          annotationId: selectedAnnotation.id,
+          content: newComment,
+          addedBy: 'Client',
+          addedByName: currentUser?.name || 'Client'
+        })
+      })
+      
+      const data = await response.json()
+      
+      if (data.status === 'success') {
+        // Update local state with new reply
+        setAnnotations(prev => prev.map(annotation => 
+          annotation.id === selectedAnnotation.id 
+            ? { 
+                ...annotation, 
+                replies: [...(annotation.replies || []), {
+                  id: data.data.id,
+                  content: newComment,
+                  addedBy: 'Client',
+                  addedByName: currentUser?.name || 'Client',
+                  createdAt: new Date().toISOString()
+                }]
+              }
+            : annotation
+        ))
+        
+        // Add to chat messages for real-time updates
+        setChatMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          type: 'annotation',
+          message: `You replied: "${newComment}"`,
+          timestamp: new Date().toISOString(),
+          addedBy: 'Client',
+          senderName: currentUser?.name || 'Client',
+          isFromClient: true
+        }])
+        
+        // Emit socket event for real-time updates
+        if (socket) {
+          console.log('🚀 Emitting addAnnotationReply socket event:', {
+            projectId: params.reviewId,
+            annotationId: selectedAnnotation.id,
+            reply: newComment,
+            addedBy: 'Client',
+            addedByName: currentUser?.name || 'Client'
+          })
+          socket.emit('addAnnotationReply', {
+            projectId: params.reviewId,
+            annotationId: selectedAnnotation.id,
+            reply: newComment,
+            addedBy: 'Client',
+            addedByName: currentUser?.name || 'Client',
+            timestamp: new Date().toISOString()
+          })
+        }
+        
+        setNewComment('')
+        
+        // Refresh annotations to show new reply
+        fetchAnnotations()
+      } else {
+        console.error('Failed to add reply:', data.message)
+        alert('Failed to add reply. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error submitting reply:', error)
+      alert('Failed to add reply. Please try again.')
+    }
+  }
+
+  // Handle approval
+  const handleApproval = async () => {
+    try {
+      const response = await fetch(`/api/projects/${params.reviewId}/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'approve',
+          approvedBy: 'Client',
+          approvedByName: reviewData?.project?.client?.name || 'Client',
+          comments: 'Approved by client'
+        })
+      })
+      
+      const data = await response.json()
+      
+      if (data.status === 'success') {
+        // Update local state
+        setReviewData((prev: any) => ({
+          ...prev,
+          status: 'APPROVED'
+        }))
+        
+        // Emit socket event
+        if (socket) {
+          socket.emit('projectStatusChanged', {
+            projectId: params.reviewId,
+            status: 'APPROVED',
+            updatedBy: 'Client'
+          })
+        }
+        
+        alert('Project approved successfully!')
+        setShowSignatureDialog(false)
+      } else {
+        console.error('Failed to approve project:', data.message)
+        alert('Failed to approve project. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error approving project:', error)
+      alert('Error approving project. Please try again.')
+    }
+  }
+
+  // Handle revision request
+  const handleRequestRevision = async () => {
+    try {
+      const response = await fetch(`/api/projects/${params.reviewId}/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'reject',
+          approvedBy: 'Client',
+          approvedByName: reviewData?.project?.client?.name || 'Client',
+          comments: revisionComments
+        })
+      })
+      
+      const data = await response.json()
+      
+      if (data.status === 'success') {
+        // Update local state
+        setReviewData((prev: any) => ({
+          ...prev,
+          status: 'REJECTED'
+        }))
+        
+        // Emit socket event
+        if (socket) {
+          socket.emit('projectStatusChanged', {
+            projectId: params.reviewId,
+            status: 'REJECTED',
+            updatedBy: 'Client',
+            comments: revisionComments
+          })
+        }
+        
+        alert('Revision requested successfully!')
+        setShowRevisionDialog(false)
+        setRevisionComments('')
+      } else {
+        console.error('Failed to request revision:', data.message)
+        alert('Failed to request revision. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error requesting revision:', error)
+      alert('Error requesting revision. Please try again.')
     }
   }
 
@@ -660,6 +956,53 @@ export default function ReviewPage({ params }: ReviewPageProps) {
           </div>
         </div>
       </header>
+
+      {/* Real-time Notifications */}
+      {notifications.length > 0 && (
+        <div className="fixed top-20 right-4 z-50 space-y-2 max-w-sm">
+          {notifications.slice(0, 3).map((notification) => (
+            <div
+              key={notification.id}
+              className="bg-white dark:bg-gray-800 border border-green-200 dark:border-green-800 rounded-lg shadow-lg p-4 animate-in slide-in-from-right duration-300"
+            >
+              <div className="flex items-start gap-3">
+                <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {notification.title}
+                    </h4>
+                    <Badge variant="secondary" className="text-xs">
+                      New
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                    {notification.message}
+                  </p>
+                  {notification.x !== undefined && notification.y !== undefined && (
+                    <p className="text-xs text-gray-500">
+                      Position: {notification.x.toFixed(1)}%, {notification.y.toFixed(1)}%
+                    </p>
+                  )}
+                  <p className="text-xs text-gray-400 mt-1">
+                    {new Date(notification.timestamp).toLocaleTimeString()}
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 text-gray-400 hover:text-gray-600"
+                  onClick={() => {
+                    setNotifications(prev => prev.filter(n => n.id !== notification.id))
+                  }}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="p-6">
@@ -790,17 +1133,269 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                 </CardHeader>
                 <CardContent>
                   {currentFileData && isImageFile(currentFileData) ? (
-                    <ImageAnnotation
-                      imageUrl={currentFileData.url}
-                      imageAlt={currentFileData.name}
-                      fileId={currentFileData.id}
-                      projectId={reviewData?.project?.id || ''}
-                      annotations={realtimeAnnotations}
-                      onAnnotationAdd={addRealtimeAnnotation}
-                      onAnnotationResolve={resolveRealtimeAnnotation}
-                      isAdmin={false}
-                      currentUser={currentUser}
-                    />
+                    <div className="relative bg-muted rounded-lg overflow-hidden">
+                      <img
+                        src={currentFileData.url}
+                        alt={currentFileData.name}
+                        className="w-full h-auto max-h-[500px] object-contain cursor-crosshair"
+                        onClick={handleImageClick}
+                      />
+                      
+                      {/* Render existing annotations on image */}
+                      {annotations.map((annotation) => {
+                        if (annotation.x !== undefined && annotation.y !== undefined) {
+                          return (
+                            <div
+                              key={annotation.id}
+                              className="absolute transform -translate-x-1/2 -translate-y-1/2 z-10"
+                              style={{
+                                left: `${annotation.x}%`,
+                                top: `${annotation.y}%`
+                              }}
+                            >
+                              {/* Main annotation pin */}
+                              <div 
+                                className={`${annotation.isResolved ? 'bg-green-500' : 'bg-red-500'} text-white text-xs px-2 py-1 rounded-full shadow-lg cursor-pointer hover:opacity-80 transition-colors group`}
+                                onClick={() => handleAnnotationClick(annotation)}
+                              >
+                                <MapPin className="h-3 w-3 inline mr-1" />
+                                {annotation.content.length > 15 ? annotation.content.substring(0, 15) + '...' : annotation.content}
+                                {annotation.replies && annotation.replies.length > 0 && (
+                                  <span className="ml-1 bg-white text-blue-500 rounded-full px-1 text-xs">
+                                    {annotation.replies.length}
+                                  </span>
+                                )}
+                                {/* Status indicator */}
+                                <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${annotation.isResolved ? 'bg-green-500' : 'bg-red-500'} border-2 border-white`}></div>
+                              </div>
+                              
+                              {/* Hover popup with full content and replies */}
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity z-30 pointer-events-none group-hover:pointer-events-auto">
+                                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-3 min-w-[250px] max-w-[300px]">
+                                  {/* Annotation header */}
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <div className={`w-2 h-2 rounded-full ${annotation.isResolved ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                                    <span className="text-sm font-medium">{annotation.addedByName || annotation.addedBy || 'Unknown'}</span>
+                                    <span className="text-xs text-gray-500">
+                                      {new Date(annotation.createdAt).toLocaleString()}
+                                    </span>
+                                  </div>
+                                  
+                                  {/* Annotation content */}
+                                  <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">{annotation.content}</p>
+                                  
+                                  {/* Position info */}
+                                  <p className="text-xs text-gray-500 mb-2">
+                                    Position: {annotation.x?.toFixed(1) || 0}%, {annotation.y?.toFixed(1) || 0}%
+                                  </p>
+                                  
+                                  {/* Show replies */}
+                                  {annotation.replies && annotation.replies.length > 0 && (
+                                    <div className="border-t border-gray-200 dark:border-gray-700 pt-2">
+                                      <div className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
+                                        Replies ({annotation.replies.length})
+                                      </div>
+                                      <div className="space-y-2 max-h-32 overflow-y-auto">
+                                        {annotation.replies.map((reply) => (
+                                          <div key={reply.id} className="bg-gray-50 dark:bg-gray-700 rounded p-2">
+                                            <div className="flex items-center gap-1 mb-1">
+                                              <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                                              <span className="text-xs font-medium">{reply.addedByName || reply.addedBy}</span>
+                                              <span className="text-xs text-gray-500">
+                                                {new Date(reply.createdAt).toLocaleString()}
+                                              </span>
+                                            </div>
+                                            <p className="text-xs text-gray-700 dark:text-gray-300">{reply.content}</p>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Action buttons */}
+                                  <div className="flex items-center gap-2 mt-3 pt-2 border-t border-gray-200 dark:border-gray-700">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-xs h-6 px-2"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleAnnotationClick(annotation)
+                                      }}
+                                      disabled={annotation.isResolved}
+                                    >
+                                      <MessageCircle className="h-3 w-3 mr-1" />
+                                      Reply
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-xs h-6 px-2"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        // Handle view details
+                                      }}
+                                    >
+                                      <Eye className="h-3 w-3 mr-1" />
+                                      View
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* Show replies directly on image */}
+                              {annotation.replies && annotation.replies.length > 0 && (
+                                <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 space-y-1">
+                                  {annotation.replies.slice(0, 3).map((reply, index) => (
+                                    <div key={reply.id} className="bg-green-500 text-white text-xs px-2 py-1 rounded-full shadow-lg max-w-[200px]">
+                                      <div className="flex items-center gap-1">
+                                        <MessageCircle className="h-2 w-2" />
+                                        <span className="truncate">{reply.content}</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                  {annotation.replies.length > 3 && (
+                                    <div className="bg-gray-500 text-white text-xs px-2 py-1 rounded-full shadow-lg">
+                                      +{annotation.replies.length - 3} more
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              
+                              {/* Reply button on hover */}
+                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs bg-white border-blue-500 text-blue-500 hover:bg-blue-50"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleAnnotationClick(annotation)
+                                  }}
+                                >
+                                  <MessageCircle className="h-3 w-3 mr-1" />
+                                  Reply
+                                </Button>
+                              </div>
+                            </div>
+                          )
+                        }
+                        return null
+                      })}
+                      
+                      {/* Render real-time annotations on image */}
+                      {realtimeAnnotations.map((annotation) => {
+                        if (annotation.x !== undefined && annotation.y !== undefined) {
+                          return (
+                            <div
+                              key={`realtime-${annotation.id}`}
+                              className="absolute transform -translate-x-1/2 -translate-y-1/2 z-10"
+                              style={{
+                                left: `${annotation.x}%`,
+                                top: `${annotation.y}%`
+                              }}
+                            >
+                              {/* Main annotation pin */}
+                              <div 
+                                className={`${annotation.resolved ? 'bg-green-500' : 'bg-red-500'} text-white text-xs px-2 py-1 rounded-full shadow-lg cursor-pointer hover:opacity-80 transition-colors group`}
+                                onClick={() => handleAnnotationClick(annotation)}
+                              >
+                                <MapPin className="h-3 w-3 inline mr-1" />
+                                {annotation.comment.length > 15 ? annotation.comment.substring(0, 15) + '...' : annotation.comment}
+                                {/* Status indicator */}
+                                <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${annotation.resolved ? 'bg-green-500' : 'bg-red-500'} border-2 border-white`}></div>
+                              </div>
+                              
+                              {/* Hover popup for real-time annotations */}
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity z-30 pointer-events-none group-hover:pointer-events-auto">
+                                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-3 min-w-[250px] max-w-[300px]">
+                                  {/* Annotation header */}
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <div className={`w-2 h-2 rounded-full ${annotation.resolved ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                                    <span className="text-sm font-medium">{annotation.addedByName || annotation.addedBy || 'Unknown'}</span>
+                                    <span className="text-xs text-gray-500">
+                                      {new Date(annotation.timestamp).toLocaleString()}
+                                    </span>
+                                  </div>
+                                  
+                                  {/* Annotation content */}
+                                  <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">{annotation.comment}</p>
+                                  
+                                  {/* Position info */}
+                                  <p className="text-xs text-gray-500 mb-2">
+                                    Position: {annotation.x?.toFixed(1) || 0}%, {annotation.y?.toFixed(1) || 0}%
+                                  </p>
+                                  
+                                  {/* Action buttons */}
+                                  <div className="flex items-center gap-2 mt-3 pt-2 border-t border-gray-200 dark:border-gray-700">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-xs h-6 px-2"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleAnnotationClick(annotation)
+                                      }}
+                                      disabled={annotation.resolved}
+                                    >
+                                      <MessageCircle className="h-3 w-3 mr-1" />
+                                      Reply
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-xs h-6 px-2"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        // Handle view details
+                                      }}
+                                    >
+                                      <Eye className="h-3 w-3 mr-1" />
+                                      View
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* Reply button on hover */}
+                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs bg-white border-blue-500 text-blue-500 hover:bg-blue-50"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleAnnotationClick(annotation)
+                                  }}
+                                >
+                                  <MessageCircle className="h-3 w-3 mr-1" />
+                                  Reply
+                                </Button>
+                              </div>
+                            </div>
+                          )
+                        }
+                        return null
+                      })}
+                      
+                      {/* Click to annotate badge */}
+                      <div className="absolute top-4 left-4">
+                        <Badge variant="outline" className="text-xs bg-white/90">
+                          <MapPin className="h-3 w-3 mr-1" />
+                          Click to annotate
+                        </Badge>
+                      </div>
+                      
+                      {/* Annotation counter badge */}
+                      {(annotations.length > 0 || realtimeAnnotations.length > 0) && (
+                        <div className="absolute top-4 right-4">
+                          <Badge variant="default" className="text-xs bg-blue-500 text-white">
+                            <MessageCircle className="h-3 w-3 mr-1" />
+                            {annotations.length + realtimeAnnotations.length} annotation{(annotations.length + realtimeAnnotations.length) !== 1 ? 's' : ''}
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
                   ) : currentFileData ? (
                     <div className="relative bg-muted rounded-lg overflow-hidden border-2 border-border">
                       <div className="w-full h-64 flex items-center justify-center text-muted-foreground">
@@ -824,12 +1419,12 @@ export default function ReviewPage({ params }: ReviewPageProps) {
               </Card>
 
               {/* Comments & Annotations */}
-              {(realtimeComments.length > 0 || realtimeAnnotations.length > 0) && (
+              {(realtimeComments.length > 0 || realtimeAnnotations.length > 0 || annotations.length > 0) && (
                 <Card className="mt-6">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <MessageCircle className="h-5 w-5" />
-                      Comments & Annotations ({realtimeComments.length + realtimeAnnotations.length})
+                      Comments & Annotations ({realtimeComments.length + realtimeAnnotations.length + annotations.length})
                     </CardTitle>
                     <CardDescription>All feedback and annotations for this file</CardDescription>
                   </CardHeader>
@@ -861,7 +1456,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                         </div>
                       ))}
                       
-                      {/* Annotations */}
+                      {/* Real-time Annotations */}
                       {realtimeAnnotations.map((annotation) => (
                         <div key={annotation.id} className="p-4 border rounded-lg">
                           <div className="flex items-start justify-between">
@@ -871,7 +1466,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                                   annotation.resolved ? "bg-green-500" : "bg-red-500"
                                 }`} />
                                 <span className="text-sm font-medium">
-                                  {(annotation as any).addedByName || (annotation as any).addedBy || 'Unknown'}
+                                  {annotation.addedByName || annotation.addedBy || 'Unknown'}
                                 </span>
                                 <Badge variant={annotation.resolved ? "default" : "destructive"} className="text-xs">
                                   {annotation.resolved ? "Resolved" : "Pending"}
@@ -882,8 +1477,57 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                               </div>
                               <p className="text-sm">{annotation.comment}</p>
                               <p className="text-xs text-muted-foreground mt-1">
-                                Position: {annotation.x.toFixed(1)}%, {annotation.y.toFixed(1)}%
+                                Position: {annotation.x?.toFixed(1) || 0}%, {annotation.y?.toFixed(1) || 0}%
                               </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      
+                      {/* Regular Annotations */}
+                      {annotations.map((annotation) => (
+                        <div key={annotation.id} className="p-4 border rounded-lg">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className={`w-3 h-3 rounded-full ${
+                                  annotation.isResolved ? "bg-green-500" : "bg-red-500"
+                                }`} />
+                                <span className="text-sm font-medium">
+                                  {annotation.addedByName || annotation.addedBy || 'Unknown'}
+                                </span>
+                                <Badge variant={annotation.isResolved ? "default" : "destructive"} className="text-xs">
+                                  {annotation.isResolved ? "Resolved" : "Pending"}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(annotation.createdAt).toLocaleString()}
+                                </span>
+                              </div>
+                              <p className="text-sm">{annotation.content}</p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Position: {annotation.x?.toFixed(1) || 0}%, {annotation.y?.toFixed(1) || 0}%
+                              </p>
+                              
+                              {/* Show replies if any */}
+                              {annotation.replies && annotation.replies.length > 0 && (
+                                <div className="mt-3 ml-4 space-y-2">
+                                  <div className="text-xs font-medium text-muted-foreground mb-2">
+                                    Replies ({annotation.replies.length})
+                            </div>
+                                  {annotation.replies.map((reply) => (
+                                    <div key={reply.id} className="p-2 bg-gray-50 dark:bg-gray-800 rounded border-l-2 border-blue-500">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                                        <span className="text-xs font-medium">{reply.addedByName || reply.addedBy}</span>
+                                        <span className="text-xs text-muted-foreground">
+                                          {new Date(reply.createdAt).toLocaleString()}
+                                        </span>
+                                      </div>
+                                      <p className="text-xs">{reply.content}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1133,32 +1777,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         </div>
       </main>
 
-      {/* Annotation Comment Dialog */}
-      <Dialog open={!!selectedAnnotation} onOpenChange={() => setSelectedAnnotation(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Annotation</DialogTitle>
-            <DialogDescription>
-              Add an annotation for this position{" "}
-              {selectedAnnotation && `${selectedAnnotation.x.toFixed(1)}%, ${selectedAnnotation.y.toFixed(1)}%`}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Textarea
-              placeholder="Enter your annotation..."
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              rows={4}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSelectedAnnotation(null)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAnnotationSubmit}>Save Annotation</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+     
 
       {/* Request Revision Dialog */}
       <Dialog open={showRevisionDialog} onOpenChange={setShowRevisionDialog}>
@@ -1257,104 +1876,228 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Annotation Modal */}
-      <Dialog open={showAnnotationModal} onOpenChange={setShowAnnotationModal}>
-        <DialogContent className="max-w-5xl max-h-[95vh] flex flex-col">
-          <DialogHeader className="flex-shrink-0">
-            <DialogTitle className="flex items-center gap-2">
-              <PenTool className="h-5 w-5" />
-              Annotate Image
-            </DialogTitle>
-            <DialogDescription>
-              Add annotations and feedback for {selectedImage?.name}
-            </DialogDescription>
-          </DialogHeader>
-          
-          {selectedImage && (
-            <div className="flex-1 flex flex-col space-y-4 min-h-0">
-              {/* Image Display */}
-              <div className="relative bg-muted rounded-lg overflow-hidden flex-shrink-0">
-                <img 
-                  src={selectedImage.url}
-                  alt={selectedImage.name}
-                  className="w-full h-auto max-h-[300px] object-contain"
-                />
-              </div>
-              
-              {/* Annotations List with Scroll */}
-              <div className="flex-1 flex flex-col space-y-3 min-h-0">
-                <h4 className="font-medium flex-shrink-0">Annotations</h4>
-                {fileAnnotations[selectedImage.id] && fileAnnotations[selectedImage.id].length > 0 ? (
-                  <div className="flex-1 overflow-y-auto space-y-2 pr-2">
-                    {fileAnnotations[selectedImage.id].map((annotation, index) => (
-                      <div key={index} className="flex items-start gap-2 p-3 bg-muted rounded-lg">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                            <span className="text-xs font-medium text-green-600">
-                              {reviewData?.project?.client?.name || 'Client'}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date().toLocaleTimeString()}
-                            </span>
-                          </div>
-                          <p className="text-sm">{annotation}</p>
-                        </div>
+      {/* Add Annotation Popup */}
+      {showAnnotationPopup && popupPosition && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-md mx-4">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Add Annotation</h3>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => removeAnnotation(selectedImage.id, index)}
-                          className="text-destructive hover:text-destructive flex-shrink-0"
+                onClick={() => {
+                  setShowAnnotationPopup(false)
+                  setPopupPosition(null)
+                  setNewComment("")
+                }}
+                className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
                         >
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
-                    ))}
+            
+            {/* Input Area */}
+            <div className="p-4">
+              <Input
+                placeholder="Add annotation..."
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && newComment.trim()) {
+                    addAnnotation()
+                  }
+                }}
+                className="border-0 focus:ring-0 text-sm dark:bg-gray-800 dark:text-gray-100"
+                autoFocus
+              />
+                </div>
+
+            {/* Action Bar */}
+            <div className="flex items-center justify-between p-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-3">
+                {/* Emoji Button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  onClick={() => {
+                    setNewComment(prev => prev + '😊')
+                  }}
+                >
+                  <span className="text-lg">😊</span>
+                </Button>
+                
+                {/* Mention Button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  onClick={() => {
+                    setNewComment(prev => prev + '@')
+                  }}
+                >
+                  <span className="text-sm font-bold dark:text-gray-100">@</span>
+                </Button>
+                
+                {/* Attachment Button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  onClick={() => {
+                    const input = document.createElement('input')
+                    input.type = 'file'
+                    input.accept = 'image/*'
+                    input.click()
+                  }}
+                >
+                  <svg className="h-4 w-4 dark:text-gray-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </Button>
+                      </div>
+              
+              {/* Submit Button */}
+              <Button
+                size="sm"
+                onClick={addAnnotation}
+                disabled={!newComment.trim()}
+                className="h-8 w-8 p-0 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 rounded-full"
+              >
+                <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+              </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+      {/* Reply Popup */}
+        {showReplyPopup && selectedAnnotationForReply && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-md mx-4">
+              {/* Header */}
+              <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Reply to Annotation</h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowReplyPopup(false)
+                    setSelectedAnnotationForReply(null)
+                    setReplyText("")
+                  }}
+                  className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              {/* Original Annotation */}
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className={`w-3 h-3 rounded-full ${selectedAnnotationForReply.isResolved ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                    <span className="text-sm font-medium">{selectedAnnotationForReply.addedByName}</span>
+                    <span className="text-xs text-gray-500">
+                      {new Date(selectedAnnotationForReply.createdAt).toLocaleString()}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-700 dark:text-gray-300">{selectedAnnotationForReply.content}</p>
+                </div>
+              </div>
+              
+              {/* Input Area */}
+              <div className="p-4">
+                {selectedAnnotationForReply.isResolved ? (
+                  <div className="text-center py-4">
+                    <div className="text-green-500 mb-2">
+                      <CheckCircle className="h-8 w-8 mx-auto" />
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      This annotation has been resolved and cannot be replied to.
+                    </p>
                   </div>
                 ) : (
-                  <div className="flex-1 flex items-center justify-center">
-                    <p className="text-sm text-muted-foreground">No annotations yet</p>
-                  </div>
+                  <Input
+                    placeholder="Type your reply..."
+                    value={replyText}
+                    onChange={(e) => setReplyText(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && replyText.trim()) {
+                        handleReplySubmit()
+                      }
+                    }}
+                    className="border-0 focus:ring-0 text-sm dark:bg-gray-800 dark:text-gray-100"
+                    autoFocus
+                  />
                 )}
               </div>
               
-              {/* Add New Annotation - Fixed at bottom */}
-              <div className="space-y-2 flex-shrink-0 border-t pt-4">
-                <Label htmlFor="newAnnotation">Add Annotation</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="newAnnotation"
-                    placeholder="Enter your annotation or feedback..."
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                        addAnnotation(selectedImage.id, e.currentTarget.value.trim())
-                        e.currentTarget.value = ''
-                      }
-                    }}
-                  />
+              {/* Action Bar */}
+              {!selectedAnnotationForReply.isResolved && (
+                <div className="flex items-center justify-between p-4 border-t border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-3">
+                    {/* Emoji Button */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                      onClick={() => {
+                        setReplyText(prev => prev + '😊')
+                      }}
+                    >
+                      <span className="text-lg">😊</span>
+                    </Button>
+                    
+                    {/* Mention Button */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                      onClick={() => {
+                        setReplyText(prev => prev + '@')
+                      }}
+                    >
+                      <span className="text-sm font-bold dark:text-gray-100">@</span>
+                    </Button>
+                    
+                    {/* Attachment Button */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                      onClick={() => {
+                        const input = document.createElement('input')
+                        input.type = 'file'
+                        input.accept = 'image/*'
+                        input.click()
+                      }}
+                    >
+                      <svg className="h-4 w-4 dark:text-gray-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </Button>
+                  </div>
+                  
+                  {/* Submit Button */}
                   <Button
-                    onClick={(e) => {
-                      const input = e.currentTarget.previousElementSibling as HTMLInputElement
-                      if (input.value.trim()) {
-                        addAnnotation(selectedImage.id, input.value.trim())
-                        input.value = ''
-                      }
-                    }}
+                    size="sm"
+                    onClick={handleReplySubmit}
+                    disabled={!replyText.trim()}
+                    className="h-8 w-8 p-0 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 rounded-full"
                   >
-                    Add
+                    <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
                   </Button>
                 </div>
-              </div>
+              )}
             </div>
-          )}
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAnnotationModal(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  )
+          </div>
+        )}
+  </div>
+)
 }

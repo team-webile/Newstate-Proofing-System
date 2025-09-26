@@ -6,14 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Logo } from "@/components/logo"
 import { Download, Eye, MessageSquare, CheckCircle, Clock, AlertCircle, Moon, Sun, PenTool, X } from "lucide-react"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+// Dialog imports removed - no longer using annotation modal
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import io from 'socket.io-client'
@@ -59,10 +52,10 @@ export default function ClientDashboard({ params }: ClientDashboardProps) {
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [socket, setSocket] = useState<any>(null)
   const [annotations, setAnnotations] = useState<{ [key: string]: string[] }>({})
-  const [showAnnotationModal, setShowAnnotationModal] = useState(false)
-  const [selectedImage, setSelectedImage] = useState<ProjectFile | null>(null)
+  // Removed annotation modal states
   const [chatMessages, setChatMessages] = useState<Array<{id: string, type: 'annotation' | 'status', message: string, timestamp: string, addedBy?: string, senderName?: string, isFromClient?: boolean}>>([])
   const [showChat, setShowChat] = useState(true)
+  const [files, setFiles] = useState<ProjectFile[]>([])
 
   // Get project ID from URL search params
   const [projectId, setProjectId] = useState<string | null>(null)
@@ -110,6 +103,8 @@ export default function ClientDashboard({ params }: ClientDashboardProps) {
       
       if (data.status === 'success') {
         setProject(data.data)
+        // Also fetch files from the project files API
+        await fetchProjectFiles()
       } else {
         setError(data.message || 'Failed to load project')
       }
@@ -118,6 +113,24 @@ export default function ClientDashboard({ params }: ClientDashboardProps) {
       setError('Failed to load project')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  // Fetch project files
+  const fetchProjectFiles = async () => {
+    if (!projectId) return
+    
+    try {
+      const response = await fetch(`/api/projects/${projectId}/files`)
+      const data = await response.json()
+      
+      if (data.status === 'success') {
+        setFiles(data.data.files || [])
+      } else {
+        console.error('Failed to fetch project files:', data.message)
+      }
+    } catch (error) {
+      console.error('Error fetching project files:', error)
     }
   }
 
@@ -218,62 +231,12 @@ export default function ClientDashboard({ params }: ClientDashboardProps) {
     return file.type.startsWith('image/')
   }
 
-  const openAnnotationModal = (file: ProjectFile) => {
-    setSelectedImage(file)
-    setShowAnnotationModal(true)
+  const openReviewPage = (file: ProjectFile) => {
+    // Redirect to review page with file ID
+    window.location.href = `/review/${projectId}?fileId=${file.id}`
   }
 
-  const addAnnotation = async (fileId: string, annotation: string) => {
-    if (!annotation.trim()) return
-    
-    try {
-      // Get current client info
-      const currentClient = {
-        name: project?.client?.name || 'Client', // Use actual client name from project
-        role: 'Client'
-      }
-      
-      // Save to database
-      const response = await fetch('/api/annotations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content: annotation,
-          fileId,
-          projectId,
-          addedBy: currentClient.role,
-          addedByName: currentClient.name
-        })
-      })
-      
-      const data = await response.json()
-      
-      if (data.status === 'success') {
-        // Update local state
-        setAnnotations(prev => ({
-          ...prev,
-          [fileId]: [...(prev[fileId] || []), annotation]
-        }))
-        
-        // Emit to socket
-        if (socket && projectId) {
-          socket.emit('addAnnotation', {
-            projectId,
-            fileId,
-            annotation,
-            addedBy: currentClient.role,
-            addedByName: currentClient.name
-          })
-        }
-      } else {
-        console.error('Failed to save annotation:', data.message)
-        alert('Failed to save annotation. Please try again.')
-      }
-    } catch (error) {
-      console.error('Error saving annotation:', error)
-      alert('Failed to save annotation. Please try again.')
-    }
-  }
+  // addAnnotation function removed - now using review page for annotations
 
   const removeAnnotation = (fileId: string, index: number) => {
     setAnnotations(prev => ({
@@ -338,7 +301,7 @@ export default function ClientDashboard({ params }: ClientDashboardProps) {
   }
 
   // Transform files into project elements for display
-  const projectElements = project.files.map((file, index) => ({
+  const projectElements = files.map((file, index) => ({
     id: file.id,
     name: file.name,
     type: getFileType(file.type),
@@ -442,12 +405,10 @@ export default function ClientDashboard({ params }: ClientDashboardProps) {
                       <Eye className="h-4 w-4 mr-2" />
                         View
                       </Button>
-                      {isImageFile(element.file) && (
-                        <Button size="sm" variant="secondary" onClick={() => openAnnotationModal(element.file)}>
-                          <PenTool className="h-4 w-4 mr-2" />
-                          Annotate
-                    </Button>
-                      )}
+                      <Button size="sm" variant="secondary" onClick={() => openReviewPage(element.file)}>
+                        <PenTool className="h-4 w-4 mr-2" />
+                        Review
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -562,104 +523,7 @@ export default function ClientDashboard({ params }: ClientDashboardProps) {
         </div>
       </main>
 
-      {/* Annotation Modal */}
-      <Dialog open={showAnnotationModal} onOpenChange={setShowAnnotationModal}>
-        <DialogContent className="max-w-5xl max-h-[95vh] flex flex-col">
-          <DialogHeader className="flex-shrink-0">
-            <DialogTitle className="flex items-center gap-2">
-              <PenTool className="h-5 w-5" />
-              Annotate Image
-            </DialogTitle>
-            <DialogDescription>
-              Add annotations and feedback for {selectedImage?.name}
-            </DialogDescription>
-          </DialogHeader>
-          
-          {selectedImage && (
-            <div className="flex-1 flex flex-col space-y-4 min-h-0">
-              {/* Image Display */}
-              <div className="relative bg-muted rounded-lg overflow-hidden flex-shrink-0">
-                <img 
-                  src={selectedImage.url}
-                  alt={selectedImage.name}
-                  className="w-full h-auto max-h-[300px] object-contain"
-                />
-              </div>
-              
-              {/* Annotations List with Scroll */}
-              <div className="flex-1 flex flex-col space-y-3 min-h-0">
-                <h4 className="font-medium flex-shrink-0">Annotations</h4>
-                {annotations[selectedImage.id] && annotations[selectedImage.id].length > 0 ? (
-                  <div className="flex-1 overflow-y-auto space-y-2 pr-2">
-                    {annotations[selectedImage.id].map((annotation, index) => (
-                      <div key={index} className="flex items-start gap-2 p-3 bg-muted rounded-lg">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                            <span className="text-xs font-medium text-green-600">
-                              {project?.client?.name || 'Client'}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date().toLocaleTimeString()}
-                            </span>
-                          </div>
-                          <p className="text-sm">{annotation}</p>
-                        </div>
-                        {/* <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeAnnotation(selectedImage.id, index)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button> */}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex-1 flex items-center justify-center">
-                    <p className="text-sm text-muted-foreground">No annotations yet</p>
-                  </div>
-                )}
-              </div>
-              
-              {/* Add New Annotation - Fixed at bottom */}
-              <div className="space-y-2 flex-shrink-0 border-t pt-4">
-                <Label htmlFor="newAnnotation">Add Annotation</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="newAnnotation"
-                    placeholder="Enter your annotation or feedback..."
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                        addAnnotation(selectedImage.id, e.currentTarget.value.trim())
-                        e.currentTarget.value = ''
-                      }
-                    }}
-                  />
-                  <Button
-                    onClick={(e) => {
-                      const input = e.currentTarget.previousElementSibling as HTMLInputElement
-                      if (input.value.trim()) {
-                        addAnnotation(selectedImage.id, input.value.trim())
-                        input.value = ''
-                      }
-                    }}
-                  >
-                    Add
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAnnotationModal(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Annotation Modal removed - now using review page */}
     </div>
   )
 }

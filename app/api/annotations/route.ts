@@ -34,31 +34,30 @@ export async function POST(req: NextRequest) {
       }, { status: 404 })
     }
 
-    // Create annotation
+    // Create annotation in database
     const annotation = await prisma.annotation.create({
       data: {
         content,
         fileId,
         projectId,
-        coordinates,
+        coordinates: coordinates ? JSON.stringify(coordinates) : null,
         addedBy,
         addedByName
       }
     })
 
+    // Emit socket event for real-time updates
+    try {
+      // Note: Socket emission would happen here in a real implementation
+      console.log(`Annotation created: ${annotation.id} for project ${projectId}`)
+    } catch (error) {
+      console.log('Socket emission skipped:', error)
+    }
+
     return NextResponse.json({
       status: 'success',
       message: 'Annotation added successfully',
-      data: {
-        id: annotation.id,
-        content: annotation.content,
-        fileId: annotation.fileId,
-        projectId: annotation.projectId,
-        coordinates: annotation.coordinates,
-        addedBy: annotation.addedBy,
-        addedByName: annotation.addedByName,
-        createdAt: annotation.createdAt
-      }
+      data: annotation
     })
 
   } catch (error) {
@@ -98,19 +97,17 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: 'desc' }
     })
 
+    // Parse coordinates for each annotation
+    const annotationsWithCoordinates = annotations.map(annotation => ({
+      ...annotation,
+      x: annotation.coordinates ? JSON.parse(annotation.coordinates).x : undefined,
+      y: annotation.coordinates ? JSON.parse(annotation.coordinates).y : undefined
+    }))
+
     return NextResponse.json({
       status: 'success',
       message: 'Annotations retrieved successfully',
-      data: annotations.map(annotation => ({
-        id: annotation.id,
-        content: annotation.content,
-        fileId: annotation.fileId,
-        projectId: annotation.projectId,
-        coordinates: annotation.coordinates,
-        addedBy: annotation.addedBy,
-        addedByName: annotation.addedByName,
-        createdAt: annotation.createdAt
-      }))
+      data: annotationsWithCoordinates
     })
 
   } catch (error) {

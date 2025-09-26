@@ -5,21 +5,15 @@ const { Server } = require('socket.io')
 
 const dev = process.env.NODE_ENV !== 'production'
 const hostname = 'localhost'
-const port = 3000
+const port = process.env.PORT || 3000
 
-const app = next({ 
-  dev, 
-  hostname, 
-  port,
-  // Disable tracing to avoid permission issues
-  experimental: {
-    tracing: false
-  }
-})
+// Create Next.js app
+const app = next({ dev, hostname, port })
 const handle = app.getRequestHandler()
 
 app.prepare().then(() => {
-  const httpServer = createServer(async (req, res) => {
+  // Create HTTP server
+  const server = createServer(async (req, res) => {
     try {
       const parsedUrl = parse(req.url, true)
       await handle(req, res, parsedUrl)
@@ -30,98 +24,139 @@ app.prepare().then(() => {
     }
   })
 
-  // Initialize Socket.IO
-  const io = new Server(httpServer, {
-    cors: {
-      origin: dev ? "http://localhost:3000" : process.env.NEXT_PUBLIC_APP_URL,
-      methods: ["GET", "POST"],
-      credentials: true
-    },
+  // Create Socket.io server
+  const io = new Server(server, {
     path: '/api/socketio',
-    transports: ['websocket', 'polling'],
-    pingTimeout: 60000,
-    pingInterval: 25000
+    cors: {
+      origin: process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000',
+      methods: ['GET', 'POST']
+    },
+    transports: ['websocket', 'polling']
   })
 
-  // Socket.IO connection handling
+  // Socket.IO event handlers
   io.on('connection', (socket) => {
-    console.log('Client connected:', socket.id)
+    console.log('🔌 Client connected:', socket.id)
 
-    // Join project room for real-time updates
+    // Join project room
     socket.on('join-project', (projectId) => {
       socket.join(`project-${projectId}`)
-      console.log(`Client ${socket.id} joined project ${projectId}`)
-    })
-
-    // Join element room for element-specific updates
-    socket.on('join-element', (elementId) => {
-      socket.join(`element-${elementId}`)
-      console.log(`Client ${socket.id} joined element ${elementId}`)
-    })
-
-    // Handle annotation additions
-    socket.on('addAnnotation', (data) => {
-      console.log('Annotation added:', data)
-      // Broadcast to all clients in the project room
-      socket.to(`project-${data.projectId}`).emit('annotationAdded', {
-        fileId: data.fileId,
-        annotation: data.annotation,
-        timestamp: new Date().toISOString(),
-        addedBy: data.addedBy || 'Admin',
-        addedByName: data.addedByName || data.addedBy || 'Unknown'
-      })
-    })
-
-    // Handle status changes
-    socket.on('statusChanged', (data) => {
-      console.log('Status changed:', data)
-      // Broadcast to all clients in the project room
-      socket.to(`project-${data.projectId}`).emit('statusChanged', {
-        status: data.status,
-        message: data.message,
-        timestamp: new Date().toISOString()
-      })
-    })
-
-    // Handle new comments
-    socket.on('newComment', (data) => {
-      console.log('New comment:', data)
-      // Broadcast to all clients in the project room
-      socket.to(`project-${data.projectId}`).emit('commentAdded', {
-        elementId: data.elementId,
-        comment: data.comment,
-        timestamp: new Date().toISOString(),
-        addedBy: data.addedBy || 'Admin'
-      })
+      console.log(`🔗 Socket ${socket.id} joined project ${projectId}`)
+      console.log(`🔗 Project room: project-${projectId}`)
     })
 
     // Leave project room
     socket.on('leave-project', (projectId) => {
       socket.leave(`project-${projectId}`)
-      console.log(`Client ${socket.id} left project ${projectId}`)
+      console.log(`Socket ${socket.id} left project ${projectId}`)
     })
 
-    // Leave element room
-    socket.on('leave-element', (elementId) => {
-      socket.leave(`element-${elementId}`)
-      console.log(`Client ${socket.id} left element ${elementId}`)
+    // Annotation events
+    socket.on('addAnnotation', (data) => {
+      console.log('📝 Server received addAnnotation event:', data)
+      console.log('📝 Broadcasting to project room:', `project-${data.projectId}`)
+      // Broadcast to all clients in the project room
+      socket.to(`project-${data.projectId}`).emit('annotationAdded', {
+        ...data,
+        id: Date.now().toString(),
+        timestamp: new Date().toISOString(),
+        resolved: false
+      })
+      console.log('📝 Broadcast sent successfully')
     })
 
+    socket.on('resolveAnnotation', (data) => {
+      console.log('✅ Annotation resolved:', data)
+      // Broadcast to all clients in the project room
+      socket.to(`project-${data.projectId}`).emit('annotationResolved', {
+        annotationId: data.annotationId,
+        resolvedBy: data.resolvedBy,
+        timestamp: new Date().toISOString()
+      })
+    })
+
+    // Comment events
+    socket.on('addComment', (data) => {
+      console.log('💬 Comment added:', data)
+      // Broadcast to all clients in the project room
+      socket.to(`project-${data.projectId}`).emit('commentAdded', {
+        ...data,
+        id: Date.now().toString(),
+        timestamp: new Date().toISOString()
+      })
+    })
+
+    // Annotation reply events
+    socket.on('addAnnotationReply', (data) => {
+      console.log('💬 Annotation reply added:', data)
+      // Broadcast to all clients in the project room
+      socket.to(`project-${data.projectId}`).emit('annotationReplyAdded', {
+        ...data,
+        id: Date.now().toString(),
+        timestamp: new Date().toISOString()
+      })
+    })
+
+    // Annotation status change events
+    socket.on('annotationStatusChanged', (data) => {
+      console.log('🔄 Annotation status changed:', data)
+      // Broadcast to all clients in the project room
+      socket.to(`project-${data.projectId}`).emit('annotationStatusUpdated', {
+        ...data,
+        timestamp: new Date().toISOString()
+      })
+    })
+
+    // Annotation assignment events
+    socket.on('annotationAssigned', (data) => {
+      console.log('👤 Annotation assigned:', data)
+      // Broadcast to all clients in the project room
+      socket.to(`project-${data.projectId}`).emit('annotationAssigned', {
+        ...data,
+        timestamp: new Date().toISOString()
+      })
+    })
+
+    // Status update events
+    socket.on('updateElementStatus', (data) => {
+      console.log('📊 Element status updated:', data)
+      // Broadcast to all clients in the project room
+      socket.to(`project-${data.projectId}`).emit('statusChanged', {
+        ...data,
+        timestamp: new Date().toISOString()
+      })
+    })
+
+    // Project status events
+    socket.on('projectStatusChanged', (data) => {
+      console.log('📈 Project status changed:', data)
+      // Broadcast to all clients in the project room
+      socket.to(`project-${data.projectId}`).emit('projectStatusChanged', {
+        ...data,
+        timestamp: new Date().toISOString()
+      })
+    })
+
+    // File upload events
+    socket.on('fileUploaded', (data) => {
+      console.log('📁 File uploaded:', data)
+      // Broadcast to all clients in the project room
+      socket.to(`project-${data.projectId}`).emit('fileUploaded', {
+        ...data,
+        timestamp: new Date().toISOString()
+      })
+    })
+
+    // Disconnect handler
     socket.on('disconnect', () => {
-      console.log('Client disconnected:', socket.id)
+      console.log('🔌 Client disconnected:', socket.id)
     })
   })
 
-  // Make io available globally for API routes
-  global.io = io
-
-  httpServer
-    .once('error', (err) => {
-      console.error(err)
-      process.exit(1)
-    })
-    .listen(port, () => {
-      console.log(`> Ready on http://${hostname}:${port}`)
-      console.log(`> Socket.IO server running on port ${port}`)
-    })
+  // Start server
+  server.listen(port, (err) => {
+    if (err) throw err
+    console.log(`🚀 Server ready on http://${hostname}:${port}`)
+    console.log(`🔌 Socket.io server running on port ${port}`)
+  })
 })

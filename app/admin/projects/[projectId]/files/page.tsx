@@ -12,8 +12,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { LogoutButton } from "@/components/logout-button"
-import { Eye, MessageSquare, PenTool, X } from "lucide-react"
+import { Eye, MessageSquare, PenTool, X, FileText } from "lucide-react"
 import io from 'socket.io-client'
+import { useRouter } from 'next/navigation'
 import {
   Select,
   SelectContent,
@@ -87,6 +88,7 @@ interface ProjectFilesPageProps {
 }
 
 export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
+  const router = useRouter()
   const [project, setProject] = useState<Project | null>(null)
   const [versions, setVersions] = useState<Version[]>([
     {
@@ -114,7 +116,8 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
   const [selectedFileForDetails, setSelectedFileForDetails] = useState<ProjectFile | null>(null)
   const [socket, setSocket] = useState<any>(null)
   const [chatMessages, setChatMessages] = useState<Array<{id: string, type: 'annotation' | 'status', message: string, timestamp: string, addedBy?: string, senderName?: string, isFromAdmin?: boolean}>>([])
-
+  const [shareLink, setShareLink] = useState<string | null>(null)
+ 
   // Fetch clients data
   const fetchClients = async () => {
     try {
@@ -164,6 +167,23 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
       }
     } catch (error) {
       console.error('Error fetching project:', error)
+    }
+  }
+
+  // Generate share link
+  const generateShareLink = async () => {
+    try {
+      const response = await fetch(`/api/projects/${params.projectId}/share-link`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      const data = await response.json()
+      
+      if (data.status === 'success') {
+        setShareLink(data.data.shareLink)
+      }
+    } catch (error) {
+      console.error('Error generating share link:', error)
     }
   }
 
@@ -458,13 +478,6 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
     }
   }
 
-  const handleCopyLink = () => {
-    if (!project) return
-    
-    navigator.clipboard.writeText(project.publicLink)
-    alert("Shareable link copied to clipboard!")
-  }
-
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes'
     const k = 1024
@@ -632,6 +645,7 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
             <Logo />
           </div>
           <div className="flex items-center gap-4">
+          
             <ThemeToggle />
             <LogoutButton />
             <Button
@@ -658,10 +672,14 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
               </div>
               <div className="flex items-center gap-2">
                 <Badge className={getStatusColor(project.status)}>{project.status}</Badge>
-                <Button variant="outline" onClick={handleCopyLink}>
-                  <Icons.Copy />
-                  <span className="ml-2">Copy Link</span>
+                <Button 
+                  variant="outline" 
+                  onClick={() => router.push(`/admin/projects/${params.projectId}/files/annotations`)}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  View Annotations
                 </Button>
+                 
               </div>
             </div>
           </div>
@@ -822,32 +840,7 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                             {/* Overlay with actions */}
                             <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 hover:opacity-100">
                               <div className="flex gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="secondary"
-                                  onClick={() => window.open(file.url, '_blank')}
-                                >
-                                  <Eye className="h-4 w-4 mr-1" />
-                                  View
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="secondary"
-                                  onClick={() => openViewDetailsModal(file)}
-                                >
-                                  <MessageSquare className="h-4 w-4 mr-1" />
-                                  Details
-                                </Button>
-                                {isImageFile(file) && (
-                                  <Button
-                                    size="sm"
-                                    variant="secondary"
-                                    onClick={() => openAnnotationModal(file)}
-                                  >
-                                    <PenTool className="h-4 w-4 mr-1" />
-                                    Annotate
-                                  </Button>
-                                )}
+                                 
                               </div>
                             </div>
                           </div>
@@ -958,10 +951,6 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                     <p className="text-sm font-mono break-all">{project.publicLink}</p>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={handleCopyLink} className="flex-1">
-                      <Icons.Copy />
-                      <span className="ml-2">Copy Link</span>
-                    </Button>
                     <Button variant="outline" size="sm" onClick={() => window.open(project.publicLink, '_blank')}>
                       <Icons.ExternalLink />
                     </Button>
@@ -1236,6 +1225,9 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      
+    
     </div>
   )
 }

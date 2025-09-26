@@ -92,7 +92,19 @@ export function useRealtimeComments({
       const data = await response.json()
 
       if (data.status === 'success') {
-        setAnnotations(data.data || [])
+        // Transform annotations to match expected format
+        const transformedAnnotations = (data.data || []).map((annotation: any) => ({
+          id: annotation.id,
+          x: annotation.x || 0,
+          y: annotation.y || 0,
+          comment: annotation.content,
+          timestamp: annotation.createdAt,
+          resolved: annotation.isResolved || false,
+          fileId: annotation.fileId,
+          addedBy: annotation.addedBy,
+          addedByName: annotation.addedByName
+        }))
+        setAnnotations(transformedAnnotations)
       }
     } catch (err) {
       console.error('Error fetching annotations:', err)
@@ -150,7 +162,7 @@ export function useRealtimeComments({
           content: annotation.comment,
           fileId: annotation.fileId,
           projectId,
-          coordinates: `${annotation.x},${annotation.y}`,
+          coordinates: { x: annotation.x, y: annotation.y },
           addedBy: currentUser.role,
           addedByName: currentUser.name
         })
@@ -169,9 +181,20 @@ export function useRealtimeComments({
           addedByName: currentUser.name
         })
 
-        // Update local state
-        setAnnotations(prev => [data.data, ...prev])
-        return data.data
+        // Update local state with transformed annotation
+        const transformedAnnotation = {
+          id: data.data.id,
+          x: data.data.x || 0,
+          y: data.data.y || 0,
+          comment: data.data.content,
+          timestamp: data.data.createdAt,
+          resolved: data.data.isResolved || false,
+          fileId: data.data.fileId,
+          addedBy: data.data.addedBy,
+          addedByName: data.data.addedByName
+        }
+        setAnnotations(prev => [transformedAnnotation, ...prev])
+        return transformedAnnotation
       } else {
         throw new Error(data.message || 'Failed to add annotation')
       }
