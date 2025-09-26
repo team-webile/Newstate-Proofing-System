@@ -258,9 +258,9 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
           addedBy: annotation.addedBy,
           addedByName: annotation.addedByName,
           createdAt: annotation.createdAt,
-          x: annotation.coordinates ? JSON.parse(annotation.coordinates).x : undefined,
-          y: annotation.coordinates ? JSON.parse(annotation.coordinates).y : undefined,
-          status: project.status || 'OPEN',
+          x: annotation.x || (annotation.coordinates ? JSON.parse(annotation.coordinates).x : undefined),
+          y: annotation.y || (annotation.coordinates ? JSON.parse(annotation.coordinates).y : undefined),
+          status: annotation.status || 'PENDING',
           isResolved: annotation.isResolved || false,
           replies: annotation.replies || []
         }))
@@ -760,15 +760,15 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
     if (!selectedFile) return false;
     const fileAnnotations = getFileAnnotations(selectedFile.id);
     return fileAnnotations.every(annotation => 
-      project.status === 'COMPLETED' || project.status === 'REJECTED'
+      annotation.status === 'COMPLETED' || annotation.status === 'REJECTED'
     );
   };
 
   const handleImageClick = (event: React.MouseEvent<HTMLImageElement>) => {
     if (!isImageFile(selectedFile!)) return
     
-    // Don't allow adding annotations if all are resolved
-    if (areAllAnnotationsResolved()) {
+    // Don't allow adding annotations if project status is completed
+    if (project?.status === 'completed') {
       return;
     }
     
@@ -1086,7 +1086,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
               <Download className="h-4 w-4 mr-2" />
               Download
             </Button>
-            {project.status === 'PENDING' && (
+            {project.status !== 'completed' && (
             <Button
               variant="outline"
               size="sm"
@@ -1177,10 +1177,10 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                   </CardTitle>
                   <CardDescription>
                     {selectedFile ? (
-                      areAllAnnotationsResolved() ? (
+                      project?.status === 'completed' ? (
                         <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
                           <CheckCircle className="h-4 w-4" />
-                          All annotations for {selectedFile.name} have been completed or rejected. No further annotations can be added.
+                          This project has been completed. No further annotations can be added.
                         </div>
                       ) : (
                         `Previewing ${selectedFile.name} - Click to add annotations`
@@ -1201,7 +1201,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                               src={selectedFile.url}
                               alt={selectedFile.name}
                               className={`w-full h-auto max-h-[500px] object-contain ${
-                                areAllAnnotationsResolved() ? 'cursor-not-allowed pointer-events-none' : 'cursor-crosshair'
+                                project?.status === 'completed' ? 'cursor-not-allowed pointer-events-none' : 'cursor-crosshair'
                               }`}
                               onClick={handleImageClick}
                             />
@@ -1268,14 +1268,14 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                                         variant="outline"
                                         className="text-xs bg-white border-blue-500 text-blue-500 hover:bg-blue-50"
                                         onClick={() => handleReplyClick(annotation)}
-                                        disabled={project.status === 'COMPLETED' || project.status === 'REJECTED'}
+                                        disabled={project?.status === 'completed'}
                                       >
                                         <MessageSquare className="h-3 w-3 mr-1" />
                                         Reply
                                       </Button>
                                       
                                       {/* Status control buttons */}
-                                      {project.status === 'PENDING' && (
+                                      {project?.status !== 'completed' && (
                                         <Button
                                           size="sm"
                                           variant="outline"
@@ -1284,18 +1284,6 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                                         >
                                           <CheckCircle className="h-3 w-3 mr-1" />
                                           Resolve
-                                        </Button>
-                                      )}
-                                      
-                                      {project.status === 'COMPLETED' && (
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          className="text-xs bg-white border-orange-500 text-orange-500 hover:bg-orange-50"
-                                          onClick={() => updateAnnotationStatus(annotation.id, 'PENDING')}
-                                        >
-                                          <AlertCircle className="h-3 w-3 mr-1" />
-                                          Reopen
                                         </Button>
                                       )}
                                     </div>
@@ -1427,13 +1415,13 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                       {/* Click to annotate badge for images */}
                       {isImageFile(selectedFile) && (
                         <div className="flex items-center gap-2">
-                          {areAllAnnotationsResolved() ? (
+                          {project?.status === 'completed' ? (
                             <Badge variant="outline" className="text-xs bg-green-50 text-green-600 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800">
                               <CheckCircle className="h-3 w-3 mr-1" />
-                              All annotations resolved
+                              Project completed
                             </Badge>
                           ) : (
-                            <Badge variant="outline" className="text-xs dark:text-gray-100 dark:border-gray-700">
+                            <Badge variant="outline" className="text-xs text-green-600 dark:text-green-400 border-green-200 dark:border-green-800">
                               <MapPin className="h-3 w-3 mr-1" />
                               Click to annotate
                             </Badge>
@@ -1885,7 +1873,9 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                     {selectedAnnotationForReply.addedByName}
                   </span>
                   <span className="text-xs text-gray-500">
-                    {new Date(selectedAnnotationForReply.createdAt).toLocaleString()}
+                    {selectedAnnotationForReply.createdAt
+                      ? new Date(selectedAnnotationForReply.createdAt).toLocaleString()
+                      : 'Invalid Date'}
                   </span>
                 </div>
                 <p className="text-sm text-gray-700 dark:text-gray-300">

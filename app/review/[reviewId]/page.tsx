@@ -413,13 +413,20 @@ export default function ReviewPage({ params }: ReviewPageProps) {
           }
         });
 
+        // Transform annotations to ensure x, y coordinates are properly set
+        const transformedAnnotations = data.data.map((annotation: any) => ({
+          ...annotation,
+          x: annotation.x || (annotation.coordinates ? JSON.parse(annotation.coordinates).x : undefined),
+          y: annotation.y || (annotation.coordinates ? JSON.parse(annotation.coordinates).y : undefined)
+        }));
+
         // Update the main annotations state for display
-        setAnnotations(data.data);
-        console.log("📝 Updated annotations state:", data.data);
+        setAnnotations(transformedAnnotations);
+        console.log("📝 Updated annotations state:", transformedAnnotations);
 
         // Also group annotations by fileId for other uses
         const annotationsByFile: { [key: string]: any[] } = {};
-        data.data.forEach((annotation: any) => {
+        transformedAnnotations.forEach((annotation: any) => {
           if (!annotationsByFile[annotation.fileId]) {
             annotationsByFile[annotation.fileId] = [];
           }
@@ -450,8 +457,8 @@ export default function ReviewPage({ params }: ReviewPageProps) {
   const handleImageClick = (event: React.MouseEvent<HTMLImageElement>) => {
     if (!currentFileData) return;
 
-    // Don't allow adding annotations if all are resolved
-    if (areAllAnnotationsResolved()) {
+    // Don't allow adding annotations if status is completed
+    if (currentVersionData?.status === 'completed') {
       return;
     }
 
@@ -484,13 +491,13 @@ export default function ReviewPage({ params }: ReviewPageProps) {
   // Check if all annotations are completed or rejected
   const areAllAnnotationsResolved = () => {
     return currentFileAnnotations.every(annotation =>
-      annotation.status === 'COMPLETED' || annotation.status === 'REJECTED'
+      annotation.status === 'completed' || annotation.status === 'rejected'
     );
   };
 
   const handleAnnotationClick = (annotation: any) => {
     // Don't allow replies to completed or rejected annotations
-    if (annotation.status === 'COMPLETED' || annotation.status === 'REJECTED') {
+    if (annotation.status === 'completed' || annotation.status === 'rejected') {
       return;
     }
 
@@ -1583,10 +1590,10 @@ console.log(currentVersionData,'currentVersionData')
                     </div>
                   </CardTitle>
                   <CardDescription>
-                    {areAllAnnotationsResolved() ? (
+                    {currentVersionData?.status === 'completed' ? (
                       <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
                         <CheckCircle className="h-4 w-4" />
-                        All annotations have been completed or rejected. No further annotations can be added.
+                        This version has been completed. No further annotations can be added.
                       </div>
                     ) : (
                       "Click anywhere on the design to add annotations and feedback"
@@ -1599,10 +1606,10 @@ console.log(currentVersionData,'currentVersionData')
                       <img
                         src={currentFileData.url}
                         alt={currentFileData.name}
-                        className={`w-full h-auto max-h-[500px] object-contain ${areAllAnnotationsResolved() || currentVersionData?.status !== 'pending' ? 'cursor-not-allowed' : 'cursor-crosshair'
+                        className={`w-full h-auto max-h-[500px] object-contain ${currentVersionData?.status === 'completed' ? 'cursor-not-allowed' : 'cursor-crosshair'
                           }`}
                         onClick={(e) => {
-                          if (currentVersionData?.status !== 'pending') {
+                          if (currentVersionData?.status === 'completed') {
                             e.preventDefault();
                             return;
                           }
@@ -1732,7 +1739,7 @@ console.log(currentVersionData,'currentVersionData')
                                         e.stopPropagation();
                                         handleAnnotationClick(annotation);
                                       }}
-                                      disabled={annotation.isResolved || currentVersionData?.status !== 'pending'}
+                                      disabled={annotation.isResolved || currentVersionData?.status === 'completed'}
                                     >
                                       <MessageCircle className="h-3 w-3 mr-1" />
                                       Reply
@@ -1885,7 +1892,7 @@ console.log(currentVersionData,'currentVersionData')
                                         e.stopPropagation();
                                         handleAnnotationClick(annotation);
                                       }}
-                                      disabled={annotation.resolved || currentVersionData?.status !== 'pending'}
+                                      disabled={annotation.resolved || currentVersionData?.status === 'completed'}
                                     >
                                       <MessageCircle className="h-3 w-3 mr-1" />
                                       Reply
@@ -1930,15 +1937,12 @@ console.log(currentVersionData,'currentVersionData')
                       })}
 
                       {/* Click to annotate badge */}
-                      {currentVersionData?.status === 'pending' && (
+                      {currentVersionData?.status !== 'completed' && (
                         <div className="absolute top-4 left-4">
-                          <Badge
-                            variant="outline"
-                            className="text-xs bg-white/90"
-                          >
-                            <MapPin className="h-3 w-3 mr-1" />
-                            Click to annotate
-                          </Badge>
+                          <Badge variant="outline" className="text-xs text-green-600 dark:text-green-400 border-green-200 dark:border-green-800">
+                              <MapPin className="h-3 w-3 mr-1" />
+                              Click to annotate
+                            </Badge>
                         </div>
                       )}
 
@@ -2778,9 +2782,9 @@ console.log(currentVersionData,'currentVersionData')
                     {selectedAnnotationForReply.addedByName}
                   </span>
                   <span className="text-xs text-gray-500">
-                    {new Date(
-                      selectedAnnotationForReply.createdAt
-                    ).toLocaleString()}
+                    {selectedAnnotationForReply.createdAt
+                      ? new Date(selectedAnnotationForReply.createdAt).toLocaleString()
+                      : 'Invalid Date'}
                   </span>
                 </div>
                 <p className="text-sm text-gray-700 dark:text-gray-300">
