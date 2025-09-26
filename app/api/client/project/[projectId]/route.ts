@@ -46,13 +46,15 @@ export async function GET(
       status: project.status,
       createdAt: project.createdAt,
       updatedAt: project.updatedAt,
+      lastActivity: project.updatedAt, // Use updatedAt as lastActivity
       client: project.client,
       user: project.user,
-      files: project.projectVersions, // Use projectVersions as files
+      files: [], // No projectVersions in current schema
       approvals: project.approvals,
       annotations: project.annotations,
       downloadEnabled: project.downloadEnabled,
-      emailNotifications: project.emailNotifications
+      emailNotifications: project.emailNotifications,
+      publicLink: `/client/${clientId}?project=${projectId}` // Add public link
     }
 
     return NextResponse.json({

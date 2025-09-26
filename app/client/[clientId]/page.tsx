@@ -290,7 +290,15 @@ export default function ClientDashboard({ params }: ClientDashboardProps) {
   }
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return 'Unknown'
+    
     const date = new Date(dateString)
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return 'Invalid Date'
+    }
+    
     const now = new Date()
     const diffTime = Math.abs(now.getTime() - date.getTime())
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
@@ -500,17 +508,7 @@ export default function ClientDashboard({ params }: ClientDashboardProps) {
         )}
 
         {/* Action Buttons */}
-        <div className="mt-8 flex justify-center gap-4">
-          <Button variant="outline" size="lg" className="border-border text-foreground bg-transparent dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">
-            REQUEST REVISIONS
-          </Button>
-          <Button variant="outline" size="lg" className="border-border text-foreground bg-transparent dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">
-            LEAVE ANNOTATIONS
-          </Button>
-          <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 dark:bg-white dark:text-black dark:hover:bg-white/90">
-            APPROVE PROJECT
-          </Button>
-        </div>
+       
 
         {/* Footer Note */}
         <div className="mt-8 text-center">

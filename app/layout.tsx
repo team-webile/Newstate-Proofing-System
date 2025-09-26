@@ -4,8 +4,8 @@ import { Inter } from "next/font/google";
 import { Suspense } from "react";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
-import { Toaster } from "@/components/ui/toaster";
 import { Providers } from "@/components/providers";
+import { Toaster } from "@/components/ui/toaster";
 
 const inter = Inter({
   subsets: ["latin"],

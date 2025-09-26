@@ -234,18 +234,12 @@ export default function ClientsPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => (window.location.href = `/admin/clients/${client.id}`)}
+                          onClick={() => (window.location.href = `/admin/projects/${client.id}/files`)}
                         >
                           <Icons.Eye />
                           <span className="ml-2">View</span>
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => (window.location.href = `/admin/clients/${client.id}/edit`)}
-                        >
-                          <Icons.Edit />
-                        </Button>
+                        
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button
