@@ -178,11 +178,26 @@ model Annotation {
   addedBy     String   // "Admin" or "Client"
   addedByName String?  // Optional name of the person who added it
   coordinates String?  // Optional coordinates for image annotations
+  isResolved  Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  replies     AnnotationReply[]
 
   @@map("annotations")
+}
+
+model AnnotationReply {
+  id          String     @id @default(cuid())
+  content     String
+  annotationId String
+  addedBy     String     // "Admin" or "Client"
+  addedByName String?    // Optional name of the person who added it
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  annotation  Annotation @relation(fields: [annotationId], references: [id], onDelete: Cascade)
+
+  @@map("annotation_replies")
 }
 
 enum UserRole {

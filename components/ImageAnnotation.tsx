@@ -17,6 +17,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 
+interface AnnotationReply {
+  id: string
+  content: string
+  addedBy: string
+  addedByName?: string
+  createdAt: string
+}
+
 interface Annotation {
   id: string
   x: number
@@ -27,6 +35,7 @@ interface Annotation {
   fileId: string
   addedBy?: string
   addedByName?: string
+  replies?: AnnotationReply[]
 }
 
 interface ImageAnnotationProps {
@@ -37,6 +46,7 @@ interface ImageAnnotationProps {
   annotations: Annotation[]
   onAnnotationAdd: (annotation: Omit<Annotation, 'id' | 'timestamp'>) => void
   onAnnotationResolve: (annotationId: string) => void
+  onAnnotationReply: (annotationId: string, reply: string) => void
   isAdmin?: boolean
   currentUser?: {
     name: string
@@ -52,6 +62,7 @@ export default function ImageAnnotation({
   annotations,
   onAnnotationAdd,
   onAnnotationResolve,
+  onAnnotationReply,
   isAdmin = false,
   currentUser = { name: 'User', role: 'Client' }
 }: ImageAnnotationProps) {
@@ -59,6 +70,9 @@ export default function ImageAnnotation({
   const [selectedAnnotation, setSelectedAnnotation] = useState<Annotation | null>(null)
   const [newComment, setNewComment] = useState('')
   const [clickPosition, setClickPosition] = useState({ x: 0, y: 0 })
+  const [showReplyDialog, setShowReplyDialog] = useState(false)
+  const [replyText, setReplyText] = useState('')
+  const [replyingToAnnotation, setReplyingToAnnotation] = useState<Annotation | null>(null)
   const imageRef = useRef<HTMLDivElement>(null)
 
   const handleImageClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -92,6 +106,25 @@ export default function ImageAnnotation({
 
   const handleAnnotationClick = (annotation: Annotation) => {
     setSelectedAnnotation(annotation)
+  }
+
+  const handleReplyClick = (annotation: Annotation) => {
+    setReplyingToAnnotation(annotation)
+    setShowReplyDialog(true)
+    setReplyText('')
+  }
+
+  const handleReplySubmit = async () => {
+    if (!replyingToAnnotation || !replyText.trim()) return
+
+    try {
+      await onAnnotationReply(replyingToAnnotation.id, replyText.trim())
+      setShowReplyDialog(false)
+      setReplyingToAnnotation(null)
+      setReplyText('')
+    } catch (error) {
+      console.error('Error submitting reply:', error)
+    }
   }
 
   const getStatusColor = (resolved: boolean) => {
@@ -265,24 +298,103 @@ export default function ImageAnnotation({
                 </p>
               </div>
               
-              {isAdmin && !selectedAnnotation.resolved && (
-                <Button
-                  onClick={() => {
-                    onAnnotationResolve(selectedAnnotation.id)
-                    setSelectedAnnotation(null)
-                  }}
-                  className="w-full"
-                >
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Mark as Resolved
-                </Button>
+              {/* Show replies if any */}
+              {selectedAnnotation.replies && selectedAnnotation.replies.length > 0 && (
+                <div className="mt-4 space-y-3">
+                  <div className="text-sm font-medium text-muted-foreground">
+                    Replies ({selectedAnnotation.replies.length})
+                  </div>
+                  {selectedAnnotation.replies.map((reply) => (
+                    <div key={reply.id} className="p-3 bg-muted rounded-lg">
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        <span className="text-sm font-medium">{reply.addedByName || reply.addedBy}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(reply.createdAt).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-sm">{reply.content}</p>
+                    </div>
+                  ))}
+                </div>
               )}
+
+              {/* Action buttons */}
+              <div className="flex gap-2 mt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => handleReplyClick(selectedAnnotation)}
+                  className="flex-1"
+                >
+                  <MessageCircle className="h-4 w-4 mr-2" />
+                  Reply
+                </Button>
+                
+                {isAdmin && !selectedAnnotation.resolved && (
+                  <Button
+                    onClick={() => {
+                      onAnnotationResolve(selectedAnnotation.id)
+                      setSelectedAnnotation(null)
+                    }}
+                    className="flex-1"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Resolve
+                  </Button>
+                )}
+              </div>
             </div>
           )}
           
           <DialogFooter>
             <Button variant="outline" onClick={() => setSelectedAnnotation(null)}>
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reply Dialog */}
+      <Dialog open={showReplyDialog} onOpenChange={setShowReplyDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5" />
+              Reply to Annotation
+            </DialogTitle>
+            <DialogDescription>
+              {replyingToAnnotation && (
+                <div className="mt-2 p-3 bg-muted rounded-lg">
+                  <p className="text-sm font-medium">{replyingToAnnotation.addedByName || replyingToAnnotation.addedBy}</p>
+                  <p className="text-sm text-muted-foreground">{replyingToAnnotation.comment}</p>
+                </div>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="reply">Your Reply</Label>
+              <Textarea
+                id="reply"
+                placeholder="Enter your reply..."
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                className="min-h-[100px]"
+                autoFocus
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowReplyDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleReplySubmit}
+              disabled={!replyText.trim()}
+            >
+              Send Reply
             </Button>
           </DialogFooter>
         </DialogContent>

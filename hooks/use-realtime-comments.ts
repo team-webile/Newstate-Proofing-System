@@ -1,54 +1,54 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useCallback } from 'react'
-import { useSocket } from '@/lib/socket-io'
+import { useState, useEffect, useCallback } from "react";
+import { useSocket } from "@/lib/socket-io";
 
 interface Comment {
-  id: string
-  elementId: string
-  commentText: string
-  coordinates?: string
-  userName: string
-  createdAt: string
-  type: 'GENERAL' | 'ANNOTATION'
-  status: 'ACTIVE' | 'RESOLVED'
-  parentId?: string
-  replies?: Comment[]
+  id: string;
+  elementId: string;
+  commentText: string;
+  coordinates?: string;
+  userName: string;
+  createdAt: string;
+  type: "GENERAL" | "ANNOTATION";
+  status: "ACTIVE" | "RESOLVED";
+  parentId?: string;
+  replies?: Comment[];
 }
 
 interface Annotation {
-  id: string
-  x: number
-  y: number
-  comment: string
-  timestamp: string
-  resolved: boolean
-  fileId: string
-  addedBy?: string
-  addedByName?: string
+  id: string;
+  x: number;
+  y: number;
+  comment: string;
+  timestamp: string;
+  resolved: boolean;
+  fileId: string;
+  addedBy?: string;
+  addedByName?: string;
 }
 
 interface UseRealtimeCommentsProps {
-  projectId: string
-  elementId?: string
-  fileId?: string
+  projectId: string;
+  elementId?: string;
+  fileId?: string;
   currentUser: {
-    name: string
-    role: string
-  }
+    name: string;
+    role: string;
+  };
 }
 
 export function useRealtimeComments({
   projectId,
   elementId,
   fileId,
-  currentUser
+  currentUser,
 }: UseRealtimeCommentsProps) {
-  const [comments, setComments] = useState<Comment[]>([])
-  const [annotations, setAnnotations] = useState<Annotation[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const {
     socket,
     addAnnotation: socketAddAnnotation,
@@ -60,273 +60,358 @@ export function useRealtimeComments({
     onStatusChanged,
     onCommentAdded,
     removeAllListeners,
-    isConnected
-  } = useSocket(projectId)
+    isConnected,
+  } = useSocket(projectId);
 
   // Fetch initial comments
   const fetchComments = useCallback(async () => {
     try {
-      setIsLoading(true)
-      setError(null)
+      setIsLoading(true);
+      setError(null);
 
-      const response = await fetch(`/api/comments?projectId=${projectId}${elementId ? `&elementId=${elementId}` : ''}`)
-      const data = await response.json()
+      const response = await fetch(
+        `/api/comments?projectId=${projectId}${
+          elementId ? `&elementId=${elementId}` : ""
+        }`
+      );
+      const data = await response.json();
 
-      if (data.status === 'success') {
-        setComments(data.data || [])
+      if (data.status === "success") {
+        setComments(data.data || []);
       } else {
-        setError(data.message || 'Failed to fetch comments')
+        setError(data.message || "Failed to fetch comments");
       }
     } catch (err) {
-      console.error('Error fetching comments:', err)
-      setError('Failed to fetch comments')
+      console.error("Error fetching comments:", err);
+      setError("Failed to fetch comments");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }, [projectId, elementId])
+  }, [projectId, elementId]);
 
   // Fetch initial annotations
   const fetchAnnotations = useCallback(async () => {
     try {
-      const response = await fetch(`/api/annotations?projectId=${projectId}${fileId ? `&fileId=${fileId}` : ''}`)
-      const data = await response.json()
+      const response = await fetch(
+        `/api/annotations?projectId=${projectId}${
+          fileId ? `&fileId=${fileId}` : ""
+        }`
+      );
+      const data = await response.json();
 
-      if (data.status === 'success') {
+      if (data.status === "success") {
         // Transform annotations to match expected format
-        const transformedAnnotations = (data.data || []).map((annotation: any) => ({
-          id: annotation.id,
-          x: annotation.x || 0,
-          y: annotation.y || 0,
-          comment: annotation.content,
-          timestamp: annotation.createdAt,
-          resolved: annotation.isResolved || false,
-          fileId: annotation.fileId,
-          addedBy: annotation.addedBy,
-          addedByName: annotation.addedByName
-        }))
-        setAnnotations(transformedAnnotations)
+        const transformedAnnotations = (data.data || []).map(
+          (annotation: any) => ({
+            id: annotation.id,
+            x: annotation.x || 0,
+            y: annotation.y || 0,
+            comment: annotation.content,
+            timestamp: annotation.createdAt,
+            resolved: annotation.isResolved || false,
+            fileId: annotation.fileId,
+            addedBy: annotation.addedBy,
+            addedByName: annotation.addedByName,
+          })
+        );
+        setAnnotations(transformedAnnotations);
       }
     } catch (err) {
-      console.error('Error fetching annotations:', err)
+      console.error("Error fetching annotations:", err);
     }
-  }, [projectId, fileId])
+  }, [projectId, fileId]);
 
   // Add new comment
-  const addComment = useCallback(async (commentText: string, coordinates?: string, parentId?: string) => {
-    try {
-      const response = await fetch('/api/comments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          elementId,
-          projectId,
-          commentText,
-          coordinates,
-          userName: currentUser.name,
-          parentId,
-          type: coordinates ? 'ANNOTATION' : 'GENERAL'
-        })
-      })
+  const addComment = useCallback(
+    async (commentText: string, coordinates?: string, parentId?: string) => {
+      try {
+        const response = await fetch("/api/comments", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            elementId,
+            projectId,
+            commentText,
+            coordinates,
+            userName: currentUser.name,
+            parentId,
+            type: coordinates ? "ANNOTATION" : "GENERAL",
+          }),
+        });
 
-      const data = await response.json()
+        const data = await response.json();
 
-      if (data.status === 'success') {
-        // Emit socket event
-        socketAddComment({
-          projectId,
-          elementId: elementId || '',
-          comment: commentText,
-          addedBy: currentUser.role,
-          addedByName: currentUser.name
-        })
+        if (data.status === "success") {
+          // Emit socket event
+          socketAddComment({
+            projectId,
+            elementId: elementId || "",
+            comment: commentText,
+            addedBy: currentUser.role,
+            addedByName: currentUser.name,
+          });
 
-        // Update local state
-        setComments(prev => [data.data, ...prev])
-        return data.data
-      } else {
-        throw new Error(data.message || 'Failed to add comment')
+          // Update local state
+          setComments((prev) => [data.data, ...prev]);
+          return data.data;
+        } else {
+          throw new Error(data.message || "Failed to add comment");
+        }
+      } catch (err) {
+        console.error("Error adding comment:", err);
+        throw err;
       }
-    } catch (err) {
-      console.error('Error adding comment:', err)
-      throw err
-    }
-  }, [projectId, elementId, currentUser, socketAddComment])
+    },
+    [projectId, elementId, currentUser, socketAddComment]
+  );
 
   // Add annotation
-  const addAnnotation = useCallback(async (annotation: Omit<Annotation, 'id' | 'timestamp'>) => {
-    try {
-      const response = await fetch('/api/annotations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content: annotation.comment,
-          fileId: annotation.fileId,
-          projectId,
-          coordinates: { x: annotation.x, y: annotation.y },
-          addedBy: currentUser.role,
-          addedByName: currentUser.name
-        })
-      })
+  const addAnnotation = useCallback(
+    async (annotation: Omit<Annotation, "id" | "timestamp">) => {
+      try {
+        const response = await fetch("/api/annotations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            content: annotation.comment,
+            fileId: annotation.fileId,
+            projectId,
+            coordinates: { x: annotation.x, y: annotation.y },
+            addedBy: currentUser.role,
+            addedByName: currentUser.name,
+          }),
+        });
 
-      const data = await response.json()
+        const data = await response.json();
 
-      if (data.status === 'success') {
-        // Emit socket event
-        socketAddAnnotation({
-          projectId,
-          fileId: annotation.fileId,
-          annotation: annotation.comment,
-          coordinates: { x: annotation.x, y: annotation.y },
-          addedBy: currentUser.role,
-          addedByName: currentUser.name
-        })
+        if (data.status === "success") {
+          // Emit socket event
+          socketAddAnnotation({
+            projectId,
+            fileId: annotation.fileId,
+            annotation: annotation.comment,
+            coordinates: { x: annotation.x, y: annotation.y },
+            addedBy: currentUser.role,
+            addedByName: currentUser.name,
+          });
 
-        // Update local state with transformed annotation
-        const transformedAnnotation = {
-          id: data.data.id,
-          x: data.data.x || 0,
-          y: data.data.y || 0,
-          comment: data.data.content,
-          timestamp: data.data.createdAt,
-          resolved: data.data.isResolved || false,
-          fileId: data.data.fileId,
-          addedBy: data.data.addedBy,
-          addedByName: data.data.addedByName
+          // Update local state with transformed annotation
+          const transformedAnnotation = {
+            id: data.data.id,
+            x: data.data.x || 0,
+            y: data.data.y || 0,
+            comment: data.data.content,
+            timestamp: data.data.createdAt,
+            resolved: data.data.isResolved || false,
+            fileId: data.data.fileId,
+            addedBy: data.data.addedBy,
+            addedByName: data.data.addedByName,
+            replies: data.data.replies || [],
+          };
+          setAnnotations((prev) => [transformedAnnotation, ...prev]);
+          return transformedAnnotation;
+        } else {
+          throw new Error(data.message || "Failed to add annotation");
         }
-        setAnnotations(prev => [transformedAnnotation, ...prev])
-        return transformedAnnotation
-      } else {
-        throw new Error(data.message || 'Failed to add annotation')
+      } catch (err) {
+        console.error("Error adding annotation:", err);
+        throw err;
       }
-    } catch (err) {
-      console.error('Error adding annotation:', err)
-      throw err
-    }
-  }, [projectId, currentUser, socketAddAnnotation])
+    },
+    [projectId, currentUser, socketAddAnnotation]
+  );
+
+  // Add annotation reply
+  const addAnnotationReply = useCallback(
+    async (annotationId: string, reply: string) => {
+      try {
+        const response = await fetch("/api/annotations/reply", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            annotationId,
+            content: reply,
+            addedBy: currentUser.role,
+            addedByName: currentUser.name,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (data.status === "success") {
+          // Update local state with new reply
+          setAnnotations((prev) =>
+            prev.map((annotation) =>
+              annotation.id === annotationId
+                ? {
+                    ...annotation,
+                    replies: [
+                      ...(annotation.replies || []),
+                      {
+                        id: data.data.id,
+                        content: data.data.content,
+                        addedBy: data.data.addedBy,
+                        addedByName: data.data.addedByName,
+                        createdAt: data.data.createdAt,
+                      },
+                    ],
+                  }
+                : annotation
+            )
+          );
+          return data.data;
+        } else {
+          throw new Error(data.message || "Failed to add reply");
+        }
+      } catch (err) {
+        console.error("Error adding reply:", err);
+        throw err;
+      }
+    },
+    [currentUser]
+  );
 
   // Resolve annotation
-  const resolveAnnotation = useCallback(async (annotationId: string) => {
-    try {
-      const response = await fetch(`/api/annotations/${annotationId}/resolve`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' }
-      })
+  const resolveAnnotation = useCallback(
+    async (annotationId: string) => {
+      try {
+        const response = await fetch(
+          `/api/annotations/${annotationId}/resolve`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+          }
+        );
 
-      const data = await response.json()
+        const data = await response.json();
 
-      if (data.status === 'success') {
-        // Emit socket event
-        socketResolveAnnotation({
-          projectId,
-          annotationId,
-          resolvedBy: currentUser.name
-        })
+        if (data.status === "success") {
+          // Emit socket event
+          socketResolveAnnotation({
+            projectId,
+            annotationId,
+            resolvedBy: currentUser.name,
+          });
 
-        // Update local state
-        setAnnotations(prev => 
-          prev.map(annotation => 
-            annotation.id === annotationId 
-              ? { ...annotation, resolved: true }
-              : annotation
-          )
-        )
-        return data.data
-      } else {
-        throw new Error(data.message || 'Failed to resolve annotation')
+          // Update local state
+          setAnnotations((prev) =>
+            prev.map((annotation) =>
+              annotation.id === annotationId
+                ? { ...annotation, resolved: true }
+                : annotation
+            )
+          );
+          return data.data;
+        } else {
+          throw new Error(data.message || "Failed to resolve annotation");
+        }
+      } catch (err) {
+        console.error("Error resolving annotation:", err);
+        throw err;
       }
-    } catch (err) {
-      console.error('Error resolving annotation:', err)
-      throw err
-    }
-  }, [projectId, currentUser, socketResolveAnnotation])
+    },
+    [projectId, currentUser, socketResolveAnnotation]
+  );
 
   // Update element status
-  const updateElementStatus = useCallback(async (status: string, comment?: string) => {
-    try {
-      const response = await fetch(`/api/elements/${elementId}/status`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status,
-          comment
-        })
-      })
+  const updateElementStatus = useCallback(
+    async (status: string, comment?: string) => {
+      try {
+        const response = await fetch(`/api/elements/${elementId}/status`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            status,
+            comment,
+          }),
+        });
 
-      const data = await response.json()
+        const data = await response.json();
 
-      if (data.status === 'success') {
-        // Emit socket event
-        socketUpdateStatus({
-          projectId,
-          elementId: elementId || '',
-          status,
-          updatedBy: currentUser.name,
-          comment
-        })
+        if (data.status === "success") {
+          // Emit socket event
+          socketUpdateStatus({
+            projectId,
+            elementId: elementId || "",
+            status,
+            updatedBy: currentUser.name,
+            comment,
+          });
 
-        return data.data
-      } else {
-        throw new Error(data.message || 'Failed to update status')
+          return data.data;
+        } else {
+          throw new Error(data.message || "Failed to update status");
+        }
+      } catch (err) {
+        console.error("Error updating status:", err);
+        throw err;
       }
-    } catch (err) {
-      console.error('Error updating status:', err)
-      throw err
-    }
-  }, [projectId, elementId, currentUser, socketUpdateStatus])
+    },
+    [projectId, elementId, currentUser, socketUpdateStatus]
+  );
 
   // Setup real-time listeners
   useEffect(() => {
-    if (!socket) return
+    if (!socket) return;
 
     // Annotation events
     onAnnotationAdded((data) => {
       if (data.fileId === fileId) {
-        setAnnotations(prev => [data, ...prev])
+        setAnnotations((prev) => [data, ...prev]);
       }
-    })
+    });
 
     onAnnotationResolved((data) => {
-      setAnnotations(prev => 
-        prev.map(annotation => 
-          annotation.id === data.annotationId 
+      setAnnotations((prev) =>
+        prev.map((annotation) =>
+          annotation.id === data.annotationId
             ? { ...annotation, resolved: true }
             : annotation
         )
-      )
-    })
+      );
+    });
 
     // Comment events
     onCommentAdded((data) => {
       if (data.elementId === elementId) {
-        setComments(prev => [data, ...prev])
+        setComments((prev) => [data, ...prev]);
       }
-    })
+    });
 
     // Status events
     onStatusChanged((data) => {
-      console.log('Status changed:', data)
+      console.log("Status changed:", data);
       // Handle status updates
-    })
+    });
 
     return () => {
-      removeAllListeners()
-    }
-  }, [socket, fileId, elementId, onAnnotationAdded, onAnnotationResolved, onCommentAdded, onStatusChanged, removeAllListeners])
+      removeAllListeners();
+    };
+  }, [
+    socket,
+    fileId,
+    elementId,
+    onAnnotationAdded,
+    onAnnotationResolved,
+    onCommentAdded,
+    onStatusChanged,
+    removeAllListeners,
+  ]);
 
   // Initial data fetch
   useEffect(() => {
-    fetchComments()
+    fetchComments();
     if (fileId) {
-      fetchAnnotations()
+      fetchAnnotations();
     }
-  }, [fetchComments, fetchAnnotations, fileId])
+  }, [fetchComments, fetchAnnotations, fileId]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      removeAllListeners()
-    }
-  }, [removeAllListeners])
+      removeAllListeners();
+    };
+  }, [removeAllListeners]);
 
   return {
     comments,
@@ -336,8 +421,9 @@ export function useRealtimeComments({
     isConnected: isConnected(),
     addComment,
     addAnnotation,
+    addAnnotationReply,
     resolveAnnotation,
     updateElementStatus,
-    refetch: fetchComments
-  }
+    refetch: fetchComments,
+  };
 }

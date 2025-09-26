@@ -1557,9 +1557,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                                 )}
                               </div>
                               <div className="flex items-center gap-1 ml-2">
-                                {isImageFile(file) && (
-                                  <PenTool className="h-4 w-4 text-muted-foreground" />
-                                )}
+                                 
                                 <Eye className="h-4 w-4 text-muted-foreground" />
                               </div>
                             </div>
