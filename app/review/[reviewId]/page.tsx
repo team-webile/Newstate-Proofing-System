@@ -2530,7 +2530,7 @@ console.log(currentVersionData,'currentVersionData')
             </div>
 
             {/* Right Sidebar - Chat Messages */}
-            <div className="lg:col-span-1">
+            {/* <div className="lg:col-span-1">
               <Card className="sticky top-6">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -2587,7 +2587,7 @@ console.log(currentVersionData,'currentVersionData')
                   </div>
                 </CardContent>
               </Card>
-            </div>
+            </div> */}
           </div>
         </div>
       </main>
