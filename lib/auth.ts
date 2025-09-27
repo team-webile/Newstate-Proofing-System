@@ -11,7 +11,8 @@ export interface AuthUser {
 
 export function verifyToken(token: string): AuthUser | null {
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
+    const jwtSecret = process.env.JWT_SECRET || 'fallback-secret-key-for-development-only'
+    const decoded = jwt.verify(token, jwtSecret) as any
     // Handle both id and userId fields
     return {
       id: decoded.id || decoded.userId,
@@ -62,5 +63,6 @@ export function getUserFromRequest(req: NextRequest): AuthUser | null {
 }
 
 export function createToken(user: AuthUser): string {
-  return jwt.sign(user, process.env.JWT_SECRET!, { expiresIn: '7d' })
+  const jwtSecret = process.env.JWT_SECRET || 'fallback-secret-key-for-development-only'
+  return jwt.sign(user, jwtSecret, { expiresIn: '7d' })
 }

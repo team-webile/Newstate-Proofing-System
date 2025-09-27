@@ -15,6 +15,7 @@ import { LogoutButton } from "@/components/logout-button"
 import { Eye, MessageSquare, PenTool, X, FileText } from "lucide-react"
 import io from 'socket.io-client'
 import { useRouter } from 'next/navigation'
+import { useToast } from "@/hooks/use-toast"
 import {
   Select,
   SelectContent,
@@ -57,9 +58,15 @@ interface Version {
   id: string
   version: string
   files: ProjectFile[]
-  status: "draft" | "pending_review" | "approved" | "rejected"
+  status: "DRAFT" | "PENDING_REVIEW" | "APPROVED" | "REJECTED"
   createdAt: string
   notes?: string
+  clientFeedback?: string
+  approvedBy?: string
+  approvedAt?: string
+  rejectedBy?: string
+  rejectedAt?: string
+  comparisonNotes?: string
 }
 
 interface Project {
@@ -89,6 +96,7 @@ interface ProjectFilesPageProps {
 
 export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
   const router = useRouter()
+  const { toast } = useToast()
   const [project, setProject] = useState<Project | null>(null)
   const [versions, setVersions] = useState<Version[]>([
     {
@@ -208,16 +216,66 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
             version: file.version || 'V1'
           }))
           
-          // Update the current version with the fetched files
-          setVersions(prev => prev.map(v => 
-            v.version === currentVersion 
-              ? { ...v, files: files }
-              : v
-          ))
+          // Group files by version
+          const filesByVersion: { [key: string]: ProjectFile[] } = {}
+          files.forEach((file: ProjectFile) => {
+            if (!filesByVersion[file.version]) {
+              filesByVersion[file.version] = []
+            }
+            filesByVersion[file.version].push(file)
+          })
+          
+          // Update versions with their respective files, preserving existing version data
+          setVersions(prev => prev.map(v => ({
+            ...v,
+            files: filesByVersion[v.version] || []
+          })))
         }
       }
     } catch (error) {
       console.error('Error fetching project files:', error)
+    }
+  }
+
+  // Fetch versions from database
+  const fetchVersions = async () => {
+    try {
+      const response = await fetch(`/api/projects/${params.projectId}/versions`)
+      const data = await response.json()
+      
+      if (data.status === 'success' && data.data && data.data.length > 0) {
+        const versionsFromDb = data.data.map((version: any) => ({
+          id: version.id,
+          version: version.version,
+          files: [], // Will be populated by fetchProjectFiles
+          status: version.status || 'DRAFT',
+          createdAt: version.createdAt,
+        }))
+        setVersions(versionsFromDb)
+      } else {
+        // If no versions from database, initialize with default V1
+        setVersions([
+          {
+            id: "1",
+            version: "V1",
+            files: [],
+            status: "DRAFT",
+            createdAt: new Date().toISOString(),
+          }
+        ])
+      }
+    } catch (error) {
+      console.error('Error fetching versions:', error)
+      // Fallback to default V1 if error
+      setVersions([
+        {
+          id: "1",
+          version: "V1",
+          files: [],
+          status: "DRAFT",
+          createdAt: new Date().toISOString(),
+        }
+      ])
     }
   }
 
@@ -248,9 +306,12 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
       await Promise.all([
         fetchProject(),
         fetchClients(),
-        fetchProjectFiles(),
+        fetchVersions(),
         fetchAnnotations()
       ])
+      
+      // Fetch files after versions are loaded to properly associate them
+      await fetchProjectFiles()
       setIsLoading(false)
     }
     
@@ -330,33 +391,45 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
       const data = await response.json()
       
       if (data.status === 'success') {
-    const uploadedFile: ProjectFile = {
+        const uploadedFile: ProjectFile = {
           id: data.data.id,
           name: data.data.name,
           url: data.data.url,
           type: data.data.type,
           size: data.data.size,
           uploadedAt: data.data.uploadedAt,
-          version: data.data.version,
-    }
+          version: currentVersion, // Use current version instead of server response
+        }
 
-    setVersions(prev => prev.map(v => 
-      v.version === currentVersion 
-        ? { ...v, files: [...v.files, uploadedFile] }
-        : v
-    ))
+        // Add file only to the current version
+        setVersions(prev => prev.map(v => 
+          v.version === currentVersion 
+            ? { ...v, files: [...v.files, uploadedFile] }
+            : v
+        ))
     
         // Show success message
-        alert('File uploaded successfully!')
+        toast({
+          title: "Success",
+          description: "File uploaded successfully!",
+        })
         
         // Refresh files after successful upload
         await fetchProjectFiles()
       } else {
-        alert(`Error: ${data.message}`)
+        toast({
+          title: "Error",
+          description: data.message || "Failed to upload file",
+          variant: "destructive"
+        })
       }
     } catch (error) {
       console.error('Upload error:', error)
-      alert('Failed to upload file. Please try again.')
+      toast({
+        title: "Error",
+        description: "Failed to upload file. Please try again.",
+        variant: "destructive"
+      })
     } finally {
     setIsUploading(false)
     setNewFile(null)
@@ -373,7 +446,11 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
       const fileToDelete = currentVersionData?.files.find(file => file.id === fileId)
       
       if (!fileToDelete) {
-        alert('File not found')
+        toast({
+          title: "Error",
+          description: "File not found",
+          variant: "destructive"
+        })
         return
       }
       
@@ -381,55 +458,108 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
       const fileName = fileToDelete.url.split('/').pop()
       
       if (!fileName) {
-        alert('Invalid file name')
+        toast({
+          title: "Error",
+          description: "Invalid file name",
+          variant: "destructive"
+        })
         return
       }
       
-      // Call delete API
-      const response = await fetch(`/api/projects/${project.id}/files?fileName=${encodeURIComponent(fileName)}`, {
+      // Call delete API with version parameter
+      const response = await fetch(`/api/projects/${project.id}/files?fileName=${encodeURIComponent(fileName)}&version=${encodeURIComponent(currentVersion)}`, {
         method: 'DELETE',
       })
       
       const data = await response.json()
       
       if (data.status === 'success') {
-        // Remove file from frontend state
-    setVersions(prev => prev.map(v => 
-      v.version === currentVersion 
-        ? { ...v, files: v.files.filter(file => file.id !== fileId) }
-        : v
-    ))
-        alert('File deleted successfully!')
+        // Remove file from frontend state - only from current version
+        setVersions(prev => prev.map(v => 
+          v.version === currentVersion 
+            ? { ...v, files: v.files.filter(file => file.id !== fileId) }
+            : v
+        ))
+        toast({
+          title: "Success",
+          description: "File deleted successfully!",
+        })
         
         // Refresh files after successful deletion
         await fetchProjectFiles()
       } else {
-        alert(`Error: ${data.message}`)
+        toast({
+          title: "Error",
+          description: data.message || "Failed to delete file",
+          variant: "destructive"
+        })
       }
     } catch (error) {
       console.error('Delete error:', error)
-      alert('Failed to delete file. Please try again.')
+      toast({
+        title: "Error",
+        description: "Failed to delete file. Please try again.",
+        variant: "destructive"
+      })
     }
   }
 
-  const handleCreateVersion = () => {
+  const handleCreateVersion = async () => {
     if (!newVersionName.trim()) {
-      alert("Please enter a version name")
+      toast({
+        title: "Validation Error",
+        description: "Please enter a version name",
+        variant: "destructive"
+      })
       return
     }
 
-    const newVersion: Version = {
-      id: Date.now().toString(),
-      version: newVersionName,
-      files: [],
-      status: "draft",
-      createdAt: new Date().toISOString(),
-    }
+    try {
+      // Save version to database
+      const response = await fetch(`/api/projects/${params.projectId}/versions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          version: newVersionName,
+          description: `Version ${newVersionName}`
+        })
+      })
 
-    setVersions(prev => [...prev, newVersion])
-    setCurrentVersion(newVersionName)
-    setNewVersionName("")
-    setShowVersionDialog(false)
+      const data = await response.json()
+      
+      if (data.status === 'success') {
+        const newVersion: Version = {
+          id: Date.now().toString(),
+          version: newVersionName,
+          files: [],
+          status: "DRAFT",
+          createdAt: new Date().toISOString(),
+        }
+
+        setVersions(prev => [...prev, newVersion])
+        setCurrentVersion(newVersionName)
+        setNewVersionName("")
+        setShowVersionDialog(false)
+        
+        toast({
+          title: "Success",
+          description: `Version ${newVersionName} created successfully!`,
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: data.message || "Failed to create version",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error('Error creating version:', error)
+      toast({
+        title: "Error",
+        description: "Failed to create version. Please try again.",
+        variant: "destructive"
+      })
+    }
   }
 
   const handleVersionChange = (version: string) => {
@@ -439,14 +569,111 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
   const handlePublishVersion = () => {
     setVersions(prev => prev.map(v => 
       v.version === currentVersion 
-        ? { ...v, status: "pending_review" as const }
+        ? { ...v, status: "PENDING_REVIEW" as const }
         : v
     ))
     
     // Update project status
     setProject(prev => prev ? { ...prev, status: "pending" as const } : null)
     
-    alert("Version published for client review!")
+    toast({
+      title: "Success",
+      description: "Version published for client review!",
+    })
+  }
+
+  const handleApproveVersion = async (versionId: string) => {
+    try {
+      const response = await fetch(`/api/projects/${params.projectId}/versions/${versionId}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          approvedBy: 'Admin User', // This should come from auth context
+          approvedAt: new Date().toISOString()
+        })
+      })
+
+      const data = await response.json()
+      
+      if (data.status === 'success') {
+        setVersions(prev => prev.map(v => 
+                 v.id === versionId
+                   ? {
+                       ...v,
+                       status: "APPROVED" as const,
+                       approvedBy: 'Admin User',
+                       approvedAt: new Date().toISOString()
+                     }
+                   : v
+        ))
+        
+        toast({
+          title: "Success",
+          description: "Version approved successfully!",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: data.message || "Failed to approve version",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error('Error approving version:', error)
+      toast({
+        title: "Error",
+        description: "Failed to approve version. Please try again.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleRejectVersion = async (versionId: string, feedback: string) => {
+    try {
+      const response = await fetch(`/api/projects/${params.projectId}/versions/${versionId}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rejectedBy: 'Admin User', // This should come from auth context
+          rejectedAt: new Date().toISOString(),
+          clientFeedback: feedback
+        })
+      })
+
+      const data = await response.json()
+      
+      if (data.status === 'success') {
+        setVersions(prev => prev.map(v => 
+                 v.id === versionId
+                   ? {
+                       ...v,
+                       status: "REJECTED" as const,
+                       rejectedBy: 'Admin User',
+                       rejectedAt: new Date().toISOString(),
+                       clientFeedback: feedback
+                     }
+                   : v
+        ))
+        
+        toast({
+          title: "Success",
+          description: "Version rejected with feedback!",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: data.message || "Failed to reject version",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error('Error rejecting version:', error)
+      toast({
+        title: "Error",
+        description: "Failed to reject version. Please try again.",
+        variant: "destructive"
+      })
+    }
   }
 
   const handleSaveProject = async () => {
@@ -468,13 +695,24 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
       
       const data = await response.json()
       if (data.status === 'success') {
-        alert("Project settings saved successfully!")
+        toast({
+          title: "Success",
+          description: "Project settings saved successfully!",
+        })
       } else {
-        alert(`Error: ${data.message || 'Failed to save project'}`)
+        toast({
+          title: "Error",
+          description: data.message || "Failed to save project",
+          variant: "destructive"
+        })
       }
     } catch (error) {
       console.error('Error saving project:', error)
-      alert('Failed to save project. Please try again.')
+      toast({
+        title: "Error",
+        description: "Failed to save project. Please try again.",
+        variant: "destructive"
+      })
     }
   }
 
@@ -544,11 +782,19 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
         }
       } else {
         console.error('Failed to save annotation:', data.message)
-        alert('Failed to save annotation. Please try again.')
+        toast({
+          title: "Error",
+          description: "Failed to save annotation. Please try again.",
+          variant: "destructive"
+        })
       }
     } catch (error) {
       console.error('Error saving annotation:', error)
-      alert('Failed to save annotation. Please try again.')
+      toast({
+        title: "Error",
+        description: "Failed to save annotation. Please try again.",
+        variant: "destructive"
+      })
     }
   }
 
@@ -576,13 +822,13 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
 
   const getVersionStatusColor = (status: string) => {
     switch (status) {
-      case "pending_review":
+      case "PENDING_REVIEW":
         return "bg-blue-500"
-      case "approved":
+      case "APPROVED":
         return "bg-green-500"
-      case "rejected":
+      case "REJECTED":
         return "bg-red-500"
-      case "draft":
+      case "DRAFT":
         return "bg-gray-500"
       default:
         return "bg-gray-500"
@@ -591,10 +837,10 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
 
   const getVersionStatusText = (status: string) => {
     switch (status) {
-      case "pending_review": return "Pending Review"
-      case "approved": return "Approved"
-      case "rejected": return "Rejected"
-      case "draft": return "Draft"
+      case "PENDING_REVIEW": return "Pending Review"
+      case "APPROVED": return "Approved"
+      case "REJECTED": return "Rejected"
+      case "DRAFT": return "Draft"
       default: return "Unknown"
     }
   }
@@ -732,19 +978,47 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                 <CardContent>
                   <div className="flex flex-wrap gap-2 mb-4">
                     {versions.map((version) => (
-                      <Button
-                        key={version.id}
-                        variant={currentVersion === version.version ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => handleVersionChange(version.version)}
-                        className="flex items-center gap-2"
-                      >
-                        <div className={`w-2 h-2 rounded-full ${getVersionStatusColor(version.status)}`} />
-                        {version.version}
-                        <Badge variant="secondary" className="ml-1">
-                          {getVersionStatusText(version.status)}
-                        </Badge>
-                      </Button>
+                      <div key={version.id} className="flex items-center gap-2">
+                        <Button
+                          variant={currentVersion === version.version ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handleVersionChange(version.version)}
+                          className="flex items-center gap-2"
+                        >
+                          <div className={`w-2 h-2 rounded-full ${getVersionStatusColor(version.status)}`} />
+                          {version.version}
+                          <Badge variant="secondary" className="ml-1">
+                            {getVersionStatusText(version.status)}
+                          </Badge>
+                        </Button>
+                        
+                        {/* Version Actions */}
+                        {version.status === "PENDING_REVIEW" && (
+                          <div className="flex gap-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleApproveVersion(version.id)}
+                              className="text-green-600 hover:text-green-700"
+                            >
+                              <Icons.CheckCircle className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const feedback = prompt("Please provide feedback for rejection:")
+                                if (feedback) {
+                                  handleRejectVersion(version.id, feedback)
+                                }
+                              }}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Icons.XCircle className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     ))}
                   </div>
                 </CardContent>
@@ -888,6 +1162,74 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                   )}
                 </CardContent>
               </Card>
+
+              {/* Version Comparison */}
+              {versions.length > 1 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Icons.Compare className="h-5 w-5" />
+                      Version Comparison
+                    </CardTitle>
+                    <CardDescription>
+                      Compare all versions side by side for client review
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {versions.map((version) => (
+                        <div key={version.id} className="border rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="font-medium">{version.version}</h4>
+                            <Badge className={getStatusColor(version.status)}>
+                              {getVersionStatusText(version.status)}
+                            </Badge>
+                          </div>
+                          
+                          {/* Version Files Preview */}
+                          <div className="space-y-2">
+                            {version.files.slice(0, 2).map((file) => (
+                              <div key={file.id} className="flex items-center gap-2 text-sm">
+                                {isImageFile(file) ? (
+                                  <img
+                                    src={file.url}
+                                    alt={file.name}
+                                    className="w-8 h-8 object-cover rounded"
+                                  />
+                                ) : (
+                                  <div className="w-8 h-8 bg-muted rounded flex items-center justify-center">
+                                    <Icons.File className="h-4 w-4" />
+                                  </div>
+                                )}
+                                <span className="truncate">{file.name}</span>
+                              </div>
+                            ))}
+                            {version.files.length > 2 && (
+                              <p className="text-xs text-muted-foreground">
+                                +{version.files.length - 2} more files
+                              </p>
+                            )}
+                          </div>
+                          
+                          {/* Version Info */}
+                          <div className="mt-3 pt-3 border-t text-xs text-muted-foreground">
+                            <p>Created: {new Date(version.createdAt).toLocaleDateString()}</p>
+                            {version.approvedBy && (
+                              <p className="text-green-600">Approved by: {version.approvedBy}</p>
+                            )}
+                            {version.rejectedBy && (
+                              <p className="text-red-600">Rejected by: {version.rejectedBy}</p>
+                            )}
+                            {version.clientFeedback && (
+                              <p className="text-orange-600">Feedback: {version.clientFeedback}</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
             {/* Project Settings & Info */}

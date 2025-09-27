@@ -36,12 +36,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-
+import { useRouter } from "next/navigation"
 export default function ClientsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [limit] = useState(10)
-
+  const router = useRouter()
   const { data, loading, error, refreshClients } = useClients(currentPage, limit, searchTerm)
   const { toast } = useToast()
 
@@ -110,7 +110,7 @@ export default function ClientsPage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => window.history.back()}
+              onClick={() => router.push('/admin/dashboard')}
               className="text-muted-foreground hover:text-foreground"
             >
               <Icons.ArrowLeft />
@@ -234,10 +234,10 @@ export default function ClientsPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => (window.location.href = `/admin/projects/${client.id}/files`)}
+                          onClick={() => router.push(`/admin/clients/${client.id}/edit`)}
                         >
-                          <Icons.Eye />
-                          <span className="ml-2">View</span>
+                          <Icons.Edit />
+                          <span className="ml-2">Edit</span>
                         </Button>
                         
                         <AlertDialog>
@@ -287,7 +287,7 @@ export default function ClientsPage() {
                 {searchTerm ? "No clients match your search criteria." : "Get started by adding your first client."}
               </p>
               <Button
-                onClick={() => (window.location.href = "/admin/clients/new")}
+                onClick={() => router.push("/admin/clients/new")}
                 className="bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 <Icons.Plus />

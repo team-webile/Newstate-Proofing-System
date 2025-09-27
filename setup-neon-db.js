@@ -112,10 +112,11 @@ async function setupDatabase() {
 
     console.log('\n🎉 Database setup completed successfully!')
     console.log('\n📋 Next steps:')
-    console.log('1. Update your .env.local with your actual Neon database URL')
+    console.log('1. Database is now connected to Neon PostgreSQL')
     console.log('2. Run: npm run dev')
     console.log('3. Visit: http://localhost:3000')
     console.log('4. Login with: admin@newstatebranding.com / admin123')
+    console.log('5. All tables have been created in your Neon database!')
 
   } catch (error) {
     console.error('❌ Database setup failed:', error.message)

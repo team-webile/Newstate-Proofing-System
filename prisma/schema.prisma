@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -61,6 +61,8 @@ model Project {
   themeMode       String        @default("system") // Project theme preference
   approvals       Approval[]
   annotations     Annotation[]
+  annotationReplies AnnotationReply[]
+  versions        Version[]
   user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   client          Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
   reviews         Review[]
@@ -192,11 +194,13 @@ model AnnotationReply {
   id          String     @id @default(cuid())
   content     String
   annotationId String
+  projectId   String
   addedBy     String     // "Admin" or "Client"
   addedByName String?    // Optional name of the person who added it
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   annotation  Annotation @relation(fields: [annotationId], references: [id], onDelete: Cascade)
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("annotation_replies")
 }
@@ -248,4 +252,32 @@ enum AnnotationStatus {
   PENDING
   COMPLETED
   REJECTED
+}
+
+enum VersionStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+model Version {
+  id          String        @id @default(cuid())
+  version     String
+  description String?
+  status      VersionStatus @default(DRAFT)
+  projectId   String
+  project     Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  // Approval/Rejection tracking
+  approvedBy  String?
+  approvedAt  DateTime?
+  rejectedBy  String?
+  rejectedAt  DateTime?
+  clientFeedback String?
+  
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@map("versions")
 }

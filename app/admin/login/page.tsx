@@ -167,20 +167,7 @@ export default function LoginPage() {
               </Button>
 
               {/* Test Toast Button */}
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={() => {
-                  toast({
-                    title: "Toast Test",
-                    description:
-                      "This is a test toast to verify the system is working!",
-                  });
-                }}
-              >
-                Test Toast
-              </Button>
+              
             </form>
           </CardContent>
         </Card>

@@ -7,7 +7,14 @@
     "dev": "node server.js",
     "dev:next": "next dev",
     "lint": "next lint",
-    "start": "node server.js"
+    "start": "node server.js",
+    "setup:neon": "node setup-neon-db.js",
+    "create:admin": "node create-admin.js",
+    "test:db": "node test-neon-connection.js",
+    "db:push": "npx prisma db push",
+    "db:generate": "npx prisma generate",
+    "db:migrate": "npx prisma migrate dev",
+    "db:studio": "npx prisma studio"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

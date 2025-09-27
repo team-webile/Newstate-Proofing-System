@@ -54,13 +54,20 @@ export async function POST(req: NextRequest) {
       // You can modify this based on your requirements
     }
 
+    // Check if JWT_SECRET is available
+    const jwtSecret = process.env.JWT_SECRET || 'fallback-secret-key-for-development-only'
+    
+    if (!process.env.JWT_SECRET) {
+      console.warn('⚠️ JWT_SECRET not found in environment variables. Using fallback key for development.')
+    }
+
     const token = jwt.sign(
       { 
         userId: isClient ? client.id : user.id, 
         email: isClient ? client.email : user.email, 
         role: isClient ? 'CLIENT' : user.role 
       },
-      process.env.JWT_SECRET!,
+      jwtSecret,
       { expiresIn: '7d' }
     )
 

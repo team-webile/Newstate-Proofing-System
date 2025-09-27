@@ -268,8 +268,7 @@ export default function AdminDashboard() {
               </div>
             ) : (
               <div className="text-center py-8">
-                <Icons.FolderOpen />
-                <p className="text-muted-foreground">No projects found</p>
+                 <p className="text-muted-foreground mb-2">No projects found</p>
                 <Button 
                   onClick={() => (window.location.href = "/admin/projects/new")}
                 >

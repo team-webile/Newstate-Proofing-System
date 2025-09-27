@@ -1,34 +1,32 @@
 const fs = require('fs');
 const path = require('path');
 
-// Create .env.local file
-const envContent = `# Database
-DATABASE_URL="postgresql://username:password@localhost:5432/client_proofing"
+// Environment variables needed for the application
+const envContent = `# JWT Secret for authentication
+JWT_SECRET=your-super-secret-jwt-key-change-this-in-production-12345
 
-# JWT Secret
-JWT_SECRET="your-super-secret-jwt-key-here-change-this-in-production"
+# Database URL (if using external database)
+# DATABASE_URL="file:./dev.db"
 
-# Upload Directory
-UPLOAD_DIR="./uploads"
-
-# Email Configuration
-EMAIL_HOST="smtp.gmail.com"
-EMAIL_PORT=587
-EMAIL_USER="your-email@gmail.com"
-EMAIL_PASS="your-app-password"
-
-# App URLs
-NEXT_PUBLIC_APP_URL="http://localhost:3000"
-NEXT_PUBLIC_API_URL="http://localhost:3000/api"
+# Next.js Environment
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=your-nextauth-secret-key-change-this-12345
 `;
 
 const envPath = path.join(__dirname, '.env.local');
 
 try {
-  fs.writeFileSync(envPath, envContent);
-  console.log('✅ .env.local file created successfully!');
-  console.log('📝 Please update the DATABASE_URL with your actual database connection string');
-  console.log('🔑 Please update the JWT_SECRET with a secure random string');
+  // Check if .env.local already exists
+  if (fs.existsSync(envPath)) {
+    console.log('✅ .env.local already exists');
+  } else {
+    // Create .env.local file
+    fs.writeFileSync(envPath, envContent);
+    console.log('✅ Created .env.local file with default environment variables');
+    console.log('⚠️  Please update JWT_SECRET and NEXTAUTH_SECRET with your own secure values');
+  }
 } catch (error) {
   console.error('❌ Error creating .env.local:', error.message);
+  console.log('\n📝 Please manually create a .env.local file with the following content:');
+  console.log(envContent);
 }

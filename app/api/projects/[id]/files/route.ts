@@ -34,8 +34,8 @@ export async function POST(
       }, { status: 404 })
     }
 
-    // Create upload directory in public folder
-    const uploadDir = join(process.cwd(), 'public', 'uploads', 'projects', projectId)
+    // Create upload directory in public folder with version subdirectory
+    const uploadDir = join(process.cwd(), 'public', 'uploads', 'projects', projectId, 'versions', version)
     await mkdir(uploadDir, { recursive: true })
 
     // Generate unique filename
@@ -60,7 +60,7 @@ export async function POST(
       data: {
         id: uuidv4(),
         name: file.name,
-        url: `/uploads/projects/${projectId}/${filename}`,
+        url: `/uploads/projects/${projectId}/versions/${version}/${filename}`,
         type: file.type,
         size: file.size,
         version: version,
@@ -96,29 +96,65 @@ export async function GET(
       }, { status: 404 })
     }
 
-    // Read files from the project directory
+    // Read files from all version directories
     const projectDir = join(process.cwd(), 'public', 'uploads', 'projects', projectId)
+    const fileList = []
     
     try {
-      const files = await readdir(projectDir)
-      const fileList = []
-      
-      for (const file of files) {
-        const filePath = join(projectDir, file)
-        const stats = await stat(filePath)
+      // Check if versions directory exists
+      const versionsDir = join(projectDir, 'versions')
+      try {
+        const versionDirs = await readdir(versionsDir)
         
-        // Skip directories and hidden files
-        if (stats.isDirectory() || file.startsWith('.')) continue
+        for (const versionDir of versionDirs) {
+          const versionPath = join(versionsDir, versionDir)
+          const versionStats = await stat(versionPath)
+          
+          // Skip if not a directory
+          if (!versionStats.isDirectory()) continue
+          
+          // Read files in this version directory
+          const files = await readdir(versionPath)
+          
+          for (const file of files) {
+            const filePath = join(versionPath, file)
+            const stats = await stat(filePath)
+            
+            // Skip directories and hidden files
+            if (stats.isDirectory() || file.startsWith('.')) continue
+            
+            fileList.push({
+              id: `${versionDir}-${file.split('.')[0]}`, // Use version and filename as ID
+              name: file,
+              url: `/uploads/projects/${projectId}/versions/${versionDir}/${file}`,
+              type: getMimeType(file),
+              size: stats.size,
+              uploadedAt: stats.mtime.toISOString(),
+              version: versionDir
+            })
+          }
+        }
+      } catch (versionsError) {
+        // Versions directory doesn't exist, check root project directory
+        const files = await readdir(projectDir)
         
-        fileList.push({
-          id: file.split('.')[0], // Use filename without extension as ID
-          name: file,
-          url: `/uploads/projects/${projectId}/${file}`,
-          type: getMimeType(file),
-          size: stats.size,
-          uploadedAt: stats.mtime.toISOString(),
-          version: 'V1' // Default version
-        })
+        for (const file of files) {
+          const filePath = join(projectDir, file)
+          const stats = await stat(filePath)
+          
+          // Skip directories and hidden files
+          if (stats.isDirectory() || file.startsWith('.')) continue
+          
+          fileList.push({
+            id: `V1-${file.split('.')[0]}`, // Use V1 as default version
+            name: file,
+            url: `/uploads/projects/${projectId}/${file}`,
+            type: getMimeType(file),
+            size: stats.size,
+            uploadedAt: stats.mtime.toISOString(),
+            version: 'V1'
+          })
+        }
       }
       
       return NextResponse.json({
@@ -178,6 +214,7 @@ export async function DELETE(
     const { id: projectId } = await params
     const { searchParams } = new URL(req.url)
     const fileName = searchParams.get('fileName')
+    const version = searchParams.get('version') || 'V1'
 
     if (!fileName) {
       return NextResponse.json({
@@ -198,15 +235,24 @@ export async function DELETE(
       }, { status: 404 })
     }
 
-    // Construct file path
-    const filePath = join(process.cwd(), 'public', 'uploads', 'projects', projectId, fileName)
+    // Try to delete from version directory first, then fallback to root
+    let filePath = join(process.cwd(), 'public', 'uploads', 'projects', projectId, 'versions', version, fileName)
 
     try {
       // Delete file from filesystem
       await unlink(filePath)
     } catch (fileError) {
-      console.error('File deletion error:', fileError)
-      // Continue even if file doesn't exist on filesystem
+      // Try deleting from root directory for backward compatibility
+      const rootFilePath = join(process.cwd(), 'public', 'uploads', 'projects', projectId, fileName)
+      try {
+        await unlink(rootFilePath)
+      } catch (rootError) {
+        console.error('File deletion error:', rootError)
+        return NextResponse.json({
+          status: 'error',
+          message: 'File not found'
+        }, { status: 404 })
+      }
     }
 
     // Update project's lastActivity
