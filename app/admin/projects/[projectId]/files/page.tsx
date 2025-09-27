@@ -987,9 +987,9 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                         >
                           <div className={`w-2 h-2 rounded-full ${getVersionStatusColor(version.status)}`} />
                           {version.version}
-                          <Badge variant="secondary" className="ml-1">
+                          {/* <Badge variant="secondary" className="ml-1">
                             {getVersionStatusText(version.status)}
-                          </Badge>
+                          </Badge> */}
                         </Button>
                         
                         {/* Version Actions */}

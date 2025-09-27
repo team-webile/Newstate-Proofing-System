@@ -216,6 +216,51 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
     }
   }
 
+  // Fetch versions from database
+  const fetchVersions = async () => {
+    try {
+      const response = await fetch(`/api/projects/${params.projectId}/versions`)
+      const data = await response.json()
+      
+      if (data.status === 'success' && data.data && data.data.length > 0) {
+        const versionsFromDb = data.data.map((version: any) => ({
+          id: version.id,
+          version: version.version,
+          files: [],
+          status: version.status || 'draft',
+          createdAt: version.createdAt,
+          annotations: []
+        }))
+        setVersions(versionsFromDb)
+      } else {
+        // If no versions from database, initialize with default V1
+        setVersions([
+          {
+            id: "1",
+            version: "V1",
+            files: [],
+            status: "draft",
+            createdAt: new Date().toISOString(),
+            annotations: []
+          }
+        ])
+      }
+    } catch (error) {
+      console.error('Error fetching versions:', error)
+      // Fallback to default V1 if error
+      setVersions([
+        {
+          id: "1",
+          version: "V1",
+          files: [],
+          status: "draft",
+          createdAt: new Date().toISOString(),
+          annotations: []
+        }
+      ])
+    }
+  }
+
   // Fetch project files
   const fetchProjectFiles = async () => {
     try {
@@ -235,6 +280,22 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
             uploadedAt: file.uploadedAt,
             version: file.version || 'V1'
           }))
+          
+          // Group files by version
+          const filesByVersion: { [key: string]: ProjectFile[] } = {}
+          files.forEach((file: ProjectFile) => {
+            if (!filesByVersion[file.version]) {
+              filesByVersion[file.version] = []
+            }
+            filesByVersion[file.version].push(file)
+          })
+          
+          // Update versions with their respective files
+          setVersions(prev => prev.map(v => ({
+            ...v,
+            files: filesByVersion[v.version] || []
+          })))
+          
           setFiles(files)
         }
       }
@@ -271,60 +332,52 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
     }
   }
 
-  // Fetch project versions
-  const fetchVersions = async () => {
-    try {
-      const response = await fetch(`/api/projects/${params.projectId}/versions`)
-      const data = await response.json()
-      
-      if (data.status === 'success') {
-        // Transform versions data
-        const transformedVersions = data.data.map((version: any, index: number) => ({
-          id: version.id,
-          version: `V${index + 1}`,
-          files: [{
-            id: version.id,
-            name: version.fileName,
-            url: version.filePath,
-            type: version.mimeType,
-            size: version.fileSize,
-            uploadedAt: version.createdAt,
-            version: `V${index + 1}`
-          }],
-          status: 'pending_review' as const,
-          createdAt: version.createdAt,
-          annotations: []
-        }))
-        setVersions(transformedVersions)
-      }
-    } catch (error) {
-      console.error('Error fetching versions:', error)
+
+  // Handle version change
+  const handleVersionChange = (version: string) => {
+    setCurrentVersion(version)
+  }
+
+
+
+  // Get current version data
+  const currentVersionData = versions.find(v => v.version === currentVersion)
+
+  // Helper functions
+  const isImageFile = (file: ProjectFile) => {
+    return file.type.startsWith('image/')
+  }
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return "0 Bytes"
+    const k = 1024
+    const sizes = ["Bytes", "KB", "MB", "GB"]
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
+  }
+
+  const getVersionStatusColor = (status: string) => {
+    switch (status) {
+      case "approved":
+        return "bg-green-500"
+      case "rejected":
+        return "bg-red-500"
+      case "pending_review":
+        return "bg-blue-500"
+      case "draft":
+        return "bg-gray-500"
+      default:
+        return "bg-gray-500"
     }
   }
 
-  // Create new version
-  const createVersion = async (file: File) => {
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('versionName', newVersionName)
-      formData.append('description', newVersionDescription)
-
-      const response = await fetch(`/api/projects/${params.projectId}/versions`, {
-        method: 'POST',
-        body: formData
-      })
-
-      const data = await response.json()
-      
-      if (data.status === 'success') {
-        setShowVersionDialog(false)
-        setNewVersionName("")
-        setNewVersionDescription("")
-        fetchVersions()
-      }
-    } catch (error) {
-      console.error('Error creating version:', error)
+  const getVersionStatusText = (status: string) => {
+    switch (status) {
+      case "approved": return "Approved"
+      case "rejected": return "Rejected"
+      case "pending_review": return "Pending Review"
+      case "draft": return "Draft"
+      default: return "Unknown"
     }
   }
 
@@ -383,10 +436,12 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
       await Promise.all([
         fetchProject(),
         fetchClients(),
-        fetchProjectFiles(),
-        fetchAnnotations(),
-        fetchVersions()
+        fetchVersions(),
+        fetchAnnotations()
       ])
+      
+      // Fetch files after versions are loaded to properly associate them
+      await fetchProjectFiles()
       setIsLoading(false)
     }
     
@@ -739,17 +794,6 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
     }
   }
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes'
-    const k = 1024
-    const sizes = ['Bytes', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-  }
-
-  const isImageFile = (file: ProjectFile) => {
-    return file.type.startsWith('image/')
-  }
 
   const getFileAnnotations = (fileId: string) => {
     return annotations.filter(ann => ann.fileId === fileId)
@@ -1168,6 +1212,84 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Main Content Section */}
             <div className="lg:col-span-2">
+              {/* Version Control Section */}
+              <Card className="mb-6">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Icons.GitBranch />
+                    Version Control
+                  </CardTitle>
+                  <CardDescription>
+                    Manage project versions and view files by version
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm font-medium">Current Version:</Label>
+                      <div className="flex gap-2">
+                        {versions.map((version) => (
+                          <Button
+                            key={version.id}
+                            variant={currentVersion === version.version ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => handleVersionChange(version.version)}
+                            className="flex items-center gap-2"
+                          >
+                            <div className={`w-2 h-2 rounded-full ${getVersionStatusColor(version.status)}`} />
+                            {version.version}
+                            
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                   
+                  </div>
+
+                  {/* Version Files */}
+                  {currentVersionData && (
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium">
+                        Files in {currentVersion} ({currentVersionData.files.length} files)
+                      </Label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {currentVersionData.files.map((file) => (
+                          <div key={file.id} className="flex items-center gap-3 p-3 border rounded-lg">
+                            <div className="w-8 h-8 bg-muted rounded flex items-center justify-center">
+                              {isImageFile(file) ? (
+                                <Icons.Image />
+                              ) : (
+                                <Icons.File />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{file.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatFileSize(file.size)} • {new Date(file.uploadedAt).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <Button
+                              variant={selectedFile?.id === file.id ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => setSelectedFile(file)}
+                            >
+                              <Eye className="h-4 w-4 mr-2" />
+                              {selectedFile?.id === file.id ? 'Selected' : 'Select'}
+                            </Button>
+                          </div>
+                        ))}
+                        {currentVersionData.files.length === 0 && (
+                          <div className="col-span-2 text-center py-8 text-muted-foreground">
+                            <Icons.File />
+                            <p>No files in this version</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
               {/* File Preview Section */}
               <Card className="mb-6">
                 <CardHeader>
@@ -1213,7 +1335,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                                   <div
                                     key={annotation.id}
                                     className={`absolute transform -translate-x-1/2 -translate-y-1/2 z-10 ${
-                                      project.status === 'COMPLETED' ? 'pointer-events-none opacity-50' : ''
+                                      project.status === 'archived' ? 'pointer-events-none opacity-50' : ''
                                     }`}
                                     style={{
                                       left: `${annotation.x}%`,
@@ -1223,10 +1345,10 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                                     {/* Main annotation pin */}
                                     <div 
                                       className={`${getAnnotationStatusColor(project.status)} text-white text-xs px-2 py-1 rounded-full shadow-lg cursor-pointer hover:opacity-80 transition-colors group ${
-                                        project.status === 'COMPLETED' ? 'cursor-not-allowed' : ''
+                                        project.status === 'archived' ? 'cursor-not-allowed' : ''
                                       }`}
                                       onClick={() => {
-                                        if (project.status !== 'COMPLETED') {
+                                        if (project.status !== 'archived') {
                                           handleAnnotationClick(annotation)
                                         }
                                       }}
@@ -1535,7 +1657,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
               </Card>
 
               {/* Files List */}
-              <Card>
+              {/* <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Icons.FolderOpen />
@@ -1593,7 +1715,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                     </div>
                   )}
                 </CardContent>
-              </Card>
+              </Card> */}
             </div>
   
             {/* File Details & Annotations */}
@@ -1637,7 +1759,8 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                 onChange={(e) => {
                   const file = e.target.files?.[0]
                   if (file) {
-                    createVersion(file)
+                    // File selected for upload
+                    console.log('File selected:', file.name)
                   }
                 }}
               />
@@ -1995,6 +2118,44 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
           </div>
         </div>
       )}
+
+      {/* Version Dialog */}
+      <Dialog open={showVersionDialog} onOpenChange={setShowVersionDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Version</DialogTitle>
+            <DialogDescription>
+              Create a new version for this project to organize files and track changes.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="versionName">Version Name</Label>
+              <Input
+                id="versionName"
+                placeholder="e.g., V2, V3, Final"
+                value={newVersionName}
+                onChange={(e) => setNewVersionName(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="versionDescription">Description (Optional)</Label>
+              <Textarea
+                id="versionDescription"
+                placeholder="Describe what's new in this version..."
+                value={newVersionDescription}
+                onChange={(e) => setNewVersionDescription(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowVersionDialog(false)}>
+              Cancel
+            </Button>
+           
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

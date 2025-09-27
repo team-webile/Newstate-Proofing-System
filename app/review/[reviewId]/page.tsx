@@ -216,19 +216,26 @@ export default function ReviewPage({ params }: ReviewPageProps) {
       const projectData = await projectResponse.json();
 
       if (projectData.status === "success") {
+        // Get project versions from database
+        const versionsResponse = await fetch(
+          `/api/projects/${params.reviewId}/versions`
+        );
+        const versionsData = await versionsResponse.json();
+
         // Get project files
         const filesResponse = await fetch(
           `/api/projects/${params.reviewId}/files`
         );
         const filesData = await filesResponse.json();
 
-        if (filesData.status === "success") {
+        if (filesData.status === "success" && versionsData.status === "success") {
           // Transform project data to review format
           const transformedReviewData = {
             id: projectData.data.id,
             reviewName: projectData.data.title,
             project: projectData.data,
             status: projectData.data.status,
+            createdAt: projectData.data.createdAt,
             elements: [
               {
                 id: "main",
@@ -248,25 +255,31 @@ export default function ReviewPage({ params }: ReviewPageProps) {
 
           setReviewData(transformedReviewData);
 
-          // Transform files to versions
-          const transformedVersions = [
-            {
-              id: "main",
-              version: "V1",
-              files: filesData.data.files.map((file: any) => ({
-                id: file.id,
-                name: file.name,
-                url: file.url,
-                type: file.type,
-                size: file.size,
-                uploadedAt: file.uploadedAt,
-              })),
-              status:
-                projectData.data.status?.toLowerCase() || "pending_review",
-              createdAt: projectData.data.createdAt,
-              annotations: [],
-            },
-          ];
+          // Group files by version
+          const filesByVersion: { [key: string]: any[] } = {};
+          filesData.data.files.forEach((file: any) => {
+            if (!filesByVersion[file.version]) {
+              filesByVersion[file.version] = [];
+            }
+            filesByVersion[file.version].push({
+              id: file.id,
+              name: file.name,
+              url: file.url,
+              type: file.type,
+              size: file.size,
+              uploadedAt: file.uploadedAt,
+            });
+          });
+
+          // Transform versions from database with their files
+          const transformedVersions = versionsData.data.map((version: any) => ({
+            id: version.id,
+            version: version.version,
+            files: filesByVersion[version.version] || [],
+            status: version.status?.toLowerCase() || "pending_review",
+            createdAt: version.createdAt,
+            annotations: [],
+          }));
 
           setVersions(transformedVersions as any);
 
@@ -274,14 +287,19 @@ export default function ReviewPage({ params }: ReviewPageProps) {
           if (transformedVersions.length > 0) {
             setCurrentVersion(transformedVersions[0].version);
 
-            // If we have a file ID from URL, select that file
+            // If we have a file ID from URL, find which version it belongs to
             if (fileId) {
-              const file = transformedVersions[0].files.find(
-                (f: any) => f.id === fileId
-              );
-              if (file) {
-                setCurrentFile(fileId);
-              } else {
+              let foundFile = false;
+              for (const version of transformedVersions) {
+                const file = version.files.find((f: any) => f.id === fileId);
+                if (file) {
+                  setCurrentVersion(version.version);
+                  setCurrentFile(fileId);
+                  foundFile = true;
+                  break;
+                }
+              }
+              if (!foundFile && transformedVersions[0].files.length > 0) {
                 setCurrentFile(transformedVersions[0].files[0].id);
               }
             } else if (transformedVersions[0].files.length > 0) {
@@ -650,14 +668,16 @@ export default function ReviewPage({ params }: ReviewPageProps) {
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case "APPROVED":
       case "completed":
         return "bg-green-500";
+      case "REJECTED":
       case "rejected":
         return "bg-red-500";
-      case "in_revision":
-        return "bg-yellow-500";
+      case "PENDING_REVIEW":
       case "pending_review":
         return "bg-blue-500";
+      case "DRAFT":
       case "draft":
         return "bg-gray-500";
       default:
@@ -667,8 +687,16 @@ export default function ReviewPage({ params }: ReviewPageProps) {
 
   const getStatusText = (status: string) => {
     switch (status) {
+      case "APPROVED":
+        return "Approved";
+      case "REJECTED":
+        return "Rejected";
+      case "PENDING_REVIEW":
+        return "Pending Review";
+      case "DRAFT":
+        return "Draft";
       case "completed":
-        return "completed";
+        return "Completed";
       case "rejected":
         return "Rejected";
       case "in_revision":
@@ -1483,9 +1511,9 @@ console.log(currentVersionData,'currentVersionData')
                           )}`}
                         />
                         {version.version}
-                        <Badge variant="secondary" className="ml-1">
+                        {/* <Badge variant="secondary" className="ml-1">
                           {getStatusText(version.status)}
-                        </Badge>
+                        </Badge> */}
                       </Button>
                     ))}
                   </div>
@@ -1516,6 +1544,93 @@ console.log(currentVersionData,'currentVersionData')
                             ))}
                         </SelectContent>
                       </Select>
+                      
+                      {/* Version Comparison Display */}
+                      {compareVersion && (
+                        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="border rounded-lg p-4">
+                            <h4 className="font-medium mb-3 flex items-center gap-2">
+                              <div className={`w-2 h-2 rounded-full ${getStatusColor(currentVersionData?.status || 'pending_review')}`} />
+                              Current: {currentVersion}
+                            </h4>
+                            <div className="space-y-3">
+                              {currentVersionData?.files.map((file: any) => (
+                                <div key={file.id} className="border rounded-lg p-2">
+                                  {file.type?.startsWith('image/') ? (
+                                    <div className="space-y-2">
+                                      <img
+                                        src={file.url}
+                                        alt={file.name}
+                                        className="w-full h-32 object-cover rounded border"
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = 'none';
+                                          e.currentTarget.nextElementSibling.style.display = 'flex';
+                                        }}
+                                      />
+                                      <div className="flex items-center gap-2 text-sm bg-muted p-2 rounded" style={{display: 'none'}}>
+                                        <Icons.File className="h-4 w-4" />
+                                        <span className="truncate">{file.name}</span>
+                                      </div>
+                                      <p className="text-xs text-muted-foreground truncate">{file.name}</p>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-2 text-sm">
+                                      <div className="w-8 h-8 bg-muted rounded flex items-center justify-center">
+                                        <Icons.File className="h-4 w-4" />
+                                      </div>
+                                      <span className="truncate">{file.name}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                              {currentVersionData?.files.length === 0 && (
+                                <p className="text-sm text-muted-foreground">No files in this version</p>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="border rounded-lg p-4">
+                            <h4 className="font-medium mb-3 flex items-center gap-2">
+                              <div className={`w-2 h-2 rounded-full ${getStatusColor(versions.find(v => v.version === compareVersion)?.status || 'pending_review')}`} />
+                              Comparing: {compareVersion}
+                            </h4>
+                            <div className="space-y-3">
+                              {versions.find(v => v.version === compareVersion)?.files.map((file: any) => (
+                                <div key={file.id} className="border rounded-lg p-2">
+                                  {file.type?.startsWith('image/') ? (
+                                    <div className="space-y-2">
+                                      <img
+                                        src={file.url}
+                                        alt={file.name}
+                                        className="w-full h-32 object-cover rounded border"
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = 'none';
+                                          e.currentTarget.nextElementSibling.style.display = 'flex';
+                                        }}
+                                      />
+                                      <div className="flex items-center gap-2 text-sm bg-muted p-2 rounded" style={{display: 'none'}}>
+                                        <Icons.File className="h-4 w-4" />
+                                        <span className="truncate">{file.name}</span>
+                                      </div>
+                                      <p className="text-xs text-muted-foreground truncate">{file.name}</p>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-2 text-sm">
+                                      <div className="w-8 h-8 bg-muted rounded flex items-center justify-center">
+                                        <Icons.File className="h-4 w-4" />
+                                      </div>
+                                      <span className="truncate">{file.name}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                              {versions.find(v => v.version === compareVersion)?.files.length === 0 && (
+                                <p className="text-sm text-muted-foreground">No files in this version</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </CardContent>
@@ -2061,16 +2176,7 @@ console.log(currentVersionData,'currentVersionData')
                                       annotation.addedBy ||
                                       "Unknown"}
                                   </span>
-                                  <Badge
-                                    variant={
-                                      annotation.resolved
-                                        ? "default"
-                                        : "destructive"
-                                    }
-                                    className="text-xs"
-                                  >
-                                    {annotation.resolved ? "Resolved" : "Pending"}
-                                  </Badge>
+                                  
                                   <span className="text-xs text-muted-foreground">
                                     {new Date(
                                       annotation.timestamp
@@ -2078,10 +2184,7 @@ console.log(currentVersionData,'currentVersionData')
                                   </span>
                                 </div>
                                 <p className="text-sm">{annotation.comment}</p>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Position: {annotation.x?.toFixed(1) || 0}%,{" "}
-                                  {annotation.y?.toFixed(1) || 0}%
-                                </p>
+                                 
                               </div>
                             </div>
                           </div>
@@ -2107,29 +2210,15 @@ console.log(currentVersionData,'currentVersionData')
                                       annotation.addedBy ||
                                       "Unknown"}
                                   </span>
-                                  <Badge
-                                    variant={
-                                      annotation.isResolved
-                                        ? "default"
-                                        : "destructive"
-                                    }
-                                    className="text-xs"
-                                  >
-                                    {annotation.isResolved
-                                      ? "Resolved"
-                                      : "Pending"}
-                                  </Badge>
+                                  
                                   <span className="text-xs text-muted-foreground">
-                                    {new Date(
-                                      annotation.createdAt
-                                    ).toLocaleString()}
+                                    {annotation.createdAt
+                                      ? new Date(annotation.createdAt).toLocaleString()
+                                      : 'Date not available'}
                                   </span>
                                 </div>
                                 <p className="text-sm">{annotation.content}</p>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Position: {annotation.x?.toFixed(1) || 0}%,{" "}
-                                  {annotation.y?.toFixed(1) || 0}%
-                                </p>
+                               
 
                                 {/* Show replies if any */}
                                 {annotation.replies &&
@@ -2300,7 +2389,7 @@ console.log(currentVersionData,'currentVersionData')
                       {currentFileData?.name || "No file selected"}
                     </p>
                   </div>
-                  <div>
+                  {/* <div>
                     <Label className="text-sm font-medium">
                       Version Status
                     </Label>
@@ -2317,7 +2406,7 @@ console.log(currentVersionData,'currentVersionData')
                     >
                       {getStatusText(currentVersionData?.status || "unknown")}
                     </Badge>
-                  </div>
+                  </div> */}
                   <div>
                     <Label className="text-sm font-medium">Review Status</Label>
                     <Badge
@@ -2337,14 +2426,17 @@ console.log(currentVersionData,'currentVersionData')
                   <div>
                     <Label className="text-sm font-medium">Created</Label>
                     <p className="text-sm text-muted-foreground">
-                      {new Date(reviewData.createdAt).toLocaleDateString(
-                        "en-US",
-                        {
-                          year: "numeric",
-                          month: "2-digit",
-                          day: "2-digit",
-                        }
-                      )}
+                      {reviewData.createdAt ? 
+                        new Date(reviewData.createdAt).toLocaleDateString(
+                          "en-US",
+                          {
+                            year: "numeric",
+                            month: "2-digit",
+                            day: "2-digit",
+                          }
+                        ) : 
+                        "Date not available"
+                      }
                     </p>
                   </div>
                 </CardContent>
