@@ -21,11 +21,15 @@ interface Annotation {
   x: number;
   y: number;
   comment: string;
+  content: string; // Add content field for compatibility
   timestamp: string;
+  createdAt: string; // Add createdAt field for compatibility
   resolved: boolean;
+  isResolved: boolean; // Add isResolved field for compatibility
   fileId: string;
   addedBy?: string;
   addedByName?: string;
+  status: "PENDING" | "COMPLETED" | "REJECTED"; // Add status field
   replies?: {
     id: string;
     content: string;
@@ -72,12 +76,19 @@ export function useRealtimeComments({
     onCommentAdded,
     onAnnotationReplyAdded,
     onReviewStatusUpdated,
+    onAnnotationStatusUpdated,
     removeAllListeners,
     isConnected,
   } = useSocket(projectId);
 
   // Fetch initial comments
   const fetchComments = useCallback(async () => {
+    // Skip if projectId is empty
+    if (!projectId) {
+      console.warn("Skipping comments fetch: projectId is empty");
+      return;
+    }
+
     try {
       setIsLoading(true);
       setError(null);
@@ -104,6 +115,12 @@ export function useRealtimeComments({
 
   // Fetch initial annotations
   const fetchAnnotations = useCallback(async () => {
+    // Skip if projectId is empty
+    if (!projectId) {
+      console.warn("Skipping annotations fetch: projectId is empty");
+      return;
+    }
+
     try {
       const response = await fetch(
         `/api/annotations?projectId=${projectId}${
@@ -214,11 +231,15 @@ export function useRealtimeComments({
             x: data.data.x || 0,
             y: data.data.y || 0,
             comment: data.data.content,
+            content: data.data.content, // Add content field
             timestamp: data.data.createdAt,
+            createdAt: data.data.createdAt, // Add createdAt field
             resolved: data.data.isResolved || false,
+            isResolved: data.data.isResolved || false, // Add isResolved field
             fileId: data.data.fileId,
             addedBy: data.data.addedBy,
             addedByName: data.data.addedByName,
+            status: (data.data.status || "PENDING") as "PENDING" | "COMPLETED" | "REJECTED", // Add status field
             replies: data.data.replies || [],
           };
           setAnnotations((prev) => [transformedAnnotation, ...prev]);
@@ -379,7 +400,23 @@ export function useRealtimeComments({
     // Annotation events
     onAnnotationAdded((data) => {
       if (data.fileId === fileId) {
-        setAnnotations((prev) => [data, ...prev]);
+        const transformedAnnotation = {
+          id: data.id,
+          x: data.coordinates?.x || 0,
+          y: data.coordinates?.y || 0,
+          comment: data.annotation,
+          content: data.annotation, // Add content field
+          timestamp: data.timestamp,
+          createdAt: data.timestamp, // Add createdAt field
+          resolved: false,
+          isResolved: false, // Add isResolved field
+          fileId: data.fileId,
+          addedBy: data.addedBy,
+          addedByName: data.addedByName,
+          status: "PENDING" as "PENDING" | "COMPLETED" | "REJECTED", // Add status field
+          replies: [],
+        };
+        setAnnotations((prev) => [transformedAnnotation, ...prev]);
       }
     });
 
@@ -387,7 +424,12 @@ export function useRealtimeComments({
       setAnnotations((prev) =>
         prev.map((annotation) =>
           annotation.id === data.annotationId
-            ? { ...annotation, resolved: true }
+            ? { 
+                ...annotation, 
+                resolved: true,
+                isResolved: true,
+                status: "COMPLETED"
+              }
             : annotation
         )
       );
@@ -426,6 +468,23 @@ export function useRealtimeComments({
       );
     });
 
+    // Listen for annotation status changes
+    onAnnotationStatusUpdated((data) => {
+      console.log("Annotation status updated:", data);
+      setAnnotations((prev) =>
+        prev.map((annotation) =>
+          annotation.id === data.annotationId
+            ? {
+                ...annotation,
+                resolved: data.status === 'COMPLETED',
+                isResolved: data.status === 'COMPLETED',
+                status: data.status,
+              }
+            : annotation
+        )
+      );
+    });
+
     // Comment events
     onCommentAdded((data) => {
       if (data.elementId === elementId) {
@@ -450,6 +509,9 @@ export function useRealtimeComments({
     onAnnotationResolved,
     onCommentAdded,
     onStatusChanged,
+    onAnnotationReplyAdded,
+    onReviewStatusUpdated,
+    onAnnotationStatusUpdated,
     removeAllListeners,
   ]);
 

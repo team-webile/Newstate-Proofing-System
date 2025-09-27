@@ -170,6 +170,13 @@ class SocketManager {
     }
   }
 
+  onAnnotationStatusUpdated(callback: (data: any) => void) {
+    if (this.socket) {
+      this.socket.off("annotationStatusUpdated"); // Remove existing listeners
+      this.socket.on("annotationStatusUpdated", callback);
+    }
+  }
+
   // Remove listeners
   removeAllListeners() {
     if (this.socket) {
@@ -210,6 +217,8 @@ export function useSocket(projectId: string) {
       socketManager.onAnnotationReplyAdded.bind(socketManager),
     onReviewStatusUpdated:
       socketManager.onReviewStatusUpdated.bind(socketManager),
+    onAnnotationStatusUpdated:
+      socketManager.onAnnotationStatusUpdated.bind(socketManager),
     removeAllListeners: socketManager.removeAllListeners.bind(socketManager),
     isConnected: socketManager.isConnected.bind(socketManager),
     disconnect: socketManager.disconnect.bind(socketManager),

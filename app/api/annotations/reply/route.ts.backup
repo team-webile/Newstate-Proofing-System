@@ -3,9 +3,9 @@ import { prisma } from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {
   try {
-    console.log("=== REPLY ROUTE CALLED ===");
-    
-    const { annotationId, content, addedBy, addedByName } = await request.json();
+    console.log("Reply route called");
+    const { annotationId, content, addedBy, addedByName } =
+      await request.json();
 
     console.log("Creating annotation reply:", {
       annotationId,
@@ -15,24 +15,31 @@ export async function POST(request: NextRequest) {
     });
 
     if (!annotationId || !content || !addedBy) {
+      console.log("Missing required fields");
       return NextResponse.json(
         { status: "error", message: "Missing required fields" },
         { status: 400 }
       );
     }
 
-    // Verify annotation exists
+    // Test Prisma connection
+    console.log("Testing Prisma connection...");
     const annotation = await prisma.annotation.findUnique({
       where: { id: annotationId },
-      include: { project: true },
+      include: {
+        project: true,
+      },
     });
 
     if (!annotation) {
+      console.log("Annotation not found:", annotationId);
       return NextResponse.json(
         { status: "error", message: "Annotation not found" },
         { status: 404 }
       );
     }
+
+    console.log("Annotation found, creating reply...");
 
     // Create the reply in database
     const reply = await prisma.annotationReply.create({
@@ -47,7 +54,29 @@ export async function POST(request: NextRequest) {
 
     console.log("Reply created successfully:", reply);
 
-    // Socket event will be handled by the socket server when client emits 'addAnnotationReply'
+    // Emit socket event for real-time updates
+    try {
+      console.log("Emitting socket event...");
+      if (global.io) {
+        global.io.to(`project-${annotation.projectId}`).emit("annotationReplyAdded", {
+          projectId: annotation.projectId,
+          annotationId,
+          reply: {
+            id: reply.id,
+            content: reply.content,
+            addedBy: reply.addedBy,
+            addedByName: reply.addedByName,
+            createdAt: reply.createdAt,
+          },
+          timestamp: new Date().toISOString(),
+        });
+        console.log("Socket event emitted successfully");
+      } else {
+        console.log("Socket.io server not available");
+      }
+    } catch (socketError) {
+      console.log("Socket emission error:", socketError);
+    }
 
     return NextResponse.json({
       status: "success",

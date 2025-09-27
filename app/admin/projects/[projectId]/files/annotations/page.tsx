@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { LogoutButton } from "@/components/logout-button"
-import { Eye, MessageSquare, PenTool, ArrowLeft, Plus, X, MapPin, CheckCircle, AlertCircle, Download, Upload, FileText } from "lucide-react"
+import { Eye, MessageSquare, PenTool, ArrowLeft, Plus, X, MapPin, CheckCircle, AlertCircle, Download, Upload, FileText, MessageCircle } from "lucide-react"
 import io from 'socket.io-client'
 import { useRouter } from 'next/navigation'
 import {
@@ -71,7 +71,7 @@ interface Project {
   allowDownloads: boolean
   emailNotifications: boolean
   publicLink: string
-  status: "draft" | "pending" | "approved" | "revisions" | "active" | "archived" | "completed"
+  status: "draft" | "pending" | "approved" | "revisions" | "active" | "archived" | "completed" | "rejected"
   createdAt: string
   lastActivity: string
 }
@@ -163,6 +163,31 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
   const [downloadFormat, setDownloadFormat] = useState<'zip' | 'individual'>('zip')
   const [isConnected, setIsConnected] = useState(false)
   const [lastUpdate, setLastUpdate] = useState<string | null>(null)
+  const [showAnnotationChat, setShowAnnotationChat] = useState(false)
+  const [selectedAnnotationChat, setSelectedAnnotationChat] = useState<Annotation | null>(null)
+  const [replyText, setReplyText] = useState("")
+  const chatScrollRef = useRef<HTMLDivElement>(null)
+
+  // Auto-scroll to bottom of chat
+  const scrollToBottom = () => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  };
+
+  // Update selectedAnnotationChat when annotations are updated
+  useEffect(() => {
+    if (selectedAnnotationChat && annotations.length > 0) {
+      const updatedAnnotation = annotations.find(a => a.id === selectedAnnotationChat.id);
+      if (updatedAnnotation && updatedAnnotation.replies) {
+        console.log('🔄 Updating selectedAnnotationChat with new replies:', updatedAnnotation.replies);
+        setSelectedAnnotationChat(prev => ({
+          ...prev!,
+          replies: updatedAnnotation.replies || []
+        }));
+      }
+    }
+  }, [annotations]);
 
   // Fetch clients data
   const fetchClients = async () => {
@@ -536,37 +561,86 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
       })
       
       // Listen for annotation replies
-      newSocket.on('annotationReplyAdded', (data: { annotationId: string, reply: string, timestamp: string, addedBy?: string, addedByName?: string }) => {
-        console.log('🔔 Received annotation reply via socket:', data)
+      newSocket.on('annotationReplyAdded', (data: any) => {
+        console.log('🔔 Admin received annotation reply via socket:', data)
         console.log('Current project ID:', params.projectId)
         console.log('Selected annotation ID:', selectedAnnotation?.id)
         console.log('Data annotation ID:', data.annotationId)
+        
+        // Handle different data structures
+        let newReply;
+        if (data.reply && typeof data.reply === 'object') {
+          // New structure: data.reply is an object
+          newReply = {
+            id: data.reply.id || Date.now().toString(),
+            content: data.reply.content || 'Reply content',
+            addedBy: data.reply.addedBy || 'Unknown',
+            addedByName: data.reply.addedByName || 'Unknown',
+            createdAt: data.reply.createdAt || new Date().toISOString()
+          };
+        } else {
+          // Fallback structure: data.reply might be a string or missing
+          newReply = {
+            id: Date.now().toString(),
+            content: data.reply || 'Reply content',
+            addedBy: data.addedBy || 'Unknown',
+            addedByName: data.addedByName || 'Unknown',
+            createdAt: data.timestamp || new Date().toISOString()
+          };
+        }
+        
+        console.log('🔔 Admin processed newReply:', newReply);
         
         setAnnotations(prev => prev.map(annotation => 
           annotation.id === data.annotationId 
             ? { 
                 ...annotation, 
-                replies: [...(annotation.replies || []), {
-                  id: Date.now().toString(),
-                  content: data.reply,
-                  addedBy: data.addedBy || 'Unknown',
-                  addedByName: data.addedByName || 'Unknown',
-                  createdAt: data.timestamp
-                }]
+                replies: [...(annotation.replies || []), newReply]
               }
             : annotation
         ))
         
+        // Update selectedAnnotationChat if it's the same annotation
+        if (selectedAnnotationChat && selectedAnnotationChat.id === data.annotationId) {
+          console.log('🔄 Admin: Updating selectedAnnotationChat with new reply:', newReply);
+          setSelectedAnnotationChat(prev => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              replies: [...(prev.replies || []), newReply]
+            };
+          });
+          
+          // Auto-scroll to bottom when receiving new reply
+          setTimeout(() => {
+            scrollToBottom();
+          }, 100);
+        } else {
+          // Show visual notification for new reply from client (when chat is not open)
+          const isFromClient = newReply.addedBy === 'Client' || newReply.addedByName === 'Client';
+          if (isFromClient) {
+            const notification = {
+              id: Date.now().toString(),
+              type: 'reply',
+              title: 'New Reply Received',
+              message: `${newReply.addedByName} replied: "${newReply.content}"`,
+              timestamp: newReply.createdAt,
+              annotationId: data.annotationId
+            };
+            setNotifications(prev => [notification, ...prev.slice(0, 9)]);
+          }
+        }
+        
         // Add to chat messages
-        const senderName = data.addedByName || data.addedBy || 'Unknown'
+        const senderName = newReply.addedByName || newReply.addedBy || 'Unknown'
         setChatMessages(prev => [...prev, {
           id: Date.now().toString(),
           type: 'annotation',
-          message: `Reply added by ${senderName}: ${data.reply}`,
-          timestamp: data.timestamp,
-          addedBy: data.addedBy,
+          message: `Reply added by ${senderName}: ${newReply.content}`,
+          timestamp: data.timestamp || newReply.createdAt,
+          addedBy: newReply.addedBy,
           senderName: senderName,
-          isFromAdmin: data.addedBy === 'admin-1'
+          isFromAdmin: newReply.addedBy === 'admin-1'
         }])
         setLastUpdate(data.timestamp)
       })
@@ -811,8 +885,8 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
   const handleImageClick = (event: React.MouseEvent<HTMLImageElement>) => {
     if (!isImageFile(selectedFile!)) return
     
-    // Don't allow adding annotations if project status is completed
-    if (project?.status === 'completed') {
+    // Don't allow adding annotations if project status is completed or rejected
+    if (project?.status === 'completed' || (project?.status as string) === 'rejected') {
       return;
     }
     
@@ -1037,6 +1111,113 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
     setShowAnnotationPanel(true)
   }
 
+  // Handle annotation chat click
+  const handleAnnotationChatClick = (annotation: Annotation) => {
+    console.log('🔍 Opening annotation chat with data:', annotation);
+    setSelectedAnnotationChat(annotation);
+    setShowAnnotationChat(true);
+    
+    // Auto-scroll to bottom when opening chat
+    setTimeout(() => {
+      scrollToBottom();
+    }, 200);
+  }
+
+  // Handle close annotation chat
+  const handleCloseAnnotationChat = () => {
+    setShowAnnotationChat(false);
+    setSelectedAnnotationChat(null);
+  }
+
+  // Handle reply submit for chat
+  const handleReplySubmit = async () => {
+    if (!replyText.trim() || !selectedAnnotationChat) return;
+
+    try {
+      const response = await fetch('/api/annotations/reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          annotationId: selectedAnnotationChat.id,
+          content: replyText,
+          addedBy: 'Admin',
+          addedByName: 'Admin User'
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.status === 'success') {
+        // Update local state
+        setAnnotations(prev => prev.map(annotation => 
+          annotation.id === selectedAnnotationChat.id 
+            ? { 
+                ...annotation, 
+                replies: [...(annotation.replies || []), {
+                  id: data.data.id,
+                  content: replyText,
+                  addedBy: 'Admin',
+                  addedByName: 'Admin User',
+                  createdAt: new Date().toISOString()
+                }]
+              }
+            : annotation
+        ));
+
+        // Update selectedAnnotationChat
+        setSelectedAnnotationChat(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            replies: [...(prev.replies || []), {
+              id: data.data.id,
+              content: replyText,
+              addedBy: 'Admin',
+              addedByName: 'Admin User',
+              createdAt: new Date().toISOString()
+            }]
+          };
+        });
+
+        // Add to chat messages
+        setChatMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          type: 'annotation',
+          message: `You replied: "${replyText}"`,
+          timestamp: new Date().toISOString(),
+          addedBy: 'Admin',
+          senderName: 'Admin User',
+          isFromAdmin: true
+        }]);
+
+        // Emit to socket
+        if (socket) {
+          socket.emit('addAnnotationReply', {
+            projectId: params.projectId,
+            annotationId: selectedAnnotationChat.id,
+            reply: replyText,
+            addedBy: 'Admin',
+            addedByName: 'Admin User',
+            timestamp: new Date().toISOString()
+          });
+        }
+
+        setReplyText('');
+        
+        // Auto-scroll to bottom after sending reply
+        setTimeout(() => {
+          scrollToBottom();
+        }, 100);
+      } else {
+        console.error('Failed to save reply:', data.message);
+        alert('Failed to save reply. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error saving reply:', error);
+      alert('Failed to save reply. Please try again.');
+    }
+  };
+
   const getAnnotationStatusColor = (status: string) => {
     switch (status) {
       case 'OPEN': return 'bg-red-500'
@@ -1165,7 +1346,20 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
           {notifications.slice(0, 3).map((notification) => (
             <div
               key={notification.id}
-              className="bg-white dark:bg-gray-800 border border-blue-200 dark:border-blue-800 rounded-lg shadow-lg p-4 animate-in slide-in-from-right duration-300"
+              className="bg-white dark:bg-gray-800 border border-blue-200 dark:border-blue-800 rounded-lg shadow-lg p-4 animate-in slide-in-from-right duration-300 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20"
+              onClick={() => {
+                if (notification.annotationId) {
+                  // Find the annotation and open chat
+                  const annotation = annotations.find(a => a.id === notification.annotationId);
+                  if (annotation) {
+                    console.log('🔍 Opening chat for annotation:', annotation);
+                    console.log('🔍 Annotation replies:', annotation.replies);
+                    handleAnnotationChatClick(annotation);
+                  }
+                }
+                // Remove notification after clicking
+                setNotifications(prev => prev.filter(n => n.id !== notification.id));
+              }}
             >
               <div className="flex items-start gap-3">
                 <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
@@ -1184,6 +1378,11 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                   {notification.x !== undefined && notification.y !== undefined && (
                     <p className="text-xs text-gray-500">
                       Position: {notification.x.toFixed(1)}%, {notification.y.toFixed(1)}%
+                    </p>
+                  )}
+                  {notification.annotationId && (
+                    <p className="text-xs text-gray-500">
+                      Click to view conversation
                     </p>
                   )}
                   <p className="text-xs text-gray-400 mt-1">
@@ -1304,8 +1503,13 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                           <CheckCircle className="h-4 w-4" />
                           This project has been completed. No further annotations can be added.
                         </div>
+                      ) : (project?.status as string) === 'rejected' ? (
+                        <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                          <AlertCircle className="h-4 w-4" />
+                          This project has been rejected. No further annotations can be added.
+                        </div>
                       ) : (
-                        `Previewing ${selectedFile.name} - Click to add annotations`
+                        "Click anywhere on the design to add annotations and feedback"
                       )
                     ) : (
                       'Select a file to preview'
@@ -1313,274 +1517,234 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {selectedFile ? (
-                    <div className="space-y-4">
-                      {/* File Preview */}
+                  {selectedFile && isImageFile(selectedFile) ? (
                       <div className="relative bg-muted rounded-lg overflow-hidden">
-                        {isImageFile(selectedFile) ? (
-                          <div className="relative">
                             <img
                               src={selectedFile.url}
                               alt={selectedFile.name}
-                              className={`w-full h-auto max-h-[500px] object-contain ${
-                                project?.status === 'completed' ? 'cursor-not-allowed pointer-events-none' : 'cursor-crosshair'
-                              }`}
-                              onClick={handleImageClick}
+                        className={`w-full h-auto max-h-[500px] object-contain ${(project?.status === 'completed' || (project?.status as string) === 'rejected') ? 'cursor-not-allowed' : 'cursor-crosshair'
+                          }`}
+                        onClick={(e) => {
+                          if (project?.status === 'completed' || (project?.status as string) === 'rejected') {
+                            e.preventDefault();
+                            return;
+                          }
+                          handleImageClick(e);
+                        }}
                             />
                             
                             {/* Render existing annotations on image */}
                             {getFileAnnotations(selectedFile.id).map((annotation) => {
-                              if (annotation.x !== undefined && annotation.y !== undefined) {
+                        if (
+                          annotation.x !== undefined &&
+                          annotation.y !== undefined
+                        ) {
+                          const hasReplies = annotation.replies && annotation.replies.length > 0
+                          const isOriginalMessage = !annotation.replies || annotation.replies.length === 0
+                          
                                 return (
                                   <div
                                     key={annotation.id}
-                                    className={`absolute transform -translate-x-1/2 -translate-y-1/2 z-10 ${
-                                      project.status === 'archived' ? 'pointer-events-none opacity-50' : ''
-                                    }`}
+                              className="absolute transform -translate-x-1/2 -translate-y-1/2 z-10"
                                     style={{
                                       left: `${annotation.x}%`,
-                                      top: `${annotation.y}%`
-                                    }}
-                                  >
-                                    {/* Main annotation pin */}
-                                    <div 
-                                      className={`${getAnnotationStatusColor(project.status)} text-white text-xs px-2 py-1 rounded-full shadow-lg cursor-pointer hover:opacity-80 transition-colors group ${
-                                        project.status === 'archived' ? 'cursor-not-allowed' : ''
-                                      }`}
-                                      onClick={() => {
-                                        if (project.status !== 'archived') {
-                                          handleAnnotationClick(annotation)
-                                        }
-                                      }}
-                                    >
+                                top: `${annotation.y}%`,
+                              }}
+                            >
+                              {/* Main annotation pin with blinking effect for original messages */}
+                              <div
+                                className={`${annotation.isResolved
+                                    ? "bg-green-500"
+                                    : "bg-red-500"
+                                  } text-white text-xs px-3 py-2 rounded-full shadow-lg cursor-pointer hover:opacity-90 transition-all duration-300 group ${
+                                    isOriginalMessage ? 'animate-pulse ring-2 ring-white ring-opacity-50' : ''
+                                  }`}
+                                onClick={() => handleAnnotationChatClick(annotation)}
+                              >
+                                {/* Original message indicator */}
+                                {isOriginalMessage && (
+                                  <div className="absolute -top-1 -left-1 w-4 h-4 bg-orange-500 rounded-full border-2 border-white animate-bounce">
+                                    <div className="w-full h-full bg-orange-400 rounded-full animate-ping"></div>
+                                  </div>
+                                )}
+                                
                                       <MapPin className="h-3 w-3 inline mr-1" />
-                                      {annotation.content.length > 15 ? annotation.content.substring(0, 15) + '...' : annotation.content}
-                                      {annotation.replies && annotation.replies.length > 0 && (
-                                        <span className="ml-1 bg-white text-blue-500 rounded-full px-1 text-xs">
-                                          {annotation.replies.length}
+                                
+                                {/* Message content */}
+                                <span className="font-medium">
+                                  {typeof annotation.content === 'string' && annotation.content.length > 12 ? annotation.content.substring(0, 12) + '...' : (typeof annotation.content === 'string' ? annotation.content : 'Annotation')}
+                                </span>
+                                
+                                {/* Reply count badge */}
+                                {hasReplies && (
+                                  <span className="ml-1 bg-white text-blue-600 rounded-full px-1.5 py-0.5 text-xs font-bold">
+                                    {annotation.replies?.length || 0}
                                         </span>
                                       )}
+                                
                                       {/* Status indicator */}
-                                      <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${getAnnotationStatusColor(project.status)} border-2 border-white`}></div>
+                                <div
+                                  className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full ${annotation.isResolved
+                                      ? "bg-green-500"
+                                      : "bg-red-500"
+                                    } border-2 border-white`}
+                                ></div>
                                     </div>
                                     
-                                    {/* Show replies directly on image */}
-                                    {annotation.replies && annotation.replies.length > 0 && (
-                                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 space-y-1">
-                                        {annotation.replies.slice(0, 3).map((reply, index) => (
-                                          <div key={reply.id} className="bg-green-500 text-white text-xs px-2 py-1 rounded-full shadow-lg max-w-[200px]">
-                                            <div className="flex items-center gap-1">
-                                              <MessageSquare className="h-2 w-2" />
-                                              <span className="truncate">{reply.content}</span>
+                              {/* Quick action tooltip */}
+                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none">
+                                <div className="bg-black text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
+                                  {isOriginalMessage ? 'Original Message' : 'View Conversation'}
+                                  {hasReplies && ` (${(annotation.replies?.length || 0)} replies)`}
                                             </div>
                                           </div>
-                                        ))}
-                                        {annotation.replies.length > 3 && (
-                                          <div className="bg-gray-500 text-white text-xs px-2 py-1 rounded-full shadow-lg">
-                                            +{annotation.replies.length - 3} more
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
                                     
                                     {/* Action buttons on hover */}
                                     <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity z-20 flex gap-1">
+                                {/* Show message if project is completed or rejected */}
+                                {(project?.status === 'completed' || (project?.status as string) === 'rejected') ? (
+                                  <div className="bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs px-3 py-2 rounded-lg border">
+                                    {project?.status === 'completed' ? 'Project Completed - No further actions' : 'Project Rejected - No further actions'}
+                                  </div>
+                                ) : (
+                                  <>
                                       <Button
                                         size="sm"
                                         variant="outline"
                                         className="text-xs bg-white border-blue-500 text-blue-500 hover:bg-blue-50"
-                                        onClick={() => handleReplyClick(annotation)}
-                                        disabled={project?.status === 'completed'}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleReplyClick(annotation);
+                                      }}
                                       >
                                         <MessageSquare className="h-3 w-3 mr-1" />
                                         Reply
                                       </Button>
                                       
                                       {/* Status control buttons */}
-                                      {project?.status !== 'completed' && (
                                         <Button
                                           size="sm"
                                           variant="outline"
                                           className="text-xs bg-white border-green-500 text-green-500 hover:bg-green-50"
-                                          onClick={() => updateAnnotationStatus(annotation.id, 'COMPLETED')}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        updateAnnotationStatus(annotation.id, 'COMPLETED');
+                                      }}
                                         >
                                           <CheckCircle className="h-3 w-3 mr-1" />
                                           Resolve
                                         </Button>
+                                  </>
                                       )}
                                     </div>
                                   </div>
-                                )
-                              }
-                              return null
-                            })}
-                            
-                            {/* Annotation input overlay */}
-                            {showAnnotationInput && annotationPosition && (
-                              <div
-                                className="absolute transform -translate-x-1/2 -translate-y-1/2 z-10"
-                                style={{
-                                  left: `${annotationPosition.x}%`,
-                                  top: `${annotationPosition.y}%`
-                                }}
-                              >
-                                 <div className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-0 min-w-[300px]">
-                                  {/* Header with Close Button */}
-                                  <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700">
-                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Add Annotation</span>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => {
-                                        setShowAnnotationInput(false)
-                                        setAnnotationPosition(null)
-                                        setNewAnnotation('')
-                                      }}
-                                      className="h-6 w-6 p-0 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                    >
-                                      <X className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                  
-                                  {/* Text Input Area */}
-                                  <div className="p-3">
-                                    <Input
-                                      placeholder="Add annotation..."
-                                      value={newAnnotation}
-                                      onChange={(e) => setNewAnnotation(e.target.value)}
-                                      onKeyPress={(e) => {
-                                        if (e.key === 'Enter' && newAnnotation.trim()) {
-                                          addAnnotation()
-                                        }
-                                      }}
-                                      className="border-0 focus:ring-0 text-sm dark:bg-gray-800 dark:text-gray-100"
-                                      autoFocus
-                                    />
-                                  </div>
-                                  
-                                  {/* Separator */}
-                                  <div className="border-t border-gray-200 dark:border-gray-700"></div>
-                                  
-                                  {/* Action Icons and Submit Button */}
-                                  <div className="flex items-center justify-between p-2">
-                                    <div className="flex items-center gap-3">
-                                      {/* Emoji Button */}
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                        onClick={() => {
-                                          // Add emoji functionality
-                                          setNewAnnotation(prev => prev + '😊')
-                                        }}
-                                      >
-                                        <span className="text-lg">😊</span>
-                                      </Button>
-                                      
-                                      {/* Mention Button */}
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                        onClick={() => {
-                                          // Add mention functionality
-                                          setNewAnnotation(prev => prev + '@')
-                                        }}
-                                      >
-                                        <span className="text-sm font-bold dark:text-gray-100">@</span>
-                                      </Button>
-                                      
-                                      {/* Attachment Button */}
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                        onClick={() => {
-                                          // Add attachment functionality
-                                          const input = document.createElement('input')
-                                          input.type = 'file'
-                                          input.accept = 'image/*'
-                                          input.click()
-                                        }}
-                                      >
-                                        <svg className="h-4 w-4 dark:text-gray-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                        </svg>
-                                      </Button>
-                                    </div>
-                                    
-                                    {/* Submit Button */}
-                                    <Button
-                                      size="sm"
-                                      onClick={() => addAnnotation()}
-                                      disabled={!newAnnotation.trim()}
-                                      className="h-8 w-8 p-0 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 rounded-full"
-                                    >
-                                      <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                                      </svg>
-                                    </Button>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-center h-48">
-                            <div className="h-16 w-16 text-muted-foreground flex items-center justify-center">
-                              <Icons.FolderOpen />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Click to annotate badge for images */}
-                      {isImageFile(selectedFile) && (
-                        <div className="flex items-center gap-2">
-                          {project?.status === 'completed' ? (
-                            <Badge variant="outline" className="text-xs bg-green-50 text-green-600 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800">
-                              <CheckCircle className="h-3 w-3 mr-1" />
-                              Project completed
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-xs text-green-600 dark:text-green-400 border-green-200 dark:border-green-800">
+                          );
+                        }
+                        return null;
+                      })}
+
+                      {/* Click to annotate badge */}
+                      {project?.status !== 'completed' && (project?.status as string) !== 'rejected' && (
+                        <div className="absolute top-4 left-4">
+                          <Badge variant="outline" className="text-xs text-green-600 dark:text-green-400 border-green-200 dark:border-green-800">
                               <MapPin className="h-3 w-3 mr-1" />
                               Click to annotate
                             </Badge>
-                          )}
-                        </div>
+                                  </div>
                       )}
-                    </div>
+                      
+                      {/* Status message badge */}
+                      {(project?.status === 'completed' || (project?.status as string) === 'rejected') && (
+                        <div className="absolute top-4 left-4">
+                          <Badge variant="outline" className={`text-xs ${project?.status === 'completed' ? 'text-green-600 dark:text-green-400 border-green-200 dark:border-green-800' : 'text-red-600 dark:text-red-400 border-red-200 dark:border-red-800'}`}>
+                              {project?.status === 'completed' ? (
+                                <>
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  Project Completed
+                                </>
+                              ) : (
+                                <>
+                                  <AlertCircle className="h-3 w-3 mr-1" />
+                                  Project Rejected
+                                </>
+                              )}
+                            </Badge>
+                                  </div>
+                      )}
+
+                      {/* Annotation counter badge */}
+                      {getFileAnnotations(selectedFile.id).length > 0 && (
+                          <div className="absolute top-4 right-4">
+                            <Badge
+                              variant="default"
+                              className="text-xs bg-blue-500 text-white"
+                            >
+                              <MessageCircle className="h-3 w-3 mr-1" />
+                              {getFileAnnotations(selectedFile.id).length}{" "}
+                              annotation
+                              {getFileAnnotations(selectedFile.id).length !== 1 ? "s" : ""}
+                            </Badge>
+                              </div>
+                            )}
+                          </div>
+                  ) : selectedFile ? (
+                    <div className="relative bg-muted rounded-lg overflow-hidden border-2 border-border">
+                      <div className="w-full h-64 flex items-center justify-center text-muted-foreground">
+                        <div className="text-center">
+                              <Icons.FolderOpen />
+                          <p className="text-lg font-medium">
+                            {selectedFile.name}
+                          </p>
+                          <p className="text-sm">
+                            This file type cannot be annotated
+                          </p>
+                            </div>
+                          </div>
+                      </div>
                   ) : (
-                    <div className="flex items-center justify-center h-48 text-muted-foreground">
+                    <div className="w-full h-64 flex items-center justify-center text-muted-foreground">
                       <div className="text-center">
                         <Icons.FolderOpen />
                         <p className="text-lg font-medium">No file selected</p>
-                        <p className="text-sm">Choose a file from the list to start reviewing</p>
+                        <p className="text-sm">
+                          Choose a file from the list above to start reviewing
+                        </p>
                       </div>
                     </div>
                   )}
                 </CardContent>
               </Card>
 
-              {/* Annotations History - Compact */}
+              {/* Comments & Annotations */}
               {selectedFile && getFileAnnotations(selectedFile.id).length > 0 && (
                 <Card className="mt-6">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-sm">
-                      <MessageSquare className="h-4 w-4" />
-                      History ({getFileAnnotations(selectedFile.id).length} annotations)
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <MessageCircle className="h-5 w-5" />
+                      Comments & Annotations (
+                      {getFileAnnotations(selectedFile.id).length}
+                      )
                     </CardTitle>
+                    <CardDescription>
+                      All feedback and annotations for this file
+                    </CardDescription>
                   </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                  <CardContent>
+                    <div className="space-y-4">
+                      {/* Annotations */}
                       {getFileAnnotations(selectedFile.id).map((annotation) => (
-                        <div key={annotation.id} className="p-2 border rounded text-xs dark:border-gray-700">
-                          <div className="flex items-center gap-2 mb-1">
-                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
-                            <span className="font-medium">{annotation.addedByName}</span>
-                            <span className="text-muted-foreground">
-                              {new Date(annotation.createdAt).toLocaleDateString()}
+                        <div key={annotation.id} className="p-4 border rounded-lg">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                <span className="text-sm font-medium">
+                                  {annotation.addedByName}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  {annotation.createdAt
+                                    ? new Date(annotation.createdAt).toLocaleString()
+                                    : 'Invalid Date'}
                             </span>
                             {annotation.x !== undefined && annotation.y !== undefined && (
                               <Badge variant="outline" className="text-xs">
@@ -1588,21 +1752,28 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                               </Badge>
                             )}
                           </div>
-                          <p className="text-xs mb-1">{annotation.content}</p>
+                              <p className="text-sm">{annotation.content}</p>
+                              {annotation.x !== undefined && annotation.y !== undefined && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Position: {annotation.x.toFixed(1)}%, {annotation.y.toFixed(1)}%
+                                </p>
+                              )}
+                            </div>
+                          </div>
                           
-                          {/* Show replies compactly */}
+                          {/* Show replies */}
                           {annotation.replies && annotation.replies.length > 0 && (
-                            <div className="ml-3 space-y-1">
+                            <div className="mt-3 ml-4 space-y-2">
                               {annotation.replies.map((reply) => (
-                                <div key={reply.id} className="p-1 bg-gray-50 dark:bg-gray-800 rounded text-xs">
-                                  <div className="flex items-center gap-1 mb-0.5">
-                                    <div className="w-1 h-1 bg-green-500 rounded-full"></div>
-                                    <span className="font-medium">{reply.addedByName}</span>
-                                    <span className="text-muted-foreground">
-                                      {new Date(reply.createdAt).toLocaleDateString()}
+                                <div key={reply.id} className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                                    <span className="text-sm font-medium">{reply.addedByName}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {new Date(reply.createdAt).toLocaleString()}
                                     </span>
                                   </div>
-                                  <p className="text-xs">{reply.content}</p>
+                                  <p className="text-sm">{reply.content}</p>
                                 </div>
                               ))}
                             </div>
@@ -2018,6 +2189,18 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                     This annotation has been resolved and cannot be replied to.
                   </p>
                 </div>
+              ) : (project?.status === 'completed' || (project?.status as string) === 'rejected') ? (
+                <div className="text-center py-4">
+                  <div className="text-orange-500 mb-2">
+                    <AlertCircle className="h-8 w-8 mx-auto" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {project?.status === 'completed' 
+                      ? 'This project has been completed. No further replies can be added.' 
+                      : 'This project has been rejected. No further replies can be added.'
+                    }
+                  </p>
+                </div>
               ) : (
                 <Input
                   placeholder="Type your reply..."
@@ -2035,7 +2218,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
             </div>
 
             {/* Action Bar */}
-            {!selectedAnnotationForReply.isResolved && (
+            {!selectedAnnotationForReply.isResolved && project?.status !== 'completed' && (project?.status as string) !== 'rejected' && (
               <div className="flex items-center justify-between p-4 border-t border-gray-200 dark:border-gray-700">
                 <div className="flex items-center gap-3">
                   {/* Emoji Button */}
@@ -2115,6 +2298,134 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                 </Button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Annotation Chat Popup */}
+      {showAnnotationChat && selectedAnnotationChat && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  Annotation Conversation
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {selectedAnnotationChat.addedByName} • {new Date(selectedAnnotationChat.createdAt).toLocaleString()}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCloseAnnotationChat}
+                className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Conversation Messages */}
+            <div ref={chatScrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 min-h-[300px]">
+              {/* Original Message */}
+              <div className="flex justify-start">
+                <div className="bg-blue-100 dark:bg-blue-900/30 rounded-lg p-3 max-w-[80%] border-l-4 border-blue-500">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <span className="text-sm font-medium">{selectedAnnotationChat.addedByName}</span>
+                    <span className="text-xs text-gray-500">
+                      {new Date(selectedAnnotationChat.createdAt).toLocaleString()}
+                    </span>
+                  </div>
+                  <p className="text-sm">{selectedAnnotationChat.content}</p>
+                </div>
+              </div>
+
+              {/* Replies */}
+              {selectedAnnotationChat.replies && selectedAnnotationChat.replies.length > 0 ? (
+                selectedAnnotationChat.replies.map((reply, index) => {
+                  const isFromAdmin = reply.addedBy === 'Admin' || reply.addedByName === 'Admin User';
+                  return (
+                    <div key={reply.id} className={`flex ${isFromAdmin ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`rounded-lg p-3 max-w-[80%] ${
+                        isFromAdmin 
+                          ? 'bg-green-100 dark:bg-green-900/30 border-l-4 border-green-500' 
+                          : 'bg-gray-100 dark:bg-gray-800 border-l-4 border-gray-400'
+                      }`}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className={`w-2 h-2 rounded-full ${isFromAdmin ? 'bg-green-500' : 'bg-gray-500'}`}></div>
+                          <span className="text-sm font-medium">{reply.addedByName}</span>
+                          <span className="text-xs text-gray-500">
+                            {new Date(reply.createdAt).toLocaleString()}
+                          </span>
+                        </div>
+                        <p className={`text-sm ${isFromAdmin ? 'text-gray-800 dark:text-gray-200' : 'text-gray-700 dark:text-gray-300'}`}>
+                          {(() => {
+                            try {
+                              if (typeof reply.content === 'string') {
+                                return reply.content;
+                              } else if (reply.content && typeof reply.content === 'object') {
+                                return (reply.content as any)?.content || 'Reply content';
+                              }
+                              return 'Reply content';
+                            } catch (error) {
+                              return 'Reply content';
+                            }
+                          })()}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No replies yet. Be the first to respond!</p>
+                  <p className="text-xs mt-2">Debug: selectedAnnotationChat.replies = {JSON.stringify(selectedAnnotationChat.replies)}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Reply Input */}
+            <div className="border-t border-gray-200 dark:border-gray-700 p-4">
+              {/* Show message if project is completed or rejected */}
+              {(project?.status === 'completed' || (project?.status as string) === 'rejected') ? (
+                <div className="text-center py-4">
+                  <div className="text-orange-500 mb-2">
+                    <AlertCircle className="h-8 w-8 mx-auto" />
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {project?.status === 'completed' 
+                      ? 'This project has been completed. No further replies can be added.' 
+                      : 'This project has been rejected. No further replies can be added.'
+                    }
+                  </p>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Type your reply..."
+                    value={replyText}
+                    onChange={(e) => setReplyText(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && replyText.trim()) {
+                        handleReplySubmit();
+                      }
+                    }}
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={handleReplySubmit}
+                    disabled={!replyText.trim()}
+                    className="bg-blue-500 hover:bg-blue-600 text-white"
+                  >
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    Reply
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

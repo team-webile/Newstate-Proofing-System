@@ -75,12 +75,35 @@ export function initializeSocketServer() {
       socket.on('addAnnotationReply', (data) => {
         console.log('💬 Received addAnnotationReply event:', data)
         console.log('Broadcasting to project room:', `project-${data.projectId}`)
+        
+        // Handle both old and new data structures
+        const replyContent = typeof data.reply === 'string' ? data.reply : data.reply.content;
+        const replyId = typeof data.reply === 'object' && data.reply.id ? data.reply.id : Date.now().toString();
+        const replyCreatedAt = typeof data.reply === 'object' && data.reply.createdAt ? data.reply.createdAt : data.timestamp;
+        
+        console.log('🔍 Processing reply data:', {
+          replyType: typeof data.reply,
+          replyContent,
+          replyId,
+          replyCreatedAt
+        });
+        
         // Broadcast to all clients in the project room
-        socket.to(`project-${data.projectId}`).emit('annotationReplyAdded', {
-          ...data,
-          id: Date.now().toString(),
-          timestamp: new Date().toISOString()
-        })
+        const broadcastData = {
+          projectId: data.projectId,
+          annotationId: data.annotationId,
+          reply: {
+            id: replyId,
+            content: replyContent,
+            addedBy: data.addedBy,
+            addedByName: data.addedByName,
+            createdAt: replyCreatedAt
+          },
+          timestamp: data.timestamp
+        };
+        
+        console.log('📡 Broadcasting annotationReplyAdded:', broadcastData);
+        socket.to(`project-${data.projectId}`).emit('annotationReplyAdded', broadcastData);
         console.log('✅ Broadcasted annotationReplyAdded event')
       })
 

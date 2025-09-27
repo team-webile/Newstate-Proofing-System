@@ -18,25 +18,14 @@ export async function PUT(request: NextRequest) {
       where: { id: annotationId },
       data: {
         status: status as any,
-        isResolved: status === 'RESOLVED',
-        resolvedBy: status === 'RESOLVED' ? updatedBy : null,
-        resolvedAt: status === 'RESOLVED' ? new Date() : null,
+        isResolved: status === 'COMPLETED',
       },
       include: {
         replies: true,
-        notifications: true
       }
     })
 
-    // Create notification for status change
-    await prisma.annotationNotification.create({
-      data: {
-        annotationId,
-        userId: annotation.addedBy, // Notify the original creator
-        type: 'ANNOTATION_STATUS_CHANGED',
-        message: `Annotation status changed to ${status} by ${updatedBy}`
-      }
-    })
+    // Note: Notification creation removed as AnnotationNotification model doesn't exist in schema
 
     // Emit socket event for real-time updates
     try {
