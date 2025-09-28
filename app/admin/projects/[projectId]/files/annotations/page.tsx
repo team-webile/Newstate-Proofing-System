@@ -99,7 +99,7 @@ interface Annotation {
   createdAt: string
   x?: number
   y?: number
-  status: 'PENDING' | 'COMPLETED' | 'REJECTED'
+  status: 'PENDING' | 'COMPLETED' | "rejected"
   assignedTo?: string
   fileVersion?: string
   isResolved: boolean
@@ -399,7 +399,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
   const getVersionStatusText = (status: string) => {
     switch (status) {
       case "approved": return "Approved"
-      case "rejected": return "Rejected"
+      case "rejected": return "rejected"
       case "pending_review": return "Pending Review"
       case "draft": return "Draft"
       default: return "Unknown"
@@ -878,7 +878,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
     if (!selectedFile) return false;
     const fileAnnotations = getFileAnnotations(selectedFile.id);
     return fileAnnotations.every(annotation => 
-      annotation.status === 'COMPLETED' || annotation.status === 'REJECTED'
+      annotation.status === 'COMPLETED' || annotation.status === "rejected"
     );
   };
 
@@ -886,7 +886,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
     if (!isImageFile(selectedFile!)) return
     
     // Don't allow adding annotations if project status is completed or rejected
-    if (project?.status === 'completed' || (project?.status as string) === 'rejected') {
+    if (project?.status === 'completed' || (project?.status as string) === "rejected") {
       return;
     }
     
@@ -1311,7 +1311,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
               <Download className="h-4 w-4 mr-2" />
               Download
             </Button>
-            {project.status !== 'completed' && (
+            {project.status !== 'completed' && project.status !== "rejected" && (
             <Button
               variant="outline"
               size="sm"
@@ -1503,7 +1503,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                           <CheckCircle className="h-4 w-4" />
                           This project has been completed. No further annotations can be added.
                         </div>
-                      ) : (project?.status as string) === 'rejected' ? (
+                      ) : (project?.status as string) === "rejected" ? (
                         <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
                           <AlertCircle className="h-4 w-4" />
                           This project has been rejected. No further annotations can be added.
@@ -1522,10 +1522,10 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                             <img
                               src={selectedFile.url}
                               alt={selectedFile.name}
-                        className={`w-full h-auto max-h-[500px] object-contain ${(project?.status === 'completed' || (project?.status as string) === 'rejected') ? 'cursor-not-allowed' : 'cursor-crosshair'
+                        className={`w-full h-auto max-h-[500px] object-contain ${(project?.status === 'completed' || (project?.status as string) === "rejected") ? 'cursor-not-allowed' : 'cursor-crosshair'
                           }`}
                         onClick={(e) => {
-                          if (project?.status === 'completed' || (project?.status as string) === 'rejected') {
+                          if (project?.status === 'completed' || (project?.status as string) === "rejected") {
                             e.preventDefault();
                             return;
                           }
@@ -1602,7 +1602,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                                     {/* Action buttons on hover */}
                                     <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity z-20 flex gap-1">
                                 {/* Show message if project is completed or rejected */}
-                                {(project?.status === 'completed' || (project?.status as string) === 'rejected') ? (
+                                {(project?.status === 'completed' || (project?.status as string) === "rejected") ? (
                                   <div className="bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs px-3 py-2 rounded-lg border">
                                     {project?.status === 'completed' ? 'Project Completed - No further actions' : 'Project Rejected - No further actions'}
                                   </div>
@@ -1644,7 +1644,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                       })}
 
                       {/* Click to annotate badge */}
-                      {project?.status !== 'completed' && (project?.status as string) !== 'rejected' && (
+                      {project?.status !== 'completed' && (project?.status as string) !== "rejected" && (
                         <div className="absolute top-4 left-4">
                           <Badge variant="outline" className="text-xs text-green-600 dark:text-green-400 border-green-200 dark:border-green-800">
                               <MapPin className="h-3 w-3 mr-1" />
@@ -1654,7 +1654,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                       )}
                       
                       {/* Status message badge */}
-                      {(project?.status === 'completed' || (project?.status as string) === 'rejected') && (
+                      {(project?.status === 'completed' || (project?.status as string) === "rejected") && (
                         <div className="absolute top-4 left-4">
                           <Badge variant="outline" className={`text-xs ${project?.status === 'completed' ? 'text-green-600 dark:text-green-400 border-green-200 dark:border-green-800' : 'text-red-600 dark:text-red-400 border-red-200 dark:border-red-800'}`}>
                               {project?.status === 'completed' ? (
@@ -2100,21 +2100,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                 </Button>
                 
                 {/* Attachment Button */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
-                  onClick={() => {
-                    const input = document.createElement('input')
-                    input.type = 'file'
-                    input.accept = 'image/*'
-                    input.click()
-                  }}
-                >
-                  <svg className="h-4 w-4 dark:text-gray-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </Button>
+                 
               </div>
               
               {/* Submit Button */}
@@ -2189,7 +2175,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                     This annotation has been resolved and cannot be replied to.
                   </p>
                 </div>
-              ) : (project?.status === 'completed' || (project?.status as string) === 'rejected') ? (
+              ) : (project?.status === 'completed' || (project?.status as string) === "rejected") ? (
                 <div className="text-center py-4">
                   <div className="text-orange-500 mb-2">
                     <AlertCircle className="h-8 w-8 mx-auto" />
@@ -2218,7 +2204,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
             </div>
 
             {/* Action Bar */}
-            {!selectedAnnotationForReply.isResolved && project?.status !== 'completed' && (project?.status as string) !== 'rejected' && (
+            {!selectedAnnotationForReply.isResolved && project?.status !== 'completed' && (project?.status as string) !== "rejected" && (
               <div className="flex items-center justify-between p-4 border-t border-gray-200 dark:border-gray-700">
                 <div className="flex items-center gap-3">
                   {/* Emoji Button */}
@@ -2390,7 +2376,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
             {/* Reply Input */}
             <div className="border-t border-gray-200 dark:border-gray-700 p-4">
               {/* Show message if project is completed or rejected */}
-              {(project?.status === 'completed' || (project?.status as string) === 'rejected') ? (
+              {(project?.status === 'completed' || (project?.status as string) === "rejected") ? (
                 <div className="text-center py-4">
                   <div className="text-orange-500 mb-2">
                     <AlertCircle className="h-8 w-8 mx-auto" />

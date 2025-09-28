@@ -57,7 +57,7 @@ export async function POST(
       await prisma.project.update({
         where: { id: projectId },
         data: {
-          status: action === 'approve' ? 'COMPLETED' : 'ACTIVE',
+          status: action === 'approve' ? 'COMPLETED' : 'REJECTED',
           lastActivity: new Date()
         }
       })

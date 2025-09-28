@@ -269,12 +269,12 @@ export default function ReviewPage({ params }: ReviewPageProps) {
               filesByVersion[file.version] = [];
             }
             filesByVersion[file.version].push({
-                id: file.id,
-                name: file.name,
-                url: file.url,
-                type: file.type,
-                size: file.size,
-                uploadedAt: file.uploadedAt,
+              id: file.id,
+              name: file.name,
+              url: file.url,
+              type: file.type,
+              size: file.size,
+              uploadedAt: file.uploadedAt,
             });
           });
 
@@ -285,7 +285,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
             files: filesByVersion[version.version] || [],
             status: version.status?.toLowerCase() || "pending_review",
             createdAt: version.createdAt,
-              annotations: [],
+            annotations: [],
           }));
 
           setVersions(transformedVersions as any);
@@ -299,9 +299,9 @@ export default function ReviewPage({ params }: ReviewPageProps) {
               let foundFile = false;
               for (const version of transformedVersions) {
                 const file = version.files.find((f: any) => f.id === fileId);
-              if (file) {
+                if (file) {
                   setCurrentVersion(version.version);
-                setCurrentFile(fileId);
+                  setCurrentFile(fileId);
                   foundFile = true;
                   break;
                 }
@@ -453,7 +453,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         console.log('🔍 Raw API data:', data.data);
         console.log('🔍 First annotation raw data:', data.data[0]);
         console.log('🔍 First annotation replies:', data.data[0]?.replies);
-        
+
         // Transform annotations to ensure x, y coordinates are properly set
         const transformedAnnotations = data.data.map((annotation: any): ProjectAnnotation => {
           // Parse coordinates if they exist
@@ -488,7 +488,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                 id: reply.id,
                 content: reply.content,
                 annotationId: reply.annotationId,
-                projectId: reply.projectId, 
+                projectId: reply.projectId,
                 addedBy: reply.addedBy,
                 addedByName: reply.addedByName,
                 createdAt: reply.createdAt,
@@ -504,7 +504,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         setAnnotations(transformedAnnotations);
 
         // Group annotations by fileId
-        const annotationsByFile = transformedAnnotations.reduce((acc: {[key: string]: any[]}, annotation: ProjectAnnotation) => {
+        const annotationsByFile = transformedAnnotations.reduce((acc: { [key: string]: any[] }, annotation: ProjectAnnotation) => {
           if (!acc[annotation.fileId]) {
             acc[annotation.fileId] = [];
           }
@@ -527,7 +527,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
   useEffect(() => {
     fetchReviewData();
     fetchAnnotations();
-    
+
     // Cleanup timeout on unmount
     return () => {
       if (fetchTimeout) {
@@ -546,7 +546,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
     if (!currentFileData) return;
 
     // Don't allow adding annotations if status is completed or rejected
-    if (reviewData.status === "COMPLETED" || reviewData.status === 'rejected') {
+    if (reviewData.status === "COMPLETED" || reviewData.status === "REJECTED") {
       return;
     }
 
@@ -579,13 +579,13 @@ export default function ReviewPage({ params }: ReviewPageProps) {
   // Check if all annotations are completed or rejected
   const areAllAnnotationsResolved = () => {
     return currentFileAnnotations.every(annotation =>
-      annotation.status === "COMPLETED" || annotation.status === 'REJECTED'
+      annotation.status === "COMPLETED" || annotation.status === "REJECTED"
     );
   };
 
   const handleAnnotationClick = (annotation: any) => {
     // Don't allow replies to completed or rejected annotations
-    if (annotation.status === "COMPLETED" || annotation.status === 'REJECTED') {
+    if (annotation.status === "COMPLETED" || annotation.status === "REJECTED") {
       return;
     }
 
@@ -600,11 +600,11 @@ export default function ReviewPage({ params }: ReviewPageProps) {
     console.log('🔍 Replies length:', annotation.replies?.length || 0);
     console.log('🔍 Replies type:', typeof annotation.replies);
     console.log('🔍 Full annotation object:', JSON.stringify(annotation, null, 2));
-    
+
     // Only refresh if we don't have replies or if the annotation is very old
-    const shouldRefresh = !annotation.replies || annotation.replies.length === 0 || 
+    const shouldRefresh = !annotation.replies || annotation.replies.length === 0 ||
       (annotation.createdAt && new Date(annotation.createdAt) < new Date(Date.now() - 5 * 60 * 1000)); // 5 minutes old
-    
+
     if (shouldRefresh) {
       try {
         console.log('🔄 Refreshing annotations for chat...');
@@ -613,10 +613,10 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         console.error('Error refreshing annotations:', error);
       }
     }
-    
+
     // Find the updated annotation with latest replies
     const updatedAnnotation = annotations.find(a => a.id === annotation.id) || annotation;
-    
+
     // Ensure we have the required fields and properly handle replies
     const chatAnnotation = {
       ...updatedAnnotation,
@@ -626,13 +626,13 @@ export default function ReviewPage({ params }: ReviewPageProps) {
       createdAt: updatedAnnotation.createdAt || new Date().toISOString(),
       replies: Array.isArray(updatedAnnotation.replies) ? updatedAnnotation.replies : []
     };
-    
+
     console.log('🔍 Processed chat annotation:', chatAnnotation);
     console.log('🔍 Processed replies:', chatAnnotation.replies);
     console.log('🔍 Processed replies length:', chatAnnotation.replies.length);
     setSelectedAnnotationChat(chatAnnotation);
     setShowAnnotationChat(true);
-    
+
     // Auto-scroll to bottom when opening chat
     setTimeout(() => {
       scrollToBottom();
@@ -647,7 +647,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
   const handleReplySubmit = async () => {
     // Use selectedAnnotationChat for the new chat popup, fallback to selectedAnnotationForReply for legacy popup
     const targetAnnotation = selectedAnnotationChat || selectedAnnotationForReply;
-    
+
     if (!targetAnnotation || !replyText.trim() || isSubmittingReply) return;
 
     setIsSubmittingReply(true);
@@ -708,7 +708,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
             console.log('🔄 Updated selectedAnnotationChat:', updatedChat);
             return updatedChat;
           });
-          
+
           // Auto-scroll to bottom after adding new reply
           setTimeout(() => {
             scrollToBottom();
@@ -735,7 +735,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
             },
           ];
         });
-        
+
         // Emit socket event for real-time updates
         if (socket) {
           console.log('📡 Emitting addAnnotationReply socket event:', {
@@ -759,9 +759,9 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         }
 
         setReplyText("");
-        
+
         // Success feedback is handled by the loading state and real-time updates
-        
+
         // Close only the legacy reply popup, keep chat popup open
         if (selectedAnnotationForReply) {
           setShowReplyPopup(false);
@@ -917,28 +917,28 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         timeout: 10000,
         forceNew: true
       });
-      
+
       setSocket(newSocket);
-      
+
       // Handle connection status
       newSocket.on('connect', () => {
         console.log('🔗 Client socket connected');
         setSocketConnected(true);
       });
-      
+
       newSocket.on('disconnect', () => {
         console.log('🔗 Client socket disconnected');
         setSocketConnected(false);
       });
-      
+
       newSocket.on('connect_error', (error) => {
         console.log('🔗 Client socket connection error:', error);
         setSocketConnected(false);
       });
-      
+
       // Join project room
       newSocket.emit('join-project', params.reviewId);
-      
+
       // Listen for annotation updates
       newSocket.on('annotationAdded', (data: { fileId: string, annotation: string, timestamp: string, addedBy?: string, addedByName?: string, x?: number, y?: number }) => {
         console.log('🔔 Client received annotationAdded event:', data);
@@ -955,17 +955,17 @@ export default function ReviewPage({ params }: ReviewPageProps) {
           y: data.y,
           replies: []
         };
-        
+
         setAnnotations(prev => [...prev, newAnnotation]);
         setLastUpdate(data.timestamp);
-        
+
         // Add to chat messages
         const senderName = data.addedByName || data.addedBy || 'Unknown';
         const isFromClient = senderName.includes('Client') || senderName === 'Client';
-        const messageText = isFromClient 
+        const messageText = isFromClient
           ? `You sent: "${data.annotation}"`
           : `Received from ${senderName}: "${data.annotation}"`;
-        
+
         setChatMessages(prev => [...prev, {
           id: Date.now().toString(),
           type: 'annotation',
@@ -975,7 +975,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
           senderName: senderName,
           isFromClient: isFromClient
         }]);
-        
+
         // Show visual notification for new annotation from admin
         if (!isFromClient) {
           const notification = {
@@ -991,7 +991,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
           setNotifications(prev => [notification, ...prev.slice(0, 9)]);
         }
       });
-      
+
       // Listen for annotation replies
       newSocket.on('annotationReplyAdded', (data: any) => {
         console.log('🔔 Client received annotation reply via socket:', data);
@@ -999,7 +999,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         console.log('🔔 Data structure:', JSON.stringify(data, null, 2));
         console.log('Current project ID:', params.reviewId);
         console.log('Data annotation ID:', data.annotationId);
-        
+
         // Handle different data structures
         let newReply;
         if (data.reply && typeof data.reply === 'object') {
@@ -1021,19 +1021,19 @@ export default function ReviewPage({ params }: ReviewPageProps) {
             createdAt: data.timestamp || new Date().toISOString()
           };
         }
-        
+
         console.log('🔔 Processed newReply:', newReply);
-        
+
         // Update annotations array
-        setAnnotations(prev => prev.map(annotation => 
-          annotation.id === data.annotationId 
-            ? { 
-                ...annotation, 
-                replies: [...(annotation.replies || []), newReply]
-              }
+        setAnnotations(prev => prev.map(annotation =>
+          annotation.id === data.annotationId
+            ? {
+              ...annotation,
+              replies: [...(annotation.replies || []), newReply]
+            }
             : annotation
         ));
-        
+
         // Update selectedAnnotationChat if it's the same annotation AND not from current client
         const isFromCurrentClient = newReply.addedBy === 'Client' || newReply.addedByName === 'Client';
         if (selectedAnnotationChat && selectedAnnotationChat.id === data.annotationId && !isFromCurrentClient) {
@@ -1047,7 +1047,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
             console.log('🔄 Socket: Updated selectedAnnotationChat:', updatedChat);
             return updatedChat;
           });
-          
+
           // Auto-scroll to bottom when receiving new reply from other users
           setTimeout(() => {
             scrollToBottom();
@@ -1058,7 +1058,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
           console.log('🔄 Socket: data.annotationId:', data.annotationId);
           console.log('🔄 Socket: isFromCurrentClient:', isFromCurrentClient);
         }
-        
+
         // Add to chat messages (only if not already added)
         const senderName = newReply.addedByName || newReply.addedBy || 'Unknown';
         setChatMessages(prev => {
@@ -1079,19 +1079,19 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         });
         setLastUpdate(data.timestamp);
       });
-      
+
       // Listen for annotation status updates
       newSocket.on('annotationStatusUpdated', (data: { annotationId: string, status: string, updatedBy?: string, updatedByName?: string, timestamp: string }) => {
-        setAnnotations(prev => prev.map(annotation => 
-          annotation.id === data.annotationId 
-            ? { 
-                ...annotation, 
-                status: data.status as any,
-                isResolved: data.status === "COMPLETED"
-              }
+        setAnnotations(prev => prev.map(annotation =>
+          annotation.id === data.annotationId
+            ? {
+              ...annotation,
+              status: data.status as any,
+              isResolved: data.status === "COMPLETED"
+            }
             : annotation
         ));
-        
+
         // Add to chat messages
         const senderName = data.updatedByName || data.updatedBy || 'Unknown';
         setChatMessages(prev => [...prev, {
@@ -1105,7 +1105,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         }]);
         setLastUpdate(data.timestamp);
       });
-      
+
       return () => {
         newSocket.emit('leave-project', params.reviewId);
         newSocket.close();
@@ -1129,7 +1129,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         // Check if the latest reply is from current client - if so, don't update to prevent duplicates
         const latestReply = updatedAnnotation.replies[updatedAnnotation.replies.length - 1];
         const isLatestFromCurrentClient = latestReply?.addedBy === 'Client' || latestReply?.addedByName === 'Client';
-        
+
         if (!isLatestFromCurrentClient) {
           console.log('🔄 Updating selectedAnnotationChat with new replies from other users:', updatedAnnotation.replies);
           setSelectedAnnotationChat(prev => ({
@@ -1440,7 +1440,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
       </div>
     );
   }
-console.log(reviewData,'ladin');
+
   // Error state
   if (error || !reviewData) {
     return (
@@ -1636,7 +1636,7 @@ console.log(reviewData,'ladin');
                             ))}
                         </SelectContent>
                       </Select>
-                      
+
                       {/* Version Comparison Display */}
                       {compareVersion && (
                         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1662,7 +1662,7 @@ console.log(reviewData,'ladin');
                                           }
                                         }}
                                       />
-                                      <div className="flex items-center gap-2 text-sm bg-muted p-2 rounded" style={{display: 'none'}}>
+                                      <div className="flex items-center gap-2 text-sm bg-muted p-2 rounded" style={{ display: 'none' }}>
                                         <Icons.File />
                                         <span className="truncate">{file.name}</span>
                                       </div>
@@ -1683,7 +1683,7 @@ console.log(reviewData,'ladin');
                               )}
                             </div>
                           </div>
-                          
+
                           <div className="border rounded-lg p-4">
                             <h4 className="font-medium mb-3 flex items-center gap-2">
                               <div className={`w-2 h-2 rounded-full ${getStatusColor(versions.find(v => v.version === compareVersion)?.status || 'pending_review')}`} />
@@ -1706,7 +1706,7 @@ console.log(reviewData,'ladin');
                                           }
                                         }}
                                       />
-                                      <div className="flex items-center gap-2 text-sm bg-muted p-2 rounded" style={{display: 'none'}}>
+                                      <div className="flex items-center gap-2 text-sm bg-muted p-2 rounded" style={{ display: 'none' }}>
                                         <Icons.File />
                                         <span className="truncate">{file.name}</span>
                                       </div>
@@ -1808,7 +1808,7 @@ console.log(reviewData,'ladin');
                         <CheckCircle className="h-4 w-4" />
                         This version has been completed. No further annotations can be added.
                       </div>
-                    ) : reviewData.status === 'rejected' ? (
+                    ) : reviewData.status === "REJECTED" ? (
                       <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
                         <AlertCircle className="h-4 w-4" />
                         This version has been rejected. No further annotations can be added.
@@ -1824,10 +1824,10 @@ console.log(reviewData,'ladin');
                       <img
                         src={currentFileData.url}
                         alt={currentFileData.name}
-                        className={`w-full h-auto max-h-[500px] object-contain ${(reviewData.status === "COMPLETED" || reviewData.status === 'rejected') ? 'cursor-not-allowed' : 'cursor-crosshair'
+                        className={`w-full h-auto max-h-[500px] object-contain ${(reviewData.status === "COMPLETED" || reviewData.status === "REJECTED") ? 'cursor-not-allowed' : 'cursor-crosshair'
                           }`}
                         onClick={(e) => {
-                          if (reviewData.status === "COMPLETED" || reviewData.status === 'rejected') {
+                          if (reviewData.status === "COMPLETED" || reviewData.status === "REJECTED") {
                             e.preventDefault();
                             return;
                           }
@@ -1843,7 +1843,7 @@ console.log(reviewData,'ladin');
                         ) {
                           const hasReplies = annotation.replies && annotation.replies.length > 0
                           const isOriginalMessage = !annotation.replies || annotation.replies.length === 0
-                          
+
                           return (
                             <div
                               key={annotation.id}
@@ -1856,10 +1856,9 @@ console.log(reviewData,'ladin');
                               {/* Main annotation pin with blinking effect for original messages */}
                               <div
                                 className={`${annotation.isResolved
-                                    ? "bg-green-500"
-                                    : "bg-red-500"
-                                  } text-white text-xs px-3 py-2 rounded-full shadow-lg cursor-pointer hover:opacity-90 transition-all duration-300 group ${
-                                    isOriginalMessage ? 'animate-pulse ring-2 ring-white ring-opacity-50' : ''
+                                  ? "bg-green-500"
+                                  : "bg-red-500"
+                                  } text-white text-xs px-3 py-2 rounded-full shadow-lg cursor-pointer hover:opacity-90 transition-all duration-300 group ${isOriginalMessage ? 'animate-pulse ring-2 ring-white ring-opacity-50' : ''
                                   }`}
                                 onClick={() =>
                                   handleAnnotationChatClick(annotation)
@@ -1871,26 +1870,26 @@ console.log(reviewData,'ladin');
                                     <div className="w-full h-full bg-orange-400 rounded-full animate-ping"></div>
                                   </div>
                                 )}
-                                
+
                                 <MapPin className="h-3 w-3 inline mr-1" />
-                                
+
                                 {/* Message content */}
                                 <span className="font-medium">
                                   {typeof annotation.content === 'string' && annotation.content.length > 12 ? annotation.content.substring(0, 12) + '...' : (typeof annotation.content === 'string' ? annotation.content : 'Annotation')}
                                 </span>
-                                
+
                                 {/* Reply count badge */}
                                 {hasReplies && (
                                   <span className="ml-1 bg-white text-blue-600 rounded-full px-1.5 py-0.5 text-xs font-bold">
                                     {annotation.replies?.length || 0}
-                                    </span>
-                                  )}
-                                
+                                  </span>
+                                )}
+
                                 {/* Status indicator */}
                                 <div
                                   className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full ${annotation.isResolved
-                                      ? "bg-green-500"
-                                      : "bg-red-500"
+                                    ? "bg-green-500"
+                                    : "bg-red-500"
                                     } border-2 border-white`}
                                 ></div>
                               </div>
@@ -1900,8 +1899,8 @@ console.log(reviewData,'ladin');
                                 <div className="bg-black text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
                                   {isOriginalMessage ? 'Original Message' : 'View Conversation'}
                                   {hasReplies && ` (${(annotation.replies?.length || 0)} replies)`}
-                                  </div>
-                                        </div>
+                                </div>
+                              </div>
                             </div>
                           );
                         }
@@ -1916,7 +1915,7 @@ console.log(reviewData,'ladin');
                         ) {
                           const hasReplies = annotation.replies && annotation.replies.length > 0
                           const isOriginalMessage = !annotation.replies || annotation.replies.length === 0
-                          
+
                           return (
                             <div
                               key={`realtime-${annotation.id}`}
@@ -1929,10 +1928,9 @@ console.log(reviewData,'ladin');
                               {/* Main annotation pin with blinking effect for original messages */}
                               <div
                                 className={`${annotation.resolved
-                                    ? "bg-green-500"
-                                    : "bg-red-500"
-                                  } text-white text-xs px-3 py-2 rounded-full shadow-lg cursor-pointer hover:opacity-90 transition-all duration-300 group ${
-                                    isOriginalMessage ? 'animate-pulse ring-2 ring-white ring-opacity-50' : ''
+                                  ? "bg-green-500"
+                                  : "bg-red-500"
+                                  } text-white text-xs px-3 py-2 rounded-full shadow-lg cursor-pointer hover:opacity-90 transition-all duration-300 group ${isOriginalMessage ? 'animate-pulse ring-2 ring-white ring-opacity-50' : ''
                                   }`}
                                 onClick={() => {
                                   console.log('🔍 Real-time annotation clicked:', annotation);
@@ -1941,7 +1939,7 @@ console.log(reviewData,'ladin');
                                     content: annotation.content || (typeof annotation.comment === 'string' ? annotation.comment : 'Annotation'),
                                     fileId: annotation.fileId || '',
                                     addedBy: annotation.addedBy || 'Unknown',
-                                    addedByName: annotation.addedByName || 'Unknown', 
+                                    addedByName: annotation.addedByName || 'Unknown',
                                     createdAt: annotation.createdAt || (typeof annotation.timestamp === 'string' ? annotation.timestamp : new Date().toISOString()),
                                     x: annotation.x,
                                     y: annotation.y,
@@ -1959,26 +1957,26 @@ console.log(reviewData,'ladin');
                                     <div className="w-full h-full bg-orange-400 rounded-full animate-ping"></div>
                                   </div>
                                 )}
-                                
+
                                 <MapPin className="h-3 w-3 inline mr-1" />
-                                
+
                                 {/* Message content */}
                                 <span className="font-medium">
                                   {typeof annotation.comment === 'string' && annotation.comment.length > 12 ? annotation.comment.substring(0, 12) + '...' : (typeof annotation.comment === 'string' ? annotation.comment : 'Annotation')}
                                 </span>
-                                
+
                                 {/* Reply count badge */}
                                 {hasReplies && (
                                   <span className="ml-1 bg-white text-blue-600 rounded-full px-1.5 py-0.5 text-xs font-bold">
                                     {annotation.replies?.length || 0}
                                   </span>
                                 )}
-                                
+
                                 {/* Status indicator */}
                                 <div
                                   className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full ${annotation.resolved
-                                      ? "bg-green-500"
-                                      : "bg-red-500"
+                                    ? "bg-green-500"
+                                    : "bg-red-500"
                                     } border-2 border-white`}
                                 ></div>
                               </div>
@@ -1988,8 +1986,8 @@ console.log(reviewData,'ladin');
                                 <div className="bg-black text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
                                   {isOriginalMessage ? 'Original Message' : 'View Conversation'}
                                   {hasReplies && ` (${(annotation.replies?.length || 0)} replies)`}
-                                  </div>
-                                  </div>
+                                </div>
+                              </div>
                             </div>
                           );
                         }
@@ -1997,31 +1995,31 @@ console.log(reviewData,'ladin');
                       })}
 
                       {/* Click to annotate badge */}
-                      {reviewData.status !== "COMPLETED" && reviewData.status !== 'rejected' && (
+                      {reviewData.status !== "COMPLETED" && reviewData.status !== "REJECTED" && (
                         <div className="absolute top-4 left-4">
                           <Badge variant="outline" className="text-xs text-green-600 dark:text-green-400 border-green-200 dark:border-green-800">
-                              <MapPin className="h-3 w-3 mr-1" />
-                              Click to annotate
-                            </Badge>
+                            <MapPin className="h-3 w-3 mr-1" />
+                            Click to annotate
+                          </Badge>
                         </div>
                       )}
-                      
+
                       {/* Status message badge */}
-                      {(reviewData.status === "COMPLETED" || reviewData.status === 'rejected') && (
+                      {(reviewData.status === "COMPLETED" || reviewData.status === "REJECTED") && (
                         <div className="absolute top-4 left-4">
                           <Badge variant="outline" className={`text-xs ${reviewData.status === "COMPLETED" ? 'text-green-600 dark:text-green-400 border-green-200 dark:border-green-800' : 'text-red-600 dark:text-red-400 border-red-200 dark:border-red-800'}`}>
-                              {reviewData.status === "COMPLETED" ? (
-                                <>
-                                  <CheckCircle className="h-3 w-3 mr-1" />
-                                  Version Completed
-                                </>
-                              ) : (
-                                <>
-                                  <AlertCircle className="h-3 w-3 mr-1" />
-                                  Version Rejected
-                                </>
-                              )}
-                            </Badge>
+                            {reviewData.status === "COMPLETED" ? (
+                              <>
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Version Completed
+                              </>
+                            ) : (
+                              <>
+                                <AlertCircle className="h-3 w-3 mr-1" />
+                                Version Rejected
+                              </>
+                            )}
+                          </Badge>
                         </div>
                       )}
 
@@ -2131,8 +2129,8 @@ console.log(reviewData,'ladin');
                                 <div className="flex items-center gap-2 mb-2">
                                   <div
                                     className={`w-3 h-3 rounded-full ${annotation.resolved
-                                        ? "bg-green-500"
-                                        : "bg-red-500"
+                                      ? "bg-green-500"
+                                      : "bg-red-500"
                                       }`}
                                   />
                                   <span className="text-sm font-medium">
@@ -2140,13 +2138,13 @@ console.log(reviewData,'ladin');
                                       annotation.addedBy ||
                                       "Unknown"}
                                   </span>
-                                  
+
                                   <span className="text-xs text-muted-foreground">
                                     {typeof annotation.timestamp === 'string' ? new Date(annotation.timestamp).toLocaleString() : 'Date not available'}
                                   </span>
                                 </div>
                                 <p className="text-sm">{typeof annotation.comment === 'string' ? annotation.comment : 'Annotation content'}</p>
-                                 
+
                               </div>
                             </div>
                           </div>
@@ -2163,8 +2161,8 @@ console.log(reviewData,'ladin');
                                 <div className="flex items-center gap-2 mb-2">
                                   <div
                                     className={`w-3 h-3 rounded-full ${annotation.isResolved
-                                        ? "bg-green-500"
-                                        : "bg-red-500"
+                                      ? "bg-green-500"
+                                      : "bg-red-500"
                                       }`}
                                   />
                                   <span className="text-sm font-medium">
@@ -2172,7 +2170,7 @@ console.log(reviewData,'ladin');
                                       annotation.addedBy ||
                                       "Unknown"}
                                   </span>
-                                  
+
                                   <span className="text-xs text-muted-foreground">
                                     {annotation.createdAt
                                       ? new Date(annotation.createdAt).toLocaleString()
@@ -2180,7 +2178,7 @@ console.log(reviewData,'ladin');
                                   </span>
                                 </div>
                                 <p className="text-sm">{typeof annotation.content === 'string' ? annotation.content : 'Annotation content'}</p>
-                               
+
 
                                 {/* Show replies if any */}
                                 {annotation.replies &&
@@ -2242,12 +2240,12 @@ console.log(reviewData,'ladin');
                         <div
                           key={revision.id}
                           className={`p-4 border rounded-lg ${revision.status === "COMPLETED"
-                              ? "bg-green-50 border-green-200"
-                              : revision.status === "rejected"
-                                ? "bg-red-50 border-red-200"
-                                : revision.status === "in_revision"
-                                  ? "bg-yellow-50 border-yellow-200"
-                                  : "bg-blue-50 border-blue-200"
+                            ? "bg-green-50 border-green-200"
+                            : revision.status === "rejected"
+                              ? "bg-red-50 border-red-200"
+                              : revision.status === "in_revision"
+                                ? "bg-yellow-50 border-yellow-200"
+                                : "bg-blue-50 border-blue-200"
                             }`}
                         >
                           <div className="flex items-start justify-between">
@@ -2397,15 +2395,15 @@ console.log(reviewData,'ladin');
                   <div>
                     <Label className="text-sm font-medium">Created</Label>
                     <p className="text-sm text-muted-foreground">
-                      {reviewData.createdAt ? 
+                      {reviewData.createdAt ?
                         new Date(reviewData.createdAt).toLocaleDateString(
-                        "en-US",
-                        {
-                          year: "numeric",
-                          month: "2-digit",
-                          day: "2-digit",
-                        }
-                        ) : 
+                          "en-US",
+                          {
+                            year: "numeric",
+                            month: "2-digit",
+                            day: "2-digit",
+                          }
+                        ) :
                         "Date not available"
                       }
                     </p>
@@ -2414,7 +2412,7 @@ console.log(reviewData,'ladin');
               </Card>
 
               {/* Review Actions */}
-              {reviewData.status === "COMPLETED" ? (
+              {reviewData.status === "COMPLETED"  ? (
                 <Card>
                   <CardHeader>
                     <CardTitle>Review Status</CardTitle>
@@ -2426,7 +2424,7 @@ console.log(reviewData,'ladin');
                     </div>
                   </CardContent>
                 </Card>
-              ) : reviewData.status === "rejected" ? (
+              ) : reviewData.status === "REJECTED" ? (
                 <Card>
                   <CardHeader>
                     <CardTitle>Review Status</CardTitle>
@@ -2449,7 +2447,7 @@ console.log(reviewData,'ladin');
                       className="w-full bg-green-600 hover:bg-green-700"
                     >
                       <Icons.CheckCircle />
-                      Approve {currentVersion}
+                      Approve  
                     </Button>
 
                     <Button
@@ -2458,7 +2456,7 @@ console.log(reviewData,'ladin');
                       className="w-full"
                     >
                       <Icons.X />
-                      Request Changes
+                      Reject  
                     </Button>
 
                     {reviewData.allowDownloads && (
@@ -2567,15 +2565,14 @@ console.log(reviewData,'ladin');
       <Dialog open={showRevisionDialog} onOpenChange={setShowRevisionDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Request Changes</DialogTitle>
+            <DialogTitle>Reject</DialogTitle>
             <DialogDescription>
-              Please provide detailed feedback about what changes you'd like to
-              see in the design.
+              Please provide detailed feedback about why you are rejecting this design and what changes are needed.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <Textarea
-              placeholder="Describe the changes you'd like to see..."
+              placeholder="Describe the changes you are rejecting..."
               value={revisionComments}
               onChange={(e) => setRevisionComments(e.target.value)}
               rows={6}
@@ -2589,7 +2586,7 @@ console.log(reviewData,'ladin');
               Cancel
             </Button>
             <Button onClick={handleRequestRevision} variant="destructive">
-              Submit Revision Request
+              Submit Reject
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2755,31 +2752,31 @@ console.log(reviewData,'ladin');
                 </Button>
 
                 {/* Attachment Button */}
-              
+
               </div>
 
               {/* Submit Button */}
-                <Button
-                  size="sm"
+              <Button
+                size="sm"
                 onClick={addAnnotation}
                 disabled={!newComment.trim()}
                 className="h-8 w-8 p-0 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 rounded-full"
-                >
-                  <svg
+              >
+                <svg
                   className="h-4 w-4 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
                     d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                    />
-                  </svg>
-                </Button>
-              </div>
+                  />
+                </svg>
+              </Button>
+            </div>
           </div>
         </div>
       )}
@@ -2823,7 +2820,7 @@ console.log(reviewData,'ladin');
 
             {/* Conversation Messages */}
             <div ref={chatScrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 min-h-[300px]">
-              
+
               {/* Original Message */}
               <div className="flex justify-start">
                 <div className="bg-blue-100 dark:bg-blue-900/30 rounded-lg p-3 max-w-[80%] border-l-4 border-blue-500">
@@ -2832,12 +2829,7 @@ console.log(reviewData,'ladin');
                     <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">
                       {selectedAnnotationChat.addedByName || selectedAnnotationChat.addedBy || "Unknown"}
                     </span>
-                    <Badge
-                      variant={selectedAnnotationChat.isResolved ? "default" : "destructive"}
-                      className="text-xs"
-                    >
-                      {selectedAnnotationChat.isResolved ? "Resolved" : "Pending"}
-                    </Badge>
+                   
                     <span className="text-xs text-gray-500">
                       {selectedAnnotationChat.createdAt
                         ? new Date(selectedAnnotationChat.createdAt).toLocaleString()
@@ -2879,11 +2871,10 @@ console.log(reviewData,'ladin');
                     const isFromClient = reply.addedBy === 'Client' || reply.addedByName === 'Client';
                     return (
                       <div key={reply.id || `reply-${index}`} className={`flex ${isFromClient ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`rounded-lg p-3 max-w-[80%] ${
-                          isFromClient 
-                            ? 'bg-green-100 dark:bg-green-900/30 border-l-4 border-green-500' 
+                        <div className={`rounded-lg p-3 max-w-[80%] ${isFromClient
+                            ? 'bg-green-100 dark:bg-green-900/30 border-l-4 border-green-500'
                             : 'bg-gray-100 dark:bg-gray-800 border-l-4 border-gray-400'
-                        }`}>
+                          }`}>
                           <div className="flex items-center gap-2 mb-2">
                             <div className={`w-2 h-2 rounded-full ${isFromClient ? 'bg-green-500' : 'bg-gray-500'}`}></div>
                             <span className={`text-sm font-semibold ${isFromClient ? 'text-green-700 dark:text-green-300' : 'text-gray-700 dark:text-gray-300'}`}>
@@ -2932,7 +2923,7 @@ console.log(reviewData,'ladin');
             </div>
 
             {/* Input Area */}
-            {!selectedAnnotationChat.isResolved && reviewData.status !== "COMPLETED" && reviewData.status !== 'rejected' && (
+            {!selectedAnnotationChat.isResolved && reviewData.status !== "COMPLETED" && reviewData.status !== "REJECTED" && (
               <div className="border-t border-gray-200 dark:border-gray-700 p-4">
                 <div className="flex items-center gap-3">
                   <Input
@@ -2961,57 +2952,57 @@ console.log(reviewData,'ladin');
                       <span className="text-lg">😊</span>
                     </Button>
 
-              {/* Submit Button */}
-              <Button
-                size="sm"
+                    {/* Submit Button */}
+                    <Button
+                      size="sm"
                       onClick={() => {
                         handleReplySubmit();
                         setReplyText('');
                       }}
                       disabled={!replyText.trim() || isSubmittingReply}
-                className="h-8 w-8 p-0 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 rounded-full"
-              >
-                {isSubmittingReply ? (
-                  <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                ) : (
-                  <svg
-                    className="h-4 w-4 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                    />
-                  </svg>
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Status message when version is completed or rejected */}
-      {!selectedAnnotationChat.isResolved && (reviewData.status === "COMPLETED" || reviewData.status === 'rejected') && (
-        <div className="border-t border-gray-200 dark:border-gray-700 p-4 text-center">
-          <div className={`mb-2 ${reviewData.status === "COMPLETED" ? 'text-green-500' : 'text-red-500'}`}>
-            {reviewData.status === "COMPLETED" ? (
-              <CheckCircle className="h-8 w-8 mx-auto" />
-            ) : (
-              <AlertCircle className="h-8 w-8 mx-auto" />
+                      className="h-8 w-8 p-0 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 rounded-full"
+                    >
+                      {isSubmittingReply ? (
+                        <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        <svg
+                          className="h-4 w-4 text-white"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                          />
+                        </svg>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
             )}
-          </div>
-          <p className="text-sm text-muted-foreground">
-            {reviewData.status === "COMPLETED" 
-              ? 'This version has been completed. No further replies can be added.' 
-              : 'This version has been rejected. No further replies can be added.'
-            }
-          </p>
-        </div>
-      )}
+
+            {/* Status message when version is completed or rejected */}
+            {!selectedAnnotationChat.isResolved && (reviewData.status === "COMPLETED" || reviewData.status === "REJECTED") && (
+              <div className="border-t border-gray-200 dark:border-gray-700 p-4 text-center">
+                <div className={`mb-2 ${reviewData.status === "COMPLETED" ? 'text-green-500' : 'text-red-500'}`}>
+                  {reviewData.status === "COMPLETED" ? (
+                    <CheckCircle className="h-8 w-8 mx-auto" />
+                  ) : (
+                    <AlertCircle className="h-8 w-8 mx-auto" />
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {reviewData.status === "COMPLETED"
+                    ? 'This version has been completed. No further replies can be added.'
+                    : 'This version has been rejected. No further replies can be added.'
+                  }
+                </p>
+              </div>
+            )}
 
             {/* Resolved message */}
             {selectedAnnotationChat.isResolved && (
@@ -3024,181 +3015,181 @@ console.log(reviewData,'ladin');
                 </p>
               </div>
             )}
-          </div>
-        </div>
-      )}
 
-      {/* Reply Popup (Legacy - keeping for backward compatibility) */}
-      {showReplyPopup && selectedAnnotationForReply && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-md mx-4">
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                Quick Reply
-              </h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setShowReplyPopup(false);
-                  setSelectedAnnotationForReply(null);
-                  setReplyText("");
-                }}
-                className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-
-            {/* Original Annotation */}
-            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <div
-                    className={`w-3 h-3 rounded-full ${selectedAnnotationForReply.isResolved
-                        ? "bg-green-500"
-                        : "bg-red-500"
-                      }`}
-                  ></div>
-                  <span className="text-sm font-medium">
-                    {selectedAnnotationForReply.addedByName || selectedAnnotationForReply.addedBy || "Unknown"}
-                  </span>
-                  
-                </div>
-                <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">
-                  {selectedAnnotationForReply.content}
-                </p>
-                
-              </div>
-            </div>
-
-            {/* Input Area */}
-            <div className="p-4">
-              {selectedAnnotationForReply.status === "COMPLETED" || selectedAnnotationForReply.status === 'REJECTED' ? (
-                <div className="text-center py-4">
-                  <div className={`mb-2 ${selectedAnnotationForReply.status === "COMPLETED" ? 'text-green-500' : 'text-red-500'}`}>
-                    <CheckCircle className="h-8 w-8 mx-auto" />
+            {/* Reply Popup (Legacy - keeping for backward compatibility) */}
+            {showReplyPopup && selectedAnnotationForReply && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-md mx-4">
+                  {/* Header */}
+                  <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                      Quick Reply
+                    </h3>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setShowReplyPopup(false);
+                        setSelectedAnnotationForReply(null);
+                        setReplyText("");
+                      }}
+                      className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    This annotation has been {selectedAnnotationForReply.status.toLowerCase()} and cannot be replied to.
-                  </p>
-                </div>
-              ) : (reviewData.status === "COMPLETED" || reviewData.status === 'rejected') ? (
-                <div className="text-center py-4">
-                  <div className={`mb-2 ${reviewData.status === "COMPLETED" ? 'text-green-500' : 'text-red-500'}`}>
-                    {reviewData.status === "COMPLETED" ? (
-                      <CheckCircle className="h-8 w-8 mx-auto" />
+
+                  {/* Original Annotation */}
+                  <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div
+                          className={`w-3 h-3 rounded-full ${selectedAnnotationForReply.isResolved
+                            ? "bg-green-500"
+                            : "bg-red-500"
+                            }`}
+                        ></div>
+                        <span className="text-sm font-medium">
+                          {selectedAnnotationForReply.addedByName || selectedAnnotationForReply.addedBy || "Unknown"}
+                        </span>
+
+                      </div>
+                      <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">
+                        {selectedAnnotationForReply.content}
+                      </p>
+
+                    </div>
+                  </div>
+
+                  {/* Input Area */}
+                  <div className="p-4">
+                    {selectedAnnotationForReply.status === "COMPLETED" || selectedAnnotationForReply.status === "REJECTED" ? (
+                      <div className="text-center py-4">
+                        <div className={`mb-2 ${selectedAnnotationForReply.status === "COMPLETED" ? 'text-green-500' : 'text-red-500'}`}>
+                          <CheckCircle className="h-8 w-8 mx-auto" />
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          This annotation has been {selectedAnnotationForReply.status.toLowerCase()} and cannot be replied to.
+                        </p>
+                      </div>
+                    ) : (reviewData.status === "COMPLETED" || reviewData.status === "REJECTED") ? (
+                      <div className="text-center py-4">
+                        <div className={`mb-2 ${reviewData.status === "COMPLETED" ? 'text-green-500' : 'text-red-500'}`}>
+                          {reviewData.status === "COMPLETED" ? (
+                            <CheckCircle className="h-8 w-8 mx-auto" />
+                          ) : (
+                            <AlertCircle className="h-8 w-8 mx-auto" />
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {reviewData.status === "COMPLETED"
+                            ? 'This version has been completed. No further replies can be added.'
+                            : 'This version has been rejected. No further replies can be added.'
+                          }
+                        </p>
+                      </div>
                     ) : (
-                      <AlertCircle className="h-8 w-8 mx-auto" />
+                      <Input
+                        placeholder="Type your reply..."
+                        value={replyText}
+                        onChange={(e) => setReplyText(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === "Enter" && replyText.trim()) {
+                            handleReplySubmit();
+                          }
+                        }}
+                        className="border-0 focus:ring-0 text-sm dark:bg-gray-800 dark:text-gray-100"
+                        autoFocus
+                      />
                     )}
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    {reviewData.status === "COMPLETED" 
-                      ? 'This version has been completed. No further replies can be added.' 
-                      : 'This version has been rejected. No further replies can be added.'
-                    }
-                  </p>
-                </div>
-              ) : (
-                <Input
-                  placeholder="Type your reply..."
-                  value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === "Enter" && replyText.trim()) {
-                      handleReplySubmit();
-                    }
-                  }}
-                  className="border-0 focus:ring-0 text-sm dark:bg-gray-800 dark:text-gray-100"
-                  autoFocus
-                />
-              )}
-            </div>
 
-            {/* Action Bar */}
-            {selectedAnnotationForReply.status === 'PENDING' && reviewData.status !== "COMPLETED" && reviewData.status !== 'rejected' && (
-              <div className="flex items-center justify-between p-4 border-t border-gray-200 dark:border-gray-700">
-                <div className="flex items-center gap-3">
-                  {/* Emoji Button */}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
-                    onClick={() => {
-                      setReplyText((prev) => prev + "😊");
-                    }}
-                  >
-                    <span className="text-lg">😊</span>
-                  </Button>
+                  {/* Action Bar */}
+                  {selectedAnnotationForReply.status === 'PENDING' && reviewData.status !== "COMPLETED" && reviewData.status !== "REJECTED" && (
+                    <div className="flex items-center justify-between p-4 border-t border-gray-200 dark:border-gray-700">
+                      <div className="flex items-center gap-3">
+                        {/* Emoji Button */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                          onClick={() => {
+                            setReplyText((prev) => prev + "😊");
+                          }}
+                        >
+                          <span className="text-lg">😊</span>
+                        </Button>
 
-                  {/* Mention Button */}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
-                    onClick={() => {
-                      setReplyText((prev) => prev + "@");
-                    }}
-                  >
-                    <span className="text-sm font-bold dark:text-gray-100">
-                      @
-                    </span>
-                  </Button>
+                        {/* Mention Button */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                          onClick={() => {
+                            setReplyText((prev) => prev + "@");
+                          }}
+                        >
+                          <span className="text-sm font-bold dark:text-gray-100">
+                            @
+                          </span>
+                        </Button>
 
-                  {/* Attachment Button */}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
-                    onClick={() => {
-                      const input = document.createElement("input");
-                      input.type = "file";
-                      input.accept = "image/*";
-                      input.click();
-                    }}
-                  >
-                    <svg
-                      className="h-4 w-4 dark:text-gray-100"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                      />
-                    </svg>
-                  </Button>
-                </div>
+                        {/* Attachment Button */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                          onClick={() => {
+                            const input = document.createElement("input");
+                            input.type = "file";
+                            input.accept = "image/*";
+                            input.click();
+                          }}
+                        >
+                          <svg
+                            className="h-4 w-4 dark:text-gray-100"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                            />
+                          </svg>
+                        </Button>
+                      </div>
 
-                {/* Submit Button */}
-                <Button
-                  size="sm"
-                  onClick={handleReplySubmit}
-                  disabled={!replyText.trim() || isSubmittingReply}
-                  className="h-8 w-8 p-0 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 rounded-full"
-                >
-                  {isSubmittingReply ? (
-                    <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  ) : (
-                    <svg
-                      className="h-4 w-4 text-white"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                      />
-                    </svg>
+                      {/* Submit Button */}
+                      <Button
+                        size="sm"
+                        onClick={handleReplySubmit}
+                        disabled={!replyText.trim() || isSubmittingReply}
+                        className="h-8 w-8 p-0 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 rounded-full"
+                      >
+                        {isSubmittingReply ? (
+                          <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                          <svg
+                            className="h-4 w-4 text-white"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                            />
+                          </svg>
+                        )}
+                      </Button>
+                    </div>
                   )}
-                </Button>
+                </div>
               </div>
             )}
           </div>
