@@ -746,8 +746,8 @@ export default function ReviewPage({ params }: ReviewPageProps) {
               addedBy: "Client",
               senderName: currentUser?.name || "Client",
               isFromClient: true,
-            }
-          });
+            });
+          }
         }
 
         // Success feedback is handled by the loading state and real-time updates
