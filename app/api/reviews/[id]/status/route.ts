@@ -37,13 +37,43 @@ export async function PUT(
       const io = getSocketServer();
       
       if (io) {
+        // Get the request headers to determine who is making the request
+        const userAgent = req.headers.get('user-agent') || '';
+        const isFromAdmin = userAgent.includes('admin') || req.url.includes('/admin/');
+        
+        // Create status update message
+        const statusMessage = `📊 Review status updated to: ${status}`;
+        
         io.to(`project-${review.projectId}`).emit('reviewStatusUpdated', {
           reviewId: review.id,
           projectId: review.projectId,
           status: status,
           updatedAt: new Date().toISOString(),
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          message: statusMessage,
+          isFromAdmin: isFromAdmin
         });
+        
+        // Send dummy success message to opposite user type
+        if (isFromAdmin) {
+          // Admin updated status, send success message to client
+          io.to(`project-${review.projectId}`).emit('dummySuccessMessage', {
+            type: 'status_updated',
+            message: `✅ Review status updated to ${status} by Admin`,
+            from: 'Admin',
+            to: 'Client',
+            timestamp: new Date().toISOString()
+          });
+        } else {
+          // Client updated status, send success message to admin
+          io.to(`project-${review.projectId}`).emit('dummySuccessMessage', {
+            type: 'status_updated',
+            message: `✅ Client updated review status to ${status}`,
+            from: 'Client',
+            to: 'Admin',
+            timestamp: new Date().toISOString()
+          });
+        }
         
         console.log(`📡 Emitted reviewStatusUpdated for review ${review.id} in project ${review.projectId}`);
       } else {

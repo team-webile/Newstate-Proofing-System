@@ -13,6 +13,7 @@ interface SocketEvents {
   onFileUploaded?: (data: any) => void;
   onStatusChanged?: (data: any) => void;
   onTyping?: (data: any) => void;
+  onDummySuccessMessage?: (data: any) => void;
 }
 
 interface UseUnifiedSocketProps {
@@ -121,6 +122,11 @@ export function useUnifiedSocket({
     newSocket.on("typing", (data) => {
       console.log("⌨️ Unified Socket - typing:", data);
       events.onTyping?.(data);
+    });
+
+    newSocket.on("dummySuccessMessage", (data) => {
+      console.log("💬 Unified Socket - dummySuccessMessage:", data);
+      events.onDummySuccessMessage?.(data);
     });
 
     setSocket(newSocket);

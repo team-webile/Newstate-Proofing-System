@@ -685,6 +685,25 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
         }])
         setLastUpdate(data.timestamp)
       }
+    },
+    onDummySuccessMessage: (data: {
+      type: string;
+      message: string;
+      from: string;
+      to: string;
+      timestamp: string;
+    }) => {
+      console.log('💬 Admin received dummy success message:', data);
+      
+      setChatMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        type: 'status',
+        message: data.message,
+        timestamp: data.timestamp,
+        addedBy: data.from,
+        senderName: data.from,
+        isFromAdmin: data.to === 'Admin'
+      }]);
     }
   })
 

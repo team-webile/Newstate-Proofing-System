@@ -266,6 +266,66 @@ export default function ClientDashboard({ params }: ClientDashboardProps) {
         }
       );
 
+      // Listen for dummy success messages
+      newSocket.on(
+        "dummySuccessMessage",
+        (data: {
+          type: string;
+          message: string;
+          from: string;
+          to: string;
+          timestamp: string;
+        }) => {
+          console.log("💬 Received dummy success message:", data);
+          
+          setChatMessages((prev) => [
+            ...prev,
+            {
+              id: Date.now().toString(),
+              type: "status",
+              message: data.message,
+              timestamp: data.timestamp,
+              addedBy: data.from,
+              senderName: data.from,
+              isFromClient: data.to === "Client",
+            },
+          ]);
+        }
+      );
+
+      // Listen for review status updates
+      newSocket.on(
+        "reviewStatusUpdated",
+        (data: {
+          reviewId: string;
+          projectId: string;
+          status: string;
+          message: string;
+          timestamp: string;
+          isFromAdmin: boolean;
+        }) => {
+          console.log("📊 Review status updated:", data);
+          
+          setChatMessages((prev) => [
+            ...prev,
+            {
+              id: Date.now().toString(),
+              type: "status",
+              message: data.message,
+              timestamp: data.timestamp,
+              addedBy: data.isFromAdmin ? "Admin" : "Client",
+              senderName: data.isFromAdmin ? "Admin" : "Client",
+              isFromClient: !data.isFromAdmin,
+            },
+          ]);
+
+          // Update project status
+          setProject((prev) =>
+            prev ? { ...prev, status: data.status } : null
+          );
+        }
+      );
+
       return () => {
         newSocket.emit("leave-project", projectId);
         newSocket.close();

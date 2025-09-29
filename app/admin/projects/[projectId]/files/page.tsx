@@ -422,6 +422,66 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
         }
       );
 
+      // Listen for dummy success messages
+      newSocket.on(
+        "dummySuccessMessage",
+        (data: {
+          type: string;
+          message: string;
+          from: string;
+          to: string;
+          timestamp: string;
+        }) => {
+          console.log("💬 Admin received dummy success message:", data);
+          
+          setChatMessages((prev) => [
+            ...prev,
+            {
+              id: Date.now().toString(),
+              type: "status",
+              message: data.message,
+              timestamp: data.timestamp,
+              addedBy: data.from,
+              senderName: data.from,
+              isFromAdmin: data.to === "Admin",
+            },
+          ]);
+        }
+      );
+
+      // Listen for review status updates
+      newSocket.on(
+        "reviewStatusUpdated",
+        (data: {
+          reviewId: string;
+          projectId: string;
+          status: string;
+          message: string;
+          timestamp: string;
+          isFromAdmin: boolean;
+        }) => {
+          console.log("📊 Admin received review status update:", data);
+          
+          setChatMessages((prev) => [
+            ...prev,
+            {
+              id: Date.now().toString(),
+              type: "status",
+              message: data.message,
+              timestamp: data.timestamp,
+              addedBy: data.isFromAdmin ? "Admin" : "Client",
+              senderName: data.isFromAdmin ? "Admin" : "Client",
+              isFromAdmin: data.isFromAdmin,
+            },
+          ]);
+
+          // Update project status
+          setProject((prev) =>
+            prev ? { ...prev, status: data.status } : null
+          );
+        }
+      );
+
       return () => {
         newSocket.emit("leave-project", params.projectId);
         newSocket.close();

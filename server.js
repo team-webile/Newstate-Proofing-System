@@ -191,6 +191,26 @@ app.prepare().then(() => {
       });
     });
 
+    // Dummy success message events
+    socket.on('dummySuccessMessage', (data) => {
+      console.log('💬 Dummy success message:', data);
+      // Broadcast to all clients in the project room
+      socket.to(`project-${data.projectId}`).emit('dummySuccessMessage', {
+        ...data,
+        timestamp: new Date().toISOString()
+      });
+    });
+
+    // Review status update events
+    socket.on('reviewStatusChanged', (data) => {
+      console.log('📊 Review status changed:', data);
+      // Broadcast to all clients in the project room
+      socket.to(`project-${data.projectId}`).emit('reviewStatusUpdated', {
+        ...data,
+        timestamp: new Date().toISOString()
+      });
+    });
+
     // Disconnect handler
     socket.on('disconnect', () => {
       console.log('Client disconnected:', socket.id);

@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
       console.log('📝 Dummy message content:', dummyReply?.content);
     } catch (error) {
       console.log("❌ Error creating dummy message:", error);
-      console.log("❌ Error details:", error.message);
+      console.log("❌ Error details:", error instanceof Error ? error.message : 'Unknown error');
     }
 
     // Emit socket event for real-time updates
@@ -100,6 +100,15 @@ export async function POST(req: NextRequest) {
       
       if (io) {
         console.log('📡 Emitting annotationAdded event for project:', projectId);
+        
+        // Determine if this is from admin or client
+        const isFromAdmin = addedBy === 'Admin' || addedByName?.includes('Admin');
+        
+        // Create dummy success message based on who added the annotation
+        const dummyMessage = isFromAdmin 
+          ? `✅ Admin added annotation: "${annotation.content}"`
+          : `✅ Client added annotation: "${annotation.content}"`;
+        
         io.to(`project-${projectId}`).emit('annotationAdded', {
           id: annotation.id,
           content: annotation.content,
@@ -113,8 +122,32 @@ export async function POST(req: NextRequest) {
           createdAt: annotation.createdAt,
           timestamp: new Date().toISOString(),
           // Include dummy message in the annotation data
-          hasDummyMessage: true
+          hasDummyMessage: true,
+          dummyMessage: dummyMessage,
+          isFromAdmin: isFromAdmin
         });
+        
+        // Send dummy success message to opposite user type
+        if (isFromAdmin) {
+          // Admin added annotation, send success message to client
+          io.to(`project-${projectId}`).emit('dummySuccessMessage', {
+            type: 'annotation_added',
+            message: `✅ Your annotation has been added successfully!`,
+            from: 'Admin',
+            to: 'Client',
+            timestamp: new Date().toISOString()
+          });
+        } else {
+          // Client added annotation, send success message to admin
+          io.to(`project-${projectId}`).emit('dummySuccessMessage', {
+            type: 'annotation_added',
+            message: `✅ Client annotation received and saved!`,
+            from: 'Client',
+            to: 'Admin',
+            timestamp: new Date().toISOString()
+          });
+        }
+        
         console.log('✅ Socket event emitted successfully');
       } else {
         console.log('⚠️ Socket server not available');
