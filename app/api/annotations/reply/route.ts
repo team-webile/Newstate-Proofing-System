@@ -3,11 +3,52 @@ import { db } from '@/db'
 import { projects, clients, users, reviews, elements, comments, approvals, settings, annotations, annotationReplies } from '@/db/schema'
 import { eq, and, or, like, desc, asc, count } from 'drizzle-orm';
 
+// GET - Get replies for an annotation
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const annotationId = searchParams.get('annotationId');
+
+    if (!annotationId) {
+      return NextResponse.json(
+        { status: "error", message: "Annotation ID is required" },
+        { status: 400 }
+      );
+    }
+
+    const replies = await db
+      .select()
+      .from(annotationReplies)
+      .where(eq(annotationReplies.annotationId, annotationId))
+      .orderBy(asc(annotationReplies.createdAt));
+
+    console.log('📝 Fetching replies for annotation:', annotationId);
+    console.log('📝 Found replies:', replies.length);
+    console.log('📝 Replies data:', replies);
+
+    return NextResponse.json({
+      status: "success",
+      data: replies,
+    });
+  } catch (error) {
+    console.error("Error fetching annotation replies:", error);
+    return NextResponse.json(
+      { status: "error", message: "Failed to fetch replies" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     console.log("=== REPLY ROUTE CALLED ===");
+    console.log("Request URL:", request.url);
+    console.log("Request method:", request.method);
     
-    const { annotationId, content, addedBy, addedByName } = await request.json();
+    const body = await request.json();
+    console.log("Request body:", body);
+    
+    const { annotationId, content, addedBy, addedByName } = body;
 
     console.log("Creating annotation reply:", {
       annotationId,

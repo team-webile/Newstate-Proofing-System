@@ -14,7 +14,9 @@ import {
   MoreVertical,
   Clock,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -22,6 +24,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useAnnotationReplies } from '@/hooks/use-annotation-replies';
 
 interface Reply {
   id: string;
@@ -35,26 +38,20 @@ interface Reply {
 
 interface AnnotationReplySystemProps {
   annotationId: string;
-  replies: Reply[];
+  projectId: string;
   currentUser: {
     id: string;
     name: string;
     role: string;
   };
-  onReplyAdd: (content: string) => Promise<void>;
-  onReplyEdit?: (replyId: string, newContent: string) => Promise<void>;
-  onReplyDelete?: (replyId: string) => Promise<void>;
   isAdmin?: boolean;
   className?: string;
 }
 
 export function AnnotationReplySystem({
   annotationId,
-  replies,
+  projectId,
   currentUser,
-  onReplyAdd,
-  onReplyEdit,
-  onReplyDelete,
   isAdmin = false,
   className = ''
 }: AnnotationReplySystemProps) {
@@ -65,6 +62,21 @@ export function AnnotationReplySystem({
   const [showReplyInput, setShowReplyInput] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Use the annotation replies hook
+  const { 
+    replies, 
+    isLoading, 
+    error, 
+    isConnected, 
+    addReply, 
+    editReply, 
+    deleteReply 
+  } = useAnnotationReplies({
+    annotationId,
+    projectId,
+    currentUser
+  });
 
   // Auto-resize textarea
   useEffect(() => {
@@ -86,7 +98,7 @@ export function AnnotationReplySystem({
 
     setIsSubmitting(true);
     try {
-      await onReplyAdd(newReply.trim());
+      await addReply(newReply.trim());
       setNewReply('');
       setShowReplyInput(false);
     } catch (error) {
@@ -105,9 +117,7 @@ export function AnnotationReplySystem({
     if (!editContent.trim() || !editingReply) return;
 
     try {
-      if (onReplyEdit) {
-        await onReplyEdit(editingReply, editContent.trim());
-      }
+      await editReply(editingReply, editContent.trim());
       setEditingReply(null);
       setEditContent('');
     } catch (error) {
@@ -116,11 +126,9 @@ export function AnnotationReplySystem({
   };
 
   const handleDeleteReply = async (replyId: string) => {
-    if (!onReplyDelete) return;
-    
     if (confirm('Are you sure you want to delete this reply?')) {
       try {
-        await onReplyDelete(replyId);
+        await deleteReply(replyId);
       } catch (error) {
         console.error('Error deleting reply:', error);
       }
@@ -185,24 +193,58 @@ export function AnnotationReplySystem({
 
   return (
     <div className={`space-y-4 ${className}`}>
-      {/* Reply Toggle Button */}
+      {/* Connection Status and Error Display */}
       <div className="flex items-center justify-between">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setShowReplyInput(!showReplyInput)}
-          className="flex items-center gap-2"
-        >
-          <MessageCircle className="w-4 h-4" />
-          {replies.length > 0 ? `${replies.length} ${replies.length === 1 ? 'Reply' : 'Replies'}` : 'Add Reply'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowReplyInput(!showReplyInput)}
+            className="flex items-center gap-2"
+          >
+            <MessageCircle className="w-4 h-4" />
+            {replies.length > 0 ? `${replies.length} ${replies.length === 1 ? 'Reply' : 'Replies'}` : 'Add Reply'}
+          </Button>
+          
+          {/* Connection Status */}
+          <div className="flex items-center gap-1 text-xs">
+            {isConnected ? (
+              <Wifi className="w-3 h-3 text-green-500" />
+            ) : (
+              <WifiOff className="w-3 h-3 text-red-500" />
+            )}
+            <span className={isConnected ? 'text-green-600' : 'text-red-600'}>
+              {isConnected ? 'Live' : 'Offline'}
+            </span>
+          </div>
+        </div>
+        
+        {/* Error Display */}
+        {error && (
+          <div className="flex items-center gap-1 text-xs text-red-600">
+            <AlertCircle className="w-3 h-3" />
+            <span>{error}</span>
+          </div>
+        )}
       </div>
+
+      {/* Loading State */}
+      {isLoading && (
+        <div className="flex items-center justify-center py-4">
+          <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <span className="ml-2 text-sm text-muted-foreground">Loading replies...</span>
+        </div>
+      )}
 
       {/* Replies List */}
       {replies.length > 0 && (
         <div className="space-y-3">
-          {replies.map((reply) => (
-            <Card key={reply.id} className="border-l-4 border-l-blue-500">
+          {replies.map((reply) => {
+            // Special styling for dummy message
+            const isDummyMessage = reply.addedBy === 'system' && reply.content === 'No replies yet. Be the first to respond!';
+            
+            return (
+            <Card key={reply.id} className={`border-l-4 ${isDummyMessage ? 'border-l-orange-500 bg-orange-50 dark:bg-orange-900/20' : 'border-l-blue-500'}`}>
               <CardContent className="p-4">
                 {editingReply === reply.id ? (
                   // Edit Mode
@@ -268,8 +310,8 @@ export function AnnotationReplySystem({
                         </div>
                       </div>
 
-                      {/* Actions Menu */}
-                      {(reply.addedBy === currentUser.id || reply.addedBy === currentUser.role || isAdmin) && (
+                      {/* Actions Menu - Hide for dummy message */}
+                      {!isDummyMessage && (reply.addedBy === currentUser.id || reply.addedBy === currentUser.role || isAdmin) && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
@@ -295,15 +337,21 @@ export function AnnotationReplySystem({
 
                     {/* Reply Content */}
                     <div className="pl-11">
-                      <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                      <p className={`text-sm whitespace-pre-wrap ${isDummyMessage ? 'text-orange-700 dark:text-orange-300 italic' : 'text-gray-700 dark:text-gray-300'}`}>
                         {reply.content}
                       </p>
+                      {isDummyMessage && (
+                        <div className="mt-2 text-xs text-orange-600 dark:text-orange-400">
+                          💡 This message will disappear when someone replies to the annotation
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 

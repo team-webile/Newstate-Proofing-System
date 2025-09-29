@@ -33,12 +33,24 @@ export async function PUT(
 
     // Emit socket event for real-time updates
     try {
-      // Note: Socket emission would happen here in a real implementation
-      console.log(
-        `Review status updated: ${review.id} to ${status} for project ${review.projectId}`
-      );
+      const { getSocketServer } = await import('@/lib/socket-server');
+      const io = getSocketServer();
+      
+      if (io) {
+        io.to(`project-${review.projectId}`).emit('reviewStatusUpdated', {
+          reviewId: review.id,
+          projectId: review.projectId,
+          status: status,
+          updatedAt: new Date().toISOString(),
+          timestamp: new Date().toISOString()
+        });
+        
+        console.log(`📡 Emitted reviewStatusUpdated for review ${review.id} in project ${review.projectId}`);
+      } else {
+        console.log("⚠️ Socket server not available for review status update");
+      }
     } catch (error) {
-      console.log("Socket emission skipped:", error);
+      console.log("Socket emission error:", error);
     }
 
     return NextResponse.json({

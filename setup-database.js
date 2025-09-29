@@ -62,7 +62,7 @@ async function setupDatabase() {
     console.log('\n📋 Next steps:')
     console.log('1. Database is now connected using centralized connection')
     console.log('2. Run: npm run dev')
-    console.log('3. Visit: https://preview.devnstage.xyz')
+    console.log('3. Visit: http://localhost:3000')
     console.log('4. Login with: admin@newstatebranding.com / admin123')
     console.log('5. All tables have been created in your database!')
 

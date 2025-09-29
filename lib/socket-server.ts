@@ -5,7 +5,13 @@ import { Socket } from 'socket.io'
 let io: SocketIOServer | null = null
 
 export function getSocketServer(): SocketIOServer | null {
-  return io
+  // First try to get from global (set by server.js)
+  if (typeof global !== 'undefined' && global.socketServer) {
+    return global.socketServer;
+  }
+  
+  // Fallback to local instance
+  return io;
 }
 
 export function initializeSocketServer() {
@@ -15,7 +21,7 @@ export function initializeSocketServer() {
     // Create Socket.io server
     io = new SocketIOServer({
       cors: {
-        origin: process.env.NEXT_PUBLIC_BASE_URL || 'https://preview.devnstage.xyz',
+        origin: process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000',
         methods: ['GET', 'POST']
       },
       transports: ['websocket', 'polling']

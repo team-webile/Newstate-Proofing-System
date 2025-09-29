@@ -26,7 +26,7 @@ app.prepare().then(() => {
 
   // Create Socket.IO server
   const allowedOrigins = [
-    'https://preview.devnstage.xyz',
+    'http://localhost:3000',
     'https://www.preview.devnstage.xyz',
     'http://localhost:3000',
     'http://127.0.0.1:3000',
@@ -195,6 +195,9 @@ app.prepare().then(() => {
       console.log('Client disconnected:', socket.id);
     });
   });
+
+  // Make socket server globally available
+  global.socketServer = io;
 
   // Start server
   server.listen(port, hostname, (err) => {

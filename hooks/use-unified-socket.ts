@@ -8,6 +8,7 @@ interface SocketEvents {
   onReplyDeleted?: (data: any) => void;
   onAnnotationStatusUpdated?: (data: any) => void;
   onAnnotationResolved?: (data: any) => void;
+  onReviewStatusUpdated?: (data: any) => void;
   onProjectStatusChanged?: (data: any) => void;
   onFileUploaded?: (data: any) => void;
   onStatusChanged?: (data: any) => void;
@@ -95,6 +96,11 @@ export function useUnifiedSocket({
     newSocket.on("annotationResolved", (data) => {
       console.log("✅ Unified Socket - annotationResolved:", data);
       events.onAnnotationResolved?.(data);
+    });
+
+    newSocket.on("reviewStatusUpdated", (data) => {
+      console.log("📋 Unified Socket - reviewStatusUpdated:", data);
+      events.onReviewStatusUpdated?.(data);
     });
 
     newSocket.on("projectStatusChanged", (data) => {
@@ -197,6 +203,22 @@ export function useUnifiedSocket({
     [socket, isConnected]
   );
 
+  const emitReviewStatusChange = useCallback(
+    (data: any) => {
+      if (!socket || !isConnected) {
+        console.warn(
+          "⚠️ Socket not connected, cannot emit review status change"
+        );
+        return false;
+      }
+
+      console.log("📋 Emitting review status change:", data);
+      socket.emit("reviewStatusChanged", data);
+      return true;
+    },
+    [socket, isConnected]
+  );
+
   const emitProjectStatusChange = useCallback(
     (data: any) => {
       if (!socket || !isConnected) {
@@ -249,6 +271,7 @@ export function useUnifiedSocket({
     emitReplyEdit,
     emitReplyDelete,
     emitAnnotationStatusChange,
+    emitReviewStatusChange,
     emitProjectStatusChange,
     emitTyping,
     reconnect,

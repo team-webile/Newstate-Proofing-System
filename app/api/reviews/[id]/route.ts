@@ -24,7 +24,7 @@ async function getProjectFiles(projectId: string) {
         id: file.split('.')[0], // Use filename without extension as ID
         name: file,
         url: `/uploads/projects/${projectId}/${file}`,
-        fullUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://preview.devnstage.xyz'}/uploads/projects/${projectId}/${file}`,
+        fullUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/uploads/projects/${projectId}/${file}`,
         type: getMimeType(file),
         size: stats.size,
         uploadedAt: stats.mtime.toISOString(),
@@ -145,7 +145,7 @@ export async function GET(req: NextRequest) {
                 mimeType: version.mimeType,
                 createdAt: version.createdAt,
                 // Add full URL for images
-                imageUrl: version.filePath ? `${process.env.NEXT_PUBLIC_BASE_URL || 'https://preview.devnstage.xyz'}${version.filePath}` : null
+                imageUrl: version.filePath ? `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}${version.filePath}` : null
               })),
               comments: element.comments,
               approvals: element.approvals
@@ -220,7 +220,7 @@ export async function GET(req: NextRequest) {
               mimeType: version.mimeType,
               createdAt: version.createdAt,
               // Add full URL for images
-              imageUrl: version.filePath ? `${process.env.NEXT_PUBLIC_BASE_URL || 'https://preview.devnstage.xyz'}${version.filePath}` : null
+              imageUrl: version.filePath ? `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}${version.filePath}` : null
             })),
             comments: element.comments,
             approvals: element.approvals
@@ -284,7 +284,7 @@ export async function GET(req: NextRequest) {
           mimeType: version.mimeType,
           createdAt: version.createdAt,
           // Add full URL for images
-          imageUrl: version.filePath ? `${process.env.NEXT_PUBLIC_BASE_URL || 'https://preview.devnstage.xyz'}${version.filePath}` : null
+          imageUrl: version.filePath ? `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}${version.filePath}` : null
         })),
         comments: element.comments,
         approvals: element.approvals

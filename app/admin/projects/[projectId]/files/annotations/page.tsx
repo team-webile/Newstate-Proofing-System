@@ -158,12 +158,14 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
   const [showApprovalDialog, setShowApprovalDialog] = useState(false)
   const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>('approve')
   const [approvalComment, setApprovalComment] = useState("")
+  const [isApproving, setIsApproving] = useState(false)
   const [showDownloadDialog, setShowDownloadDialog] = useState(false)
   const [downloadFormat, setDownloadFormat] = useState<'zip' | 'individual'>('zip')
   const [lastUpdate, setLastUpdate] = useState<string | null>(null)
   const [showAnnotationChat, setShowAnnotationChat] = useState(false)
   const [selectedAnnotationChat, setSelectedAnnotationChat] = useState<Annotation | null>(null)
   const [replyText, setReplyText] = useState("")
+  const [isSubmittingReply, setIsSubmittingReply] = useState(false)
   const chatScrollRef = useRef<HTMLDivElement>(null)
 
   // Auto-scroll to bottom of chat
@@ -406,6 +408,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
 
   // Approve or reject project
   const handleApproval = async () => {
+    setIsApproving(true);
     try {
       const response = await fetch(`/api/projects/${params.projectId}/approve`, {
         method: 'POST',
@@ -427,6 +430,8 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
       }
     } catch (error) {
       console.error('Error processing approval:', error)
+    } finally {
+      setIsApproving(false);
     }
   }
 
@@ -477,6 +482,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
     emitAnnotation,
     emitAnnotationReply,
     emitAnnotationStatusChange,
+    emitReviewStatusChange,
     emitProjectStatusChange
   } = useUnifiedSocket({
     projectId: params.projectId,
@@ -558,7 +564,14 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
           annotation.id === data.annotationId 
             ? { 
                 ...annotation, 
-                replies: [...(annotation.replies || []), newReply]
+                replies: [
+                  // Filter out dummy messages
+                  ...(annotation.replies || []).filter(reply => 
+                    reply.addedBy !== 'system' && reply.content !== 'No replies yet. Be the first to respond!'
+                  ),
+                  // Add the new real reply
+                  newReply
+                ]
               }
             : annotation
         ))
@@ -569,7 +582,14 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
             if (!prev) return prev;
             return {
               ...prev,
-              replies: [...(prev.replies || []), newReply]
+              replies: [
+                // Filter out dummy messages
+                ...(prev.replies || []).filter(reply => 
+                  reply.addedBy !== 'system' && reply.content !== 'No replies yet. Be the first to respond!'
+                ),
+                // Add the new real reply
+                newReply
+              ]
             };
           });
           
@@ -620,6 +640,29 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
           id: Date.now().toString(),
           type: 'status',
           message: `Annotation status changed to ${data.status} by ${senderName}`,
+          timestamp: data.timestamp,
+          addedBy: data.updatedBy,
+          senderName: senderName,
+          isFromAdmin: data.updatedBy === 'admin-1'
+        }])
+        setLastUpdate(data.timestamp)
+      },
+      onReviewStatusUpdated: (data) => {
+        console.log('🔔 Admin received reviewStatusUpdated event:', data)
+        
+        // Update project status if review status affects it
+        if (data.status === 'APPROVED' || data.status === 'REJECTED') {
+          setProject(prev => prev ? { 
+            ...prev, 
+            status: data.status === 'APPROVED' ? 'completed' : 'rejected' as any 
+          } : prev)
+        }
+        
+        const senderName = data.updatedByName || data.updatedBy || 'Unknown'
+        setChatMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          type: 'status',
+          message: `Review status changed to ${data.status} by ${senderName}`,
           timestamp: data.timestamp,
           addedBy: data.updatedBy,
           senderName: senderName,
@@ -799,6 +842,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
   const addReply = async (annotationId: string) => {
     if (!newReply.trim()) return
     
+    setIsSubmittingReply(true);
     try {
       const response = await fetch('/api/annotations/reply', {
         method: 'POST',
@@ -861,6 +905,8 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
     } catch (error) {
       console.error('Error saving reply:', error)
       alert('Failed to save reply. Please try again.')
+    } finally {
+      setIsSubmittingReply(false);
     }
   }
 
@@ -955,14 +1001,12 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
         ))
         
         // Emit assignment
-        if (socket) {
-          socket.emit('annotationAssigned', {
+        emitAnnotationStatusChange({
             projectId: params.projectId,
             annotationId,
             assignedTo: userId,
             assignedBy: currentUser?.name || 'Admin'
           })
-        }
       }
     } catch (error) {
       console.error('Error assigning annotation:', error)
@@ -994,8 +1038,9 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
 
   // Handle reply submit for chat
   const handleReplySubmit = async () => {
-    if (!replyText.trim() || !selectedAnnotationChat) return;
+    if (!replyText.trim() || !selectedAnnotationChat || isSubmittingReply) return;
 
+    setIsSubmittingReply(true);
     try {
       const response = await fetch('/api/annotations/reply', {
         method: 'POST',
@@ -1011,34 +1056,48 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
       const data = await response.json();
 
       if (data.status === 'success') {
-        // Update local state
+        // Update local state - remove dummy messages when adding real reply
         setAnnotations(prev => prev.map(annotation => 
           annotation.id === selectedAnnotationChat.id 
             ? { 
                 ...annotation, 
-                replies: [...(annotation.replies || []), {
-                  id: data.data.id,
-                  content: replyText,
-                  addedBy: 'Admin',
-                  addedByName: 'Admin User',
-                  createdAt: new Date().toISOString()
-                }]
+                replies: [
+                  // Filter out dummy messages
+                  ...(annotation.replies || []).filter(reply => 
+                    reply.addedBy !== 'system' && reply.content !== 'No replies yet. Be the first to respond!'
+                  ),
+                  // Add the new real reply
+                  {
+                    id: data.data.id,
+                    content: replyText,
+                    addedBy: 'Admin',
+                    addedByName: 'Admin User',
+                    createdAt: new Date().toISOString()
+                  }
+                ]
               }
             : annotation
         ));
 
-        // Update selectedAnnotationChat
+        // Update selectedAnnotationChat - remove dummy messages when adding real reply
         setSelectedAnnotationChat(prev => {
           if (!prev) return prev;
           return {
             ...prev,
-            replies: [...(prev.replies || []), {
-              id: data.data.id,
-              content: replyText,
-              addedBy: 'Admin',
-              addedByName: 'Admin User',
-              createdAt: new Date().toISOString()
-            }]
+            replies: [
+              // Filter out dummy messages
+              ...(prev.replies || []).filter(reply => 
+                reply.addedBy !== 'system' && reply.content !== 'No replies yet. Be the first to respond!'
+              ),
+              // Add the new real reply
+              {
+                id: data.data.id,
+                content: replyText,
+                addedBy: 'Admin',
+                addedByName: 'Admin User',
+                createdAt: new Date().toISOString()
+              }
+            ]
           };
         });
 
@@ -1076,6 +1135,8 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
     } catch (error) {
       console.error('Error saving reply:', error);
       alert('Failed to save reply. Please try again.');
+    } finally {
+      setIsSubmittingReply(false);
     }
   };
 
@@ -1842,8 +1903,21 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
             <Button variant="outline" onClick={() => setShowApprovalDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleApproval}>
-              {approvalAction === 'approve' ? 'Approve' : 'Reject'} Project
+            <Button 
+              onClick={handleApproval}
+              disabled={isApproving}
+              className="disabled:opacity-50"
+            >
+              {isApproving ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  {approvalAction === 'approve' ? 'Approving...' : 'Rejecting...'}
+                </>
+              ) : (
+                <>
+                  {approvalAction === 'approve' ? 'Approve' : 'Reject'} Project
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2190,10 +2264,17 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
               </div>
 
               {/* Replies */}
-              {selectedAnnotationChat.replies && selectedAnnotationChat.replies.length > 0 ? (
-                selectedAnnotationChat.replies.map((reply, index) => {
-                  const isFromAdmin = reply.addedBy === 'Admin' || reply.addedByName === 'Admin User';
-                  return (
+              {(() => {
+                // Filter out dummy messages for display
+                const realReplies = selectedAnnotationChat.replies?.filter(reply => 
+                  reply.addedBy !== 'system' && reply.content !== 'No replies yet. Be the first to respond!'
+                ) || [];
+                
+                // Check if we have real replies
+                if (realReplies.length > 0) {
+                  return realReplies.map((reply, index) => {
+                    const isFromAdmin = reply.addedBy === 'Admin' || reply.addedByName === 'Admin User';
+                    return (
                     <div key={reply.id} className={`flex ${isFromAdmin ? 'justify-end' : 'justify-start'}`}>
                       <div className={`rounded-lg p-3 max-w-[80%] ${
                         isFromAdmin 
@@ -2224,14 +2305,18 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                       </div>
                     </div>
                   );
-                })
-              ) : (
-                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                  <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>No replies yet. Be the first to respond!</p>
-                  <p className="text-xs mt-2">Debug: selectedAnnotationChat.replies = {JSON.stringify(selectedAnnotationChat.replies)}</p>
-                </div>
-              )}
+                  });
+                } else {
+                  // Show dummy message when no real replies
+                  return (
+                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                      <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p>No replies yet. Be the first to respond!</p>
+                      <p className="text-xs mt-2">Debug: selectedAnnotationChat.replies = {JSON.stringify(selectedAnnotationChat.replies)}</p>
+                    </div>
+                  );
+                }
+              })()}
             </div>
 
             {/* Reply Input */}
@@ -2252,23 +2337,33 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
               ) : (
                 <div className="flex gap-2">
                   <Input
-                    placeholder="Type your reply..."
+                    placeholder={isSubmittingReply ? "Sending reply..." : "Type your reply..."}
                     value={replyText}
                     onChange={(e) => setReplyText(e.target.value)}
                     onKeyPress={(e) => {
-                      if (e.key === 'Enter' && replyText.trim()) {
+                      if (e.key === 'Enter' && replyText.trim() && !isSubmittingReply) {
                         handleReplySubmit();
                       }
                     }}
-                    className="flex-1"
+                    disabled={isSubmittingReply}
+                    className="flex-1 disabled:opacity-50"
                   />
                   <Button
                     onClick={handleReplySubmit}
-                    disabled={!replyText.trim()}
-                    className="bg-blue-500 hover:bg-blue-600 text-white"
+                    disabled={!replyText.trim() || isSubmittingReply}
+                    className="bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50"
                   >
-                    <MessageSquare className="h-4 w-4 mr-2" />
-                    Reply
+                    {isSubmittingReply ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <MessageSquare className="h-4 w-4 mr-2" />
+                        Reply
+                      </>
+                    )}
                   </Button>
                 </div>
               )}

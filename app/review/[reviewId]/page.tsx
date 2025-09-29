@@ -895,6 +895,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
     emitAnnotation,
     emitAnnotationReply,
     emitAnnotationStatusChange,
+    emitReviewStatusChange,
     emitProjectStatusChange
   } = useUnifiedSocket({
     projectId: params.reviewId,
@@ -1035,6 +1036,29 @@ export default function ReviewPage({ params }: ReviewPageProps) {
           id: Date.now().toString(),
           type: 'status',
           message: `Annotation status changed to ${data.status} by ${senderName}`,
+          timestamp: data.timestamp,
+          addedBy: data.updatedBy,
+          senderName: senderName,
+          isFromClient: data.updatedBy === 'Client'
+        }]);
+        setLastUpdate(data.timestamp);
+      },
+      onReviewStatusUpdated: (data) => {
+        console.log('🔔 Client received reviewStatusUpdated event:', data);
+        
+        // Update project status if review status affects it
+        if (data.status === 'APPROVED' || data.status === 'REJECTED') {
+          setProject(prev => prev ? { 
+            ...prev, 
+            status: data.status === 'APPROVED' ? 'completed' : 'rejected' as any 
+          } : prev);
+        }
+        
+        const senderName = data.updatedByName || data.updatedBy || 'Unknown';
+        setChatMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          type: 'status',
+          message: `Review status changed to ${data.status} by ${senderName}`,
           timestamp: data.timestamp,
           addedBy: data.updatedBy,
           senderName: senderName,

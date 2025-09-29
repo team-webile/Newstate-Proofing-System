@@ -1,8 +1,7 @@
-'use client';
+import { useState, useEffect, useCallback } from 'react';
+import { useUnifiedSocket } from './use-unified-socket';
 
-import { useState, useCallback } from 'react';
-
-interface Reply {
+interface AnnotationReply {
   id: string;
   content: string;
   addedBy: string;
@@ -20,179 +19,210 @@ interface UseAnnotationRepliesProps {
     name: string;
     role: string;
   };
-  onReplyUpdate?: (replies: Reply[]) => void;
 }
 
-export function useAnnotationReplies({
-  annotationId,
-  projectId,
-  currentUser,
-  onReplyUpdate
+export function useAnnotationReplies({ 
+  annotationId, 
+  projectId, 
+  currentUser 
 }: UseAnnotationRepliesProps) {
-  const [replies, setReplies] = useState<Reply[]>([]);
+  const [replies, setReplies] = useState<AnnotationReply[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Socket events for real-time updates
+  const { 
+    isConnected, 
+    emitAnnotationReply,
+    emitReplyEdit,
+    emitReplyDelete
+  } = useUnifiedSocket({
+    projectId,
+    events: {
+      onAnnotationReplyAdded: (data) => {
+        console.log('💬 Received annotationReplyAdded:', data);
+        if (data.annotationId === annotationId) {
+          setReplies(prev => {
+            // Remove dummy message when a real reply is added
+            const filteredReplies = prev.filter(reply => 
+              !(reply.addedBy === 'system' && reply.content === 'No replies yet. Be the first to respond!')
+            );
+            return [...filteredReplies, data.reply];
+          });
+        }
+      },
+      onReplyEdited: (data) => {
+        console.log('✏️ Received replyEdited:', data);
+        if (data.annotationId === annotationId) {
+          setReplies(prev => 
+            prev.map(reply => 
+              reply.id === data.reply.id 
+                ? { ...reply, content: data.reply.content, isEdited: true, updatedAt: data.reply.updatedAt }
+                : reply
+            )
+          );
+        }
+      },
+      onReplyDeleted: (data) => {
+        console.log('🗑️ Received replyDeleted:', data);
+        if (data.annotationId === annotationId) {
+          setReplies(prev => prev.filter(reply => reply.id !== data.replyId));
+        }
+      }
+    }
+  });
+
+  // Fetch replies from API
+  const fetchReplies = useCallback(async () => {
+    if (!annotationId) return;
+    
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch(`/api/annotations/reply?annotationId=${annotationId}`);
+      const result = await response.json();
+      
+      if (result.status === 'success') {
+        setReplies(result.data || []);
+      } else {
+        setError(result.message || 'Failed to fetch replies');
+      }
+    } catch (err) {
+      console.error('Error fetching replies:', err);
+      setError('Failed to fetch replies');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [annotationId]);
+
   // Add a new reply
   const addReply = useCallback(async (content: string) => {
-    setIsLoading(true);
-    setError(null);
+    if (!content.trim() || !annotationId) return;
+
+    const replyData = {
+      annotationId,
+      content: content.trim(),
+      addedBy: currentUser.id,
+      addedByName: currentUser.name,
+      projectId,
+      timestamp: new Date().toISOString()
+    };
 
     try {
-      const response = await fetch('/api/annotations/reply', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          annotationId,
-          content,
-          addedBy: currentUser.role,
-          addedByName: currentUser.name
-        })
-      });
-
-      const data = await response.json();
-
-      if (data.status === 'success') {
-        const newReply: Reply = {
-          id: data.data.id,
-          content: data.data.content,
-          addedBy: data.data.addedBy,
-          addedByName: data.data.addedByName,
-          createdAt: data.data.createdAt,
-          updatedAt: data.data.updatedAt,
-          isEdited: data.data.isEdited || false
-        };
-
-        setReplies(prev => [...prev, newReply]);
-        onReplyUpdate?.(replies.concat(newReply));
-        return newReply;
-      } else {
-        throw new Error(data.message || 'Failed to add reply');
+      // Send via socket for real-time updates
+      const socketSuccess = emitAnnotationReply(replyData);
+      
+      if (!socketSuccess) {
+        console.warn('Socket not connected, falling back to API');
+        // Fallback to API if socket is not connected
+        const response = await fetch('/api/annotations/reply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(replyData)
+        });
+        
+        const result = await response.json();
+        if (result.status === 'success') {
+          setReplies(prev => [...prev, result.data]);
+        }
       }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to add reply';
-      setError(errorMessage);
-      throw new Error(errorMessage);
-    } finally {
-      setIsLoading(false);
+    } catch (error) {
+      console.error('Error adding reply:', error);
+      setError('Failed to add reply');
     }
-  }, [annotationId, currentUser, onReplyUpdate, replies]);
+  }, [annotationId, currentUser, projectId, emitAnnotationReply]);
 
-  // Edit an existing reply
+  // Edit a reply
   const editReply = useCallback(async (replyId: string, newContent: string) => {
-    setIsLoading(true);
-    setError(null);
+    if (!newContent.trim()) return;
+
+    const editData = {
+      annotationId,
+      replyId,
+      content: newContent.trim(),
+      addedBy: currentUser.id,
+      projectId,
+      timestamp: new Date().toISOString()
+    };
 
     try {
-      const response = await fetch(`/api/annotations/reply/${replyId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content: newContent,
-          updatedBy: currentUser.role,
-          updatedByName: currentUser.name
-        })
-      });
-
-      const data = await response.json();
-
-      if (data.status === 'success') {
-        const updatedReply: Reply = {
-          id: data.data.id,
-          content: data.data.content,
-          addedBy: data.data.addedBy,
-          addedByName: data.data.addedByName,
-          createdAt: data.data.createdAt,
-          updatedAt: data.data.updatedAt,
-          isEdited: data.data.isEdited || false
-        };
-
-        setReplies(prev => prev.map(reply => 
-          reply.id === replyId ? updatedReply : reply
-        ));
+      // Send via socket for real-time updates
+      const socketSuccess = emitReplyEdit(editData);
+      
+      if (!socketSuccess) {
+        console.warn('Socket not connected, falling back to API');
+        // Fallback to API if socket is not connected
+        const response = await fetch('/api/annotations/reply', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(editData)
+        });
         
-        const updatedReplies = replies.map(reply => 
-          reply.id === replyId ? updatedReply : reply
-        );
-        onReplyUpdate?.(updatedReplies);
-        
-        return updatedReply;
-      } else {
-        throw new Error(data.message || 'Failed to edit reply');
+        const result = await response.json();
+        if (result.status === 'success') {
+          setReplies(prev => 
+            prev.map(reply => 
+              reply.id === replyId 
+                ? { ...reply, content: newContent, isEdited: true, updatedAt: new Date().toISOString() }
+                : reply
+            )
+          );
+        }
       }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to edit reply';
-      setError(errorMessage);
-      throw new Error(errorMessage);
-    } finally {
-      setIsLoading(false);
+    } catch (error) {
+      console.error('Error editing reply:', error);
+      setError('Failed to edit reply');
     }
-  }, [currentUser, onReplyUpdate, replies]);
+  }, [annotationId, currentUser, projectId, emitReplyEdit]);
 
   // Delete a reply
   const deleteReply = useCallback(async (replyId: string) => {
-    setIsLoading(true);
-    setError(null);
+    const deleteData = {
+      annotationId,
+      replyId,
+      addedBy: currentUser.id,
+      projectId,
+      timestamp: new Date().toISOString()
+    };
 
     try {
-      const response = await fetch(`/api/annotations/reply/${replyId}`, {
-        method: 'DELETE'
-      });
-
-      const data = await response.json();
-
-      if (data.status === 'success') {
-        setReplies(prev => prev.filter(reply => reply.id !== replyId));
+      // Send via socket for real-time updates
+      const socketSuccess = emitReplyDelete(deleteData);
+      
+      if (!socketSuccess) {
+        console.warn('Socket not connected, falling back to API');
+        // Fallback to API if socket is not connected
+        const response = await fetch('/api/annotations/reply', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(deleteData)
+        });
         
-        const updatedReplies = replies.filter(reply => reply.id !== replyId);
-        onReplyUpdate?.(updatedReplies);
-        
-        return true;
-      } else {
-        throw new Error(data.message || 'Failed to delete reply');
+        const result = await response.json();
+        if (result.status === 'success') {
+          setReplies(prev => prev.filter(reply => reply.id !== replyId));
+        }
       }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to delete reply';
-      setError(errorMessage);
-      throw new Error(errorMessage);
-    } finally {
-      setIsLoading(false);
+    } catch (error) {
+      console.error('Error deleting reply:', error);
+      setError('Failed to delete reply');
     }
-  }, [onReplyUpdate, replies]);
+  }, [annotationId, currentUser, projectId, emitReplyDelete]);
 
-  // Check if user can edit/delete a reply
-  const canModifyReply = useCallback((reply: Reply) => {
-    return reply.addedBy === currentUser.role || 
-           reply.addedBy === currentUser.id || 
-           currentUser.role === 'Admin';
-  }, [currentUser]);
-
-  // Get reply count
-  const replyCount = replies.length;
-
-  // Get latest reply
-  const latestReply = replies.length > 0 ? replies[replies.length - 1] : null;
-
-  // Check if there are unread replies (for notifications)
-  const hasUnreadReplies = useCallback((lastReadTimestamp?: string) => {
-    if (!lastReadTimestamp) return replies.length > 0;
-    
-    return replies.some(reply => 
-      new Date(reply.createdAt) > new Date(lastReadTimestamp)
-    );
-  }, [replies]);
+  // Load replies on mount
+  useEffect(() => {
+    fetchReplies();
+  }, [fetchReplies]);
 
   return {
     replies,
     isLoading,
     error,
+    isConnected,
     addReply,
     editReply,
     deleteReply,
-    canModifyReply,
-    replyCount,
-    latestReply,
-    hasUnreadReplies,
-    setReplies
+    refetch: fetchReplies
   };
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/db'
-import { projects, clients, users, reviews, elements, comments, approvals, settings, annotations } from '@/db/schema'
+import { projects, clients, users, reviews, elements, comments, approvals, settings, annotations, annotationReplies } from '@/db/schema'
 import { eq, and, or, like, desc, asc, count } from 'drizzle-orm';
 
 // POST - Add new annotation
@@ -68,6 +68,31 @@ export async function POST(req: NextRequest) {
     
     console.log('Annotations POST - Annotation created:', annotation);
 
+    // Create a dummy message for the annotation conversation
+    try {
+      const { annotationReplies } = await import('@/db/schema');
+      
+      console.log('📝 Creating dummy message for annotation:', annotation.id);
+      
+      // Add dummy message: "No replies yet. Be the first to respond!"
+      const [dummyReply] = await db.insert(annotationReplies).values({
+        annotationId: annotation.id,
+        projectId: annotation.projectId,
+        content: "No replies yet. Be the first to respond!",
+        addedBy: "system",
+        addedByName: "System",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }).returning();
+      
+      console.log('📝 Created dummy message for annotation:', dummyReply);
+      console.log('📝 Dummy message ID:', dummyReply?.id);
+      console.log('📝 Dummy message content:', dummyReply?.content);
+    } catch (error) {
+      console.log("❌ Error creating dummy message:", error);
+      console.log("❌ Error details:", error.message);
+    }
+
     // Emit socket event for real-time updates
     try {
       const { getSocketServer } = await import('@/lib/socket-server');
@@ -86,7 +111,9 @@ export async function POST(req: NextRequest) {
           isResolved: annotation.isResolved,
           status: annotation.status,
           createdAt: annotation.createdAt,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          // Include dummy message in the annotation data
+          hasDummyMessage: true
         });
         console.log('✅ Socket event emitted successfully');
       } else {
@@ -145,21 +172,36 @@ export async function GET(req: NextRequest) {
       .where(eq(annotations.projectId, projectId))
       .orderBy(desc(annotations.createdAt));
 
-    // Parse coordinates for each annotation
-    const annotationsWithCoordinates = annotationsList.map((annotation: any) => ({
-      ...annotation,
-      x: annotation.coordinates
-        ? JSON.parse(annotation.coordinates).x
-        : undefined,
-      y: annotation.coordinates
-        ? JSON.parse(annotation.coordinates).y
-        : undefined,
-    }));
+    // Fetch replies for each annotation
+    const annotationsWithReplies = await Promise.all(
+      annotationsList.map(async (annotation: any) => {
+        // Fetch replies for this annotation
+        const replies = await db
+          .select()
+          .from(annotationReplies)
+          .where(eq(annotationReplies.annotationId, annotation.id))
+          .orderBy(asc(annotationReplies.createdAt));
+
+        return {
+          ...annotation,
+          x: annotation.coordinates
+            ? JSON.parse(annotation.coordinates).x
+            : undefined,
+          y: annotation.coordinates
+            ? JSON.parse(annotation.coordinates).y
+            : undefined,
+          replies: replies
+        };
+      })
+    );
+
+    console.log('📝 Fetched annotations with replies:', annotationsWithReplies.length);
+    console.log('📝 Sample annotation with replies:', annotationsWithReplies[0]);
 
     return NextResponse.json({
       status: "success",
       message: "Annotations retrieved successfully",
-      data: annotationsWithCoordinates,
+      data: annotationsWithReplies,
     });
   } catch (error) {
     console.error("Annotation fetch error:", error);

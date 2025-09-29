@@ -359,8 +359,8 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
   useEffect(() => {
     if (params.projectId) {
       const newSocket = io(process.env.NODE_ENV === 'production' 
-        ? 'https://preview.devnstage.xyz'
-        : 'https://preview.devnstage.xyz', {
+        ? 'http://localhost:3000'
+        : 'http://localhost:3000', {
         path: "/api/socketio",
         transports: ["websocket", "polling"],
       });
