@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Card,
   CardContent,
@@ -78,6 +79,7 @@ interface ProjectEditPageProps {
 }
 
 export default function ProjectEditPage({ params }: ProjectEditPageProps) {
+  const router = useRouter();
   const { toast } = useToast();
   const [project, setProject] = useState<Project | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -327,8 +329,7 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
           title: "Project Updated",
           description: "Project has been updated successfully!",
         });
-        // Optionally redirect back to projects list
-        // window.location.href = '/admin/projects'
+        router.push("/admin/projects");
       } else {
         toast({
           title: "Update Error",
