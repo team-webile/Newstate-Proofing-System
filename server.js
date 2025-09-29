@@ -25,18 +25,34 @@ app.prepare().then(() => {
   });
 
   // Create Socket.IO server
-  const allowedOrigins = process.env.NEXT_PUBLIC_APP_URL 
-    ? [process.env.NEXT_PUBLIC_APP_URL, process.env.NEXT_PUBLIC_APP_URL.replace('https://', 'https://www.')]
-    : ['https://preview.devnstage.xyz', 'http://127.0.0.1:3000'];
+  const allowedOrigins = [
+    'https://preview.devnstage.xyz',
+    'https://www.preview.devnstage.xyz',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3001'
+  ];
+  
+  // Add environment-specific origins
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    allowedOrigins.push(process.env.NEXT_PUBLIC_APP_URL);
+    if (process.env.NEXT_PUBLIC_APP_URL.includes('preview.devnstage.xyz')) {
+      allowedOrigins.push('https://www.preview.devnstage.xyz');
+    }
+  }
     
   const io = new Server(server, {
     cors: {
       origin: allowedOrigins,
       methods: ['GET', 'POST', 'PUT', 'DELETE'],
-      credentials: true
+      credentials: true,
+      allowedHeaders: ['Content-Type', 'Authorization']
     },
     transports: ['websocket', 'polling'],
-    allowEIO3: true
+    allowEIO3: true,
+    pingTimeout: 60000,
+    pingInterval: 25000
   });
 
   // Socket.IO event handlers
