@@ -168,9 +168,7 @@ export default function ClientReviewPage({ params }: ReviewPageProps) {
 
   // Initialize Socket.io connection
   useEffect(() => {
-    const newSocket = io(process.env.NODE_ENV === 'production' 
-      ? 'http://localhost:3000'
-      : 'http://localhost:3000', {
+    const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000', {
       path: "/api/socketio",
       transports: ["websocket", "polling"],
     });

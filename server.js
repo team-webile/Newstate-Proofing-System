@@ -27,19 +27,20 @@ app.prepare().then(() => {
   // Create Socket.IO server
   const allowedOrigins = [
     'http://localhost:3000',
-    'https://www.preview.devnstage.xyz',
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    'http://localhost:3001',
-    'http://127.0.0.1:3001'
   ];
   
   // Add environment-specific origins
   if (process.env.NEXT_PUBLIC_APP_URL) {
     allowedOrigins.push(process.env.NEXT_PUBLIC_APP_URL);
-    if (process.env.NEXT_PUBLIC_APP_URL.includes('preview.devnstage.xyz')) {
-      allowedOrigins.push('https://www.preview.devnstage.xyz');
-    }
+  }
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    allowedOrigins.push(process.env.NEXT_PUBLIC_API_URL); 
+  }
+  if (process.env.NEXT_PUBLIC_SOCKET_URL) {
+    allowedOrigins.push(process.env.NEXT_PUBLIC_SOCKET_URL);
+  }
+  if (process.env.NEXT_PUBLIC_BASE_URL) {
+    allowedOrigins.push(process.env.NEXT_PUBLIC_BASE_URL);
   }
     
   const io = new Server(server, {
