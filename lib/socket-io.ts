@@ -11,19 +11,19 @@ class SocketManager {
       return this.socket;
     }
 
-    this.socket = io(
-      process.env.NODE_ENV === 'production' 
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 
+      (process.env.NODE_ENV === 'production' 
         ? 'https://preview.devnstage.xyz'
-        : 'http://localhost:3000',
-      {
-        transports: ["websocket", "polling"],
-        autoConnect: true,
-        reconnection: true,
-        reconnectionAttempts: this.maxReconnectAttempts,
-        reconnectionDelay: this.reconnectDelay,
-        forceNew: true,
-      }
-    );
+        : 'http://localhost:3000');
+    
+    this.socket = io(socketUrl, {
+      transports: ["websocket", "polling"],
+      autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: this.maxReconnectAttempts,
+      reconnectionDelay: this.reconnectDelay,
+      forceNew: true,
+    });
 
     // Connection event handlers
     this.socket.on("connect", () => {

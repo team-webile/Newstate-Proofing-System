@@ -4,7 +4,7 @@ const next = require('next');
 const { Server } = require('socket.io');
 
 const dev = process.env.NODE_ENV !== 'production';
-const hostname = 'localhost';
+const hostname = process.env.HOSTNAME || (dev ? 'localhost' : '0.0.0.0');
 const port = process.env.PORT || 3000;
 
 // Create Next.js app
@@ -28,11 +28,13 @@ app.prepare().then(() => {
   const io = new Server(server, {
     cors: {
       origin: process.env.NODE_ENV === 'production' 
-        ? 'https://preview.devnstage.xyz'
-        : 'http://localhost:3000',
-      methods: ['GET', 'POST']
+        ? ['https://preview.devnstage.xyz', 'https://www.preview.devnstage.xyz']
+        : ['http://localhost:3000', 'http://127.0.0.1:3000'],
+      methods: ['GET', 'POST', 'PUT', 'DELETE'],
+      credentials: true
     },
-    transports: ['websocket', 'polling']
+    transports: ['websocket', 'polling'],
+    allowEIO3: true
   });
 
   // Socket.IO event handlers
@@ -177,9 +179,11 @@ app.prepare().then(() => {
   });
 
   // Start server
-  server.listen(port, (err) => {
+  server.listen(port, hostname, (err) => {
     if (err) throw err;
     console.log(`🚀 Server running on http://${hostname}:${port}`);
     console.log(`🔌 Socket.IO server running on the same port`);
+    console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
+    console.log(`🔗 CORS Origins: ${process.env.NODE_ENV === 'production' ? 'https://preview.devnstage.xyz' : 'http://localhost:3000'}`);
   });
 });
