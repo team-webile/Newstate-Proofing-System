@@ -28,6 +28,7 @@ import {
 // import ImageAnnotation from "@/components/ImageAnnotation"
 import { useRealtimeComments } from "@/hooks/use-realtime-comments";
 import { useUnifiedSocket } from '@/hooks/use-unified-socket';
+import { RealtimeImageAnnotation } from '@/components/RealtimeImageAnnotation';
 import {
   Dialog,
   DialogContent,

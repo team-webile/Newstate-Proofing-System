@@ -33,8 +33,9 @@ export function useUnifiedSocket({
   useEffect(() => {
     if (!autoConnect || !projectId) return;
 
-    const socketUrl =
-      process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3000";
+    const socketUrl = process.env.NODE_ENV === 'production' 
+      ? 'https://preview.devnstage.xyz'
+      : 'http://localhost:3000';
     const newSocket = io(socketUrl, {
       transports: ["websocket", "polling"],
       autoConnect: true,

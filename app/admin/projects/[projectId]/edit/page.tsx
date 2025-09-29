@@ -26,6 +26,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { useToast } from "@/hooks/use-toast"
 
 interface Client {
   id: string
@@ -64,6 +65,8 @@ interface ProjectEditPageProps {
 }
 
 export default function ProjectEditPage({ params }: ProjectEditPageProps) {
+  const { toast } = useToast()
+
   const [project, setProject] = useState<Project | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [showFileDialog, setShowFileDialog] = useState(false)
@@ -183,13 +186,25 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
           files: [...prev.files, uploadedFile]
         } : null)
         
-        alert('File uploaded successfully!')
+        toast({
+          title: "Success",
+          description: "File uploaded successfully!",
+          variant: "default"
+        })
       } else {
-        alert(`Error: ${data.message}`)
+        toast({
+          title: "Error",
+          description: data.message || 'Failed to upload file',
+          variant: "destructive"
+        })
       }
     } catch (error) {
       console.error('Upload error:', error)
-      alert('Failed to upload file. Please try again.')
+      toast({
+        title: "Error",
+        description: "Failed to upload file. Please try again.",
+        variant: "destructive"
+      })
     } finally {
       setIsUploading(false)
       setNewFile(null)
@@ -205,7 +220,11 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
       const fileToDelete = project.files.find(file => file.id === fileId)
       
       if (!fileToDelete) {
-        alert('File not found')
+        toast({
+          title: "Error",
+          description: "File not found",
+          variant: "destructive"
+        })
         return
       }
       
@@ -213,7 +232,11 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
       const fileName = fileToDelete.url.split('/').pop()
       
       if (!fileName) {
-        alert('Invalid file name')
+        toast({
+          title: "Error",
+          description: "Invalid file name",
+          variant: "destructive"
+        })
         return
       }
       
@@ -230,13 +253,25 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
           ...prev,
           files: prev.files.filter(file => file.id !== fileId)
         } : null)
-        alert('File deleted successfully!')
+        toast({
+          title: "Success",
+          description: "File deleted successfully!",
+          variant: "default"
+        })
       } else {
-        alert(`Error: ${data.message}`)
+        toast({
+          title: "Error",
+          description: data.message || 'Failed to delete file',
+          variant: "destructive"
+        })
       }
     } catch (error) {
       console.error('Delete error:', error)
-      alert('Failed to delete file. Please try again.')
+      toast({
+        title: "Error",
+        description: "Failed to delete file. Please try again.",
+        variant: "destructive"
+      })
     }
   }
 
@@ -264,15 +299,27 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
       const data = await response.json()
       
       if (data.status === 'success') {
-        alert("Project updated successfully!")
+        toast({
+          title: "Success",
+          description: "Project updated successfully!",
+          variant: "default"
+        })
         // Optionally redirect back to projects list
         // window.location.href = '/admin/projects'
       } else {
-        alert(`Error: ${data.message || 'Failed to update project'}`)
+        toast({
+          title: "Error",
+          description: data.message || 'Failed to update project',
+          variant: "destructive"
+        })
       }
     } catch (error) {
       console.error('Error updating project:', error)
-      alert('Failed to update project. Please try again.')
+      toast({
+        title: "Error",
+        description: "Failed to update project. Please try again.",
+        variant: "destructive"
+      })
     } finally {
       setIsSaving(false)
     }
@@ -287,7 +334,11 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
       setTimeout(() => setIsCopied(false), 2000) // Reset after 2 seconds
     } catch (error) {
       console.error('Failed to copy:', error)
-      alert("Failed to copy link. Please try again.")
+      toast({
+        title: "Error",
+        description: "Failed to copy link. Please try again.",
+        variant: "destructive"
+      })
     }
   }
 

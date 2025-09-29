@@ -69,7 +69,9 @@ export function useRealtimeAnnotations(
     }
 
     const socketUrl =
-      process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3000";
+      process.env.NODE_ENV === 'production' 
+        ? 'https://preview.devnstage.xyz'
+        : 'http://localhost:3000';
     const newSocket = io(socketUrl, {
       transports: ["websocket", "polling"],
       autoConnect: false, // Don't auto-connect during build

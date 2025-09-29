@@ -61,7 +61,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   useEffect(() => {
     // Initialize socket connection
     const newSocket = io(process.env.NODE_ENV === 'production' 
-      ? process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+      ? 'https://preview.devnstage.xyz'
       : 'http://localhost:3000', {
       transports: ['websocket', 'polling'],
       timeout: 20000,

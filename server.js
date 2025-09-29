@@ -27,7 +27,9 @@ app.prepare().then(() => {
   // Create Socket.IO server
   const io = new Server(server, {
     cors: {
-      origin: process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000',
+      origin: process.env.NODE_ENV === 'production' 
+        ? 'https://preview.devnstage.xyz'
+        : 'http://localhost:3000',
       methods: ['GET', 'POST']
     },
     transports: ['websocket', 'polling']
