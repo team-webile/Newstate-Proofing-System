@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 
 export async function GET(
   request: NextRequest,
@@ -9,31 +11,7 @@ export async function GET(
     const { elementId } = await params
 
     // Fetch element with all related data
-    const element = await prisma.element.findUnique({
-      where: { id: elementId },
-      include: {
-        versions: {
-          orderBy: { version: 'desc' }
-        },
-        comments: {
-          include: {
-            replies: {
-              orderBy: { createdAt: 'asc' }
-            }
-          },
-          orderBy: { createdAt: 'desc' }
-        },
-        review: {
-          include: {
-            project: {
-              include: {
-                client: true
-              }
-            }
-          }
-        }
-      }
-    })
+    const element = await db.element.select().from(table).where(eq(table.id, id))
 
     if (!element) {
       return NextResponse.json(
@@ -83,7 +61,7 @@ export async function PATCH(
     }
 
     // Update element status
-    const updatedElement = await prisma.element.update({
+    const updatedElement = await db.element.update({
       where: { id: elementId },
       data: { status },
       include: {

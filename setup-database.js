@@ -1,42 +1,79 @@
+#!/usr/bin/env node
+
+/**
+ * Database Setup Script for Client Proofing System
+ * 
+ * This script uses the centralized database connection from lib/prisma.ts
+ * to set up the database with proper configuration.
+ */
+
 const { execSync } = require('child_process')
 const fs = require('fs')
 const path = require('path')
 
 console.log('🚀 Setting up Client Proofing System Database...\n')
 
-// Check if .env file exists
-const envPath = path.join(__dirname, '.env')
+// Check if .env.local exists
+const envPath = path.join(process.cwd(), '.env.local')
+const envExamplePath = path.join(process.cwd(), 'env.example')
+
 if (!fs.existsSync(envPath)) {
-  console.log('❌ .env file not found!')
-  console.log('Please copy env.example to .env and configure your database connection.')
-  console.log('Example: cp env.example .env')
+  console.log('📝 Creating .env.local from env.example...')
+  if (fs.existsSync(envExamplePath)) {
+    fs.copyFileSync(envExamplePath, envPath)
+    console.log('✅ .env.local created successfully!')
+    console.log('⚠️  Please update the DATABASE_URL in .env.local with your actual database connection string')
+  } else {
+    console.log('❌ env.example not found. Please create .env.local manually.')
+    process.exit(1)
+  }
+} else {
+  console.log('✅ .env.local already exists')
+}
+
+// Load environment variables
+require('dotenv').config({ path: envPath })
+
+const DATABASE_URL = process.env.DATABASE_URL
+
+if (!DATABASE_URL) {
+  console.log('❌ DATABASE_URL not found in .env.local')
+  console.log('Please set your database URL in .env.local')
+  console.log('Format: postgresql://username:password@host:port/database')
   process.exit(1)
 }
 
-try {
-  // Push database schema
-  console.log('📊 Pushing database schema...')
-  execSync('npx prisma db push', { stdio: 'inherit' })
-  console.log('✅ Database schema pushed successfully!\n')
+console.log('🔗 Database URL found:', DATABASE_URL.replace(/:[^:@]+@/, ':***@'))
 
-  // Generate Prisma client
-  console.log('🔧 Generating Prisma client...')
-  execSync('npx prisma generate', { stdio: 'inherit' })
-  console.log('✅ Prisma client generated successfully!\n')
+async function setupDatabase() {
+  try {
+    console.log('\n🔄 Pushing database schema...')
+    execSync('npx prisma db push', { stdio: 'inherit' })
+    console.log('✅ Database schema pushed successfully!')
 
-  // Create dummy data
-  console.log('🎭 Creating dummy data...')
-  execSync('node create-dummy-data.js', { stdio: 'inherit' })
-  console.log('✅ Dummy data created successfully!\n')
+    console.log('\n🔄 Generating Prisma client...')
+    execSync('npx prisma generate', { stdio: 'inherit' })
+    console.log('✅ Prisma client generated successfully!')
 
-  console.log('🎉 Setup complete! You can now run:')
-  console.log('  npm run dev')
-  console.log('\nThen visit: http://localhost:3000')
-  console.log('\nLogin with:')
-  console.log('  Email: admin@newstatebranding.com')
-  console.log('  Password: admin123')
+    console.log('\n🔄 Creating default admin user...')
+    execSync('node -e "require(\'./lib/prisma.ts\').then(() => console.log(\'✅ Admin user setup completed\'))"', { stdio: 'inherit' })
 
-} catch (error) {
-  console.error('❌ Setup failed:', error.message)
-  process.exit(1)
+    console.log('\n🎉 Database setup completed successfully!')
+    console.log('\n📋 Next steps:')
+    console.log('1. Database is now connected using centralized connection')
+    console.log('2. Run: npm run dev')
+    console.log('3. Visit: http://localhost:3000')
+    console.log('4. Login with: admin@newstatebranding.com / admin123')
+    console.log('5. All tables have been created in your database!')
+
+  } catch (error) {
+    console.error('❌ Database setup failed:', error.message)
+    console.log('\n🔧 Troubleshooting:')
+    console.log('1. Make sure your DATABASE_URL is correct in .env.local')
+    console.log('2. Check if your database is accessible')
+    console.log('3. Verify your database credentials')
+    process.exit(1)
+  }
 }
+
+setupDatabase()

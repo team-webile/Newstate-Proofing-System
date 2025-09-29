@@ -1,134 +1,81 @@
-import { Comment as PrismaComment, CommentType, CommentStatus } from '@prisma/client';
-import { prisma } from '@/lib/prisma';
+import { db } from '@/db';
+import { comments, elements } from '@/db/schema';
+import { eq } from 'drizzle-orm';
 
 export interface CreateCommentData {
+  type?: 'GENERAL' | 'ANNOTATION' | 'APPROVAL_REQUEST' | 'ADMIN_REPLY';
+  status?: 'ACTIVE' | 'RESOLVED' | 'ARCHIVED';
+  elementId: string;
   commentText: string;
   coordinates?: string;
-  type?: CommentType;
-  status?: CommentStatus;
-  elementId: string;
   userName: string;
   parentId?: string;
 }
 
 export interface UpdateCommentData {
+  type?: 'GENERAL' | 'ANNOTATION' | 'APPROVAL_REQUEST' | 'ADMIN_REPLY';
+  status?: 'ACTIVE' | 'RESOLVED' | 'ARCHIVED';
   commentText?: string;
   coordinates?: string;
-  type?: CommentType;
-  status?: CommentStatus;
   userName?: string;
-  parentId?: string;
 }
 
 export class CommentModel {
-  static async create(data: CreateCommentData): Promise<any> {
-    return await prisma.comment.create({
-      data: data as any,
-    });
+  static async create(data: CreateCommentData) {
+    const [comment] = await db.insert(comments).values(data).returning();
+    return comment;
   }
 
-  static async findById(id: string): Promise<PrismaComment | null> {
-    return await prisma.comment.findUnique({
-      where: { id },
-    });
+  static async findById(id: string) {
+    const [comment] = await db
+      .select({
+        id: comments.id,
+        type: comments.type,
+        status: comments.status,
+        createdAt: comments.createdAt,
+        updatedAt: comments.updatedAt,
+        elementId: comments.elementId,
+        commentText: comments.commentText,
+        coordinates: comments.coordinates,
+        userName: comments.userName,
+        parentId: comments.parentId,
+        element: elements,
+      })
+      .from(comments)
+      .leftJoin(elements, eq(comments.elementId, elements.id))
+      .where(eq(comments.id, id));
+    
+    return comment || null;
   }
 
-  static async findByElementId(elementId: string): Promise<any[]> {
-    return await prisma.comment.findMany({
-      where: { 
-        elementId,
-        parentId: null // Only get top-level comments
-      } as any,
-      include: {
-        replies: {
-          orderBy: { createdAt: 'asc' },
-        },
-      } as any,
-      orderBy: { createdAt: 'desc' },
-    });
+  static async update(id: string, data: UpdateCommentData) {
+    const [comment] = await db
+      .update(comments)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(comments.id, id))
+      .returning();
+    
+    return comment;
   }
 
-  static async update(id: string, data: UpdateCommentData): Promise<PrismaComment> {
-    return await prisma.comment.update({
-      where: { id },
-      data,
-    });
+  static async delete(id: string) {
+    const [comment] = await db.delete(comments).where(eq(comments.id, id)).returning();
+    return comment;
   }
 
-  static async delete(id: string): Promise<PrismaComment> {
-    return await prisma.comment.delete({
-      where: { id },
-    });
+  static async findByElementId(elementId: string) {
+    return await db
+      .select()
+      .from(comments)
+      .where(eq(comments.elementId, elementId))
+      .orderBy(comments.createdAt);
   }
 
-  static async updateStatus(id: string, status: CommentStatus): Promise<PrismaComment> {
-    return await prisma.comment.update({
-      where: { id },
-      data: { status },
-    });
-  }
-
-  static async findByType(type: CommentType): Promise<PrismaComment[]> {
-    return await prisma.comment.findMany({
-      where: { type },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        element: {
-          include: {
-            review: {
-              include: {
-                project: true,
-              },
-            },
-          },
-        },
-      },
-    });
-  }
-
-  static async findAll(): Promise<any[]> {
-    return await prisma.comment.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: {
-        element: {
-          include: {
-            review: {
-              include: {
-                project: true,
-              },
-            },
-          },
-        },
-        replies: {
-          orderBy: { createdAt: 'asc' },
-        },
-      } as any,
-    });
-  }
-
-  static async createReply(parentId: string, data: Omit<CreateCommentData, 'parentId'>): Promise<any> {
-    return await prisma.comment.create({
-      data: {
-        ...data,
-        parentId,
-      } as any,
-    });
-  }
-
-  static async getCommentsWithReplies(elementId: string): Promise<any[]> {
-    return await prisma.comment.findMany({
-      where: { 
-        elementId,
-        parentId: null 
-      } as any,
-      include: {
-        replies: {
-          orderBy: { createdAt: 'asc' },
-        },
-      } as any,
-      orderBy: { createdAt: 'desc' },
-    });
+  static async findReplies(parentId: string) {
+    return await db
+      .select()
+      .from(comments)
+      .where(eq(comments.parentId, parentId))
+      .orderBy(comments.createdAt);
   }
 }
-
-export { CommentType, CommentStatus };

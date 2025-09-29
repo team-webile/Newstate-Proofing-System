@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { writeFile, mkdir, unlink, readdir, stat } from 'fs/promises'
 import { join } from 'path'
-import { v4 as uuidv4 } from 'uuid'
-import { prisma } from '@/lib/prisma'
+import { randomUUID } from 'crypto'
+import { db } from '@/db'
+import { projects } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 
 // POST - Upload file to project
 export async function POST(
@@ -23,9 +25,7 @@ export async function POST(
     }
 
     // Verify project exists
-    const project = await prisma.project.findUnique({
-      where: { id: projectId }
-    })
+    const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
 
     if (!project) {
       return NextResponse.json({
@@ -40,7 +40,7 @@ export async function POST(
 
     // Generate unique filename
     const fileExtension = file.name.split('.').pop()
-    const filename = `${uuidv4()}.${fileExtension}`
+    const filename = `${randomUUID()}.${fileExtension}`
     const filePath = join(uploadDir, filename)
 
     // Save file
@@ -49,16 +49,15 @@ export async function POST(
     await writeFile(filePath, buffer)
 
     // Update project's lastActivity
-    await prisma.project.update({
-      where: { id: projectId },
-      data: { lastActivity: new Date() }
-    })
+    await db.update(projects)
+      .set({ lastActivity: new Date() })
+      .where(eq(projects.id, projectId))
 
     return NextResponse.json({
       status: 'success',
       message: 'File uploaded successfully',
       data: {
-        id: uuidv4(),
+        id: randomUUID(),
         name: file.name,
         url: `/uploads/projects/${projectId}/versions/${version}/${filename}`,
         type: file.type,
@@ -85,9 +84,7 @@ export async function GET(
     const { id: projectId } = await params
 
     // Verify project exists
-    const project = await prisma.project.findUnique({
-      where: { id: projectId }
-    })
+    const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
 
     if (!project) {
       return NextResponse.json({
@@ -224,9 +221,7 @@ export async function DELETE(
     }
 
     // Verify project exists
-    const project = await prisma.project.findUnique({
-      where: { id: projectId }
-    })
+    const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
 
     if (!project) {
       return NextResponse.json({
@@ -256,10 +251,9 @@ export async function DELETE(
     }
 
     // Update project's lastActivity
-    await prisma.project.update({
-      where: { id: projectId },
-      data: { lastActivity: new Date() }
-    })
+    await db.update(projects)
+      .set({ lastActivity: new Date() })
+      .where(eq(projects.id, projectId))
 
     return NextResponse.json({
       status: 'success',

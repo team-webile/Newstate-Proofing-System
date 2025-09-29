@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 import { withAuth, AuthUser } from '@/lib/auth'
 import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
@@ -19,7 +21,7 @@ async function handler(req: NextRequest, user: AuthUser) {
     }
 
     // Verify element exists and user has access
-    const element = await prisma.element.findFirst({
+    const element = await db.element.findFirst({
       where: { 
         id: elementId,
         review: {
@@ -38,7 +40,7 @@ async function handler(req: NextRequest, user: AuthUser) {
     }
 
     // Get next version number
-    const latestVersion = await prisma.elementVersion.findFirst({
+    const latestVersion = await db.elementVersion.findFirst({
       where: { elementId },
       orderBy: { version: 'desc' }
     })
@@ -60,7 +62,7 @@ async function handler(req: NextRequest, user: AuthUser) {
     await writeFile(filePath, buffer)
 
     // Save version to database
-    const version = await prisma.elementVersion.create({
+    const version = await db.elementVersion.create({
       data: {
         version: nextVersion,
         filename: file.name,

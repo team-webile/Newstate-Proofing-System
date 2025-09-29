@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 
 // POST - Add new comment
 export async function POST(req: NextRequest) {
@@ -24,7 +26,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify element exists and belongs to project
-    const element = await prisma.element.findFirst({
+    const element = await db.element.findFirst({
       where: {
         id: elementId,
         review: {
@@ -41,7 +43,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Create comment
-    const comment = await prisma.comment.create({
+    const comment = await db.comment.create({
       data: {
         elementId,
         commentText,
@@ -116,7 +118,7 @@ export async function GET(req: NextRequest) {
       where.elementId = elementId
     }
 
-    const comments = await prisma.comment.findMany({
+    const comments = await db.comment.findMany({
       where,
       include: {
         element: {

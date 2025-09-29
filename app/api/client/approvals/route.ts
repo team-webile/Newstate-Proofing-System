@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 
 // Extend global to include io
 declare global {
@@ -47,13 +49,13 @@ export async function POST(req: NextRequest) {
       approvalData.projectId = data.projectId
     }
     
-    const approval = await prisma.approval.create({
+    const approval = await db.approval.create({
       data: approvalData
     })
 
     // Update element status if it's an element approval
     if (data.type === 'ELEMENT' && data.elementId) {
-      await prisma.element.update({
+      await db.element.update({
         where: { id: data.elementId },
         data: { status: 'APPROVED' }
       })
@@ -61,16 +63,7 @@ export async function POST(req: NextRequest) {
       // Get project ID for Socket.IO emission
       let projectId: string | null = null
       try {
-        const elementWithProject = await prisma.element.findUnique({
-          where: { id: data.elementId },
-          include: {
-            review: {
-              include: {
-                project: true
-              }
-            }
-          }
-        })
+        const elementWithProject = await db.element.select().from(table).where(eq(table.id, id))
         
         if (elementWithProject?.review?.project) {
           projectId = elementWithProject.review.project.id

@@ -1,124 +1,87 @@
-import { Review as PrismaReview, ReviewStatus } from '@prisma/client';
-import { prisma } from '@/lib/prisma';
+import { db } from '@/db';
+import { reviews, projects } from '@/db/schema';
+import { eq } from 'drizzle-orm';
 
 export interface CreateReviewData {
-  reviewName: string;
   description?: string;
-  status?: ReviewStatus;
+  status?: 'PENDING' | 'IN_PROGRESS' | 'APPROVED' | 'REJECTED';
   projectId: string;
+  reviewName: string;
   shareLink: string;
-  updatedAt: Date;
 }
 
 export interface UpdateReviewData {
-  reviewName?: string;
   description?: string;
-  status?: ReviewStatus;
+  status?: 'PENDING' | 'IN_PROGRESS' | 'APPROVED' | 'REJECTED';
+  reviewName?: string;
 }
 
 export class ReviewModel {
-  static async create(data: CreateReviewData): Promise<PrismaReview> {
-    return await prisma.review.create({
-      data,
-    });
+  static async create(data: CreateReviewData) {
+    const [review] = await db.insert(reviews).values(data).returning();
+    return review;
   }
 
-  static async findById(id: string): Promise<PrismaReview | null> {
-    return await prisma.review.findUnique({
-      where: { id },
-    });
+  static async findById(id: string) {
+    const [review] = await db
+      .select({
+        id: reviews.id,
+        description: reviews.description,
+        status: reviews.status,
+        createdAt: reviews.createdAt,
+        updatedAt: reviews.updatedAt,
+        projectId: reviews.projectId,
+        reviewName: reviews.reviewName,
+        shareLink: reviews.shareLink,
+        project: projects,
+      })
+      .from(reviews)
+      .leftJoin(projects, eq(reviews.projectId, projects.id))
+      .where(eq(reviews.id, id));
+    
+    return review || null;
   }
 
-  static async findByProjectId(projectId: string): Promise<PrismaReview[]> {
-    return await prisma.review.findMany({
-      where: { projectId },
-      orderBy: { createdAt: 'desc' },
-    });
+  static async findByShareLink(shareLink: string) {
+    const [review] = await db
+      .select({
+        id: reviews.id,
+        description: reviews.description,
+        status: reviews.status,
+        createdAt: reviews.createdAt,
+        updatedAt: reviews.updatedAt,
+        projectId: reviews.projectId,
+        reviewName: reviews.reviewName,
+        shareLink: reviews.shareLink,
+        project: projects,
+      })
+      .from(reviews)
+      .leftJoin(projects, eq(reviews.projectId, projects.id))
+      .where(eq(reviews.shareLink, shareLink));
+    
+    return review || null;
   }
 
-  static async findByProjectIdFirst(projectId: string): Promise<PrismaReview | null> {
-    return await prisma.review.findFirst({
-      where: { projectId },
-      orderBy: { createdAt: 'desc' },
-    });
+  static async update(id: string, data: UpdateReviewData) {
+    const [review] = await db
+      .update(reviews)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(reviews.id, id))
+      .returning();
+    
+    return review;
   }
 
-  static async update(id: string, data: UpdateReviewData): Promise<PrismaReview> {
-    return await prisma.review.update({
-      where: { id },
-      data,
-    });
+  static async delete(id: string) {
+    const [review] = await db.delete(reviews).where(eq(reviews.id, id)).returning();
+    return review;
   }
 
-  static async delete(id: string): Promise<PrismaReview> {
-    return await prisma.review.delete({
-      where: { id },
-    });
-  }
-
-  static async findWithElements(id: string): Promise<PrismaReview | null> {
-    return await prisma.review.findUnique({
-      where: { id },
-      include: {
-        project: true,
-        elements: {
-          include: {
-            versions: true,
-            comments: true,
-            approvals: true,
-          },
-          orderBy: { createdAt: 'desc' },
-        },
-      },
-    });
-  }
-
-  static async updateStatus(id: string, status: ReviewStatus): Promise<PrismaReview> {
-    return await prisma.review.update({
-      where: { id },
-      data: { status },
-    });
-  }
-
-  static async findAll(): Promise<PrismaReview[]> {
-    return await prisma.review.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: {
-        project: true,
-        _count: {
-          select: {
-            elements: true,
-          },
-        },
-      },
-    });
-  }
-
-  static async findByShareLink(shareLink: string): Promise<any> {
-    return await prisma.review.findUnique({
-      where: { shareLink },
-      include: {
-        project: {
-          include: {
-            user: true,
-          },
-        },
-        elements: {
-          include: {
-            versions: {
-              orderBy: { version: 'desc' },
-            },
-            comments: {
-              where: { status: 'ACTIVE' },
-              orderBy: { createdAt: 'desc' },
-            },
-            approvals: true,
-          },
-          orderBy: { createdAt: 'desc' },
-        },
-      },
-    });
+  static async findByProjectId(projectId: string) {
+    return await db
+      .select()
+      .from(reviews)
+      .where(eq(reviews.projectId, projectId))
+      .orderBy(reviews.createdAt);
   }
 }
-
-export { ReviewStatus };

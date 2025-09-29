@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings, annotations } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 
 export async function GET(
   req: NextRequest,
@@ -10,6 +12,8 @@ export async function GET(
     const { searchParams } = new URL(req.url)
     const clientId = searchParams.get('clientId')
 
+    console.log('Client project API - projectId:', projectId, 'clientId:', clientId)
+
     if (!clientId) {
       return NextResponse.json({
         status: 'error',
@@ -17,19 +21,34 @@ export async function GET(
       }, { status: 400 })
     }
 
-    // Find project with client verification
-    const project = await prisma.project.findFirst({
-      where: {
-        id: projectId,
-        clientId: clientId
-      },
-      include: {
-        client: true,
-        user: true,
-        approvals: true,
-        annotations: true
-      }
-    })
+    // Find project with client verification using Drizzle
+    const [project] = await db
+      .select({
+        id: projects.id,
+        title: projects.title,
+        description: projects.description,
+        status: projects.status,
+        createdAt: projects.createdAt,
+        updatedAt: projects.updatedAt,
+        lastActivity: projects.lastActivity,
+        downloadEnabled: projects.downloadEnabled,
+        emailNotifications: projects.emailNotifications,
+        clientId: projects.clientId,
+        userId: projects.userId,
+        clientName: clients.name,
+        clientEmail: clients.email,
+        userName: users.name,
+        userEmail: users.email
+      })
+      .from(projects)
+      .leftJoin(clients, eq(projects.clientId, clients.id))
+      .leftJoin(users, eq(projects.userId, users.id))
+      .where(and(
+        eq(projects.id, projectId),
+        eq(projects.clientId, clientId)
+      ))
+
+    console.log('Project found:', project)
 
     if (!project) {
       return NextResponse.json({
@@ -37,6 +56,24 @@ export async function GET(
         message: 'Project not found or access denied'
       }, { status: 404 })
     }
+
+    // Get approvals for this project
+    const projectApprovals = await db
+      .select()
+      .from(approvals)
+      .where(eq(approvals.projectId, projectId))
+      .orderBy(desc(approvals.approvedAt))
+
+    console.log('Approvals found:', projectApprovals.length)
+
+    // Get annotations for this project
+    const projectAnnotations = await db
+      .select()
+      .from(annotations)
+      .where(eq(annotations.projectId, projectId))
+      .orderBy(desc(annotations.createdAt))
+
+    console.log('Annotations found:', projectAnnotations.length)
 
     // Transform project data for client
     const clientProject = {
@@ -46,16 +83,26 @@ export async function GET(
       status: project.status,
       createdAt: project.createdAt,
       updatedAt: project.updatedAt,
-      lastActivity: project.updatedAt, // Use updatedAt as lastActivity
-      client: project.client,
-      user: project.user,
+      lastActivity: project.lastActivity,
+      client: {
+        id: project.clientId,
+        name: project.clientName,
+        email: project.clientEmail
+      },
+      user: {
+        id: project.userId,
+        name: project.userName,
+        email: project.userEmail
+      },
       files: [], // No projectVersions in current schema
-      approvals: project.approvals,
-      annotations: project.annotations,
+      approvals: projectApprovals,
+      annotations: projectAnnotations,
       downloadEnabled: project.downloadEnabled,
       emailNotifications: project.emailNotifications,
       publicLink: `/client/${clientId}?project=${projectId}` // Add public link
     }
+
+    console.log('Returning client project:', clientProject)
 
     return NextResponse.json({
       status: 'success',
@@ -65,9 +112,12 @@ export async function GET(
 
   } catch (error) {
     console.error('Client project fetch error:', error)
+    console.error('Error details:', error.message)
+    console.error('Error stack:', error.stack)
     return NextResponse.json({
       status: 'error',
-      message: 'Failed to fetch project'
+      message: 'Failed to fetch project',
+      error: error.message
     }, { status: 500 })
   }
 }

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
-import { ElementModel } from '@/models/Element'
-import { ReviewModel } from '@/models/Review'
-import { prisma } from '@/lib/prisma'
 
 export async function POST(req: NextRequest) {
   try {
@@ -99,16 +99,14 @@ export async function POST(req: NextRequest) {
     // Create element versions
     console.log('Creating element versions')
     for (const version of versions) {
-      await prisma.elementVersion.create({
-        data: {
+      await db.insert(elementVersion).values({
           elementId: element.id,
           version: version.version,
           filename: version.filename,
           filePath: version.filePath,
           fileSize: version.fileSize,
           mimeType: version.mimeType
-        }
-      })
+        })
     }
     console.log('Created all versions')
 

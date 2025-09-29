@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 
 export async function GET(req: NextRequest) {
   try {
-    const reviews = await prisma.review.findMany({
+    const reviews = await db.review.findMany({
       select: {
         id: true,
         reviewName: true,

@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { NextRequest, NextResponse } from 'next/server'
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm';
 
 export async function PUT(
   req: NextRequest,
@@ -20,16 +22,14 @@ export async function PUT(
     }
 
     // Update review status
-    const review = await prisma.review.update({
-      where: { id },
-      data: {
+    const [review] = await db
+      .update(reviews)
+      .set({
         status,
         updatedAt: new Date(),
-      },
-      include: {
-        project: true,
-      },
-    });
+      })
+      .where(eq(reviews.id, id))
+      .returning();
 
     // Emit socket event for real-time updates
     try {

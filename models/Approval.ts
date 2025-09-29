@@ -1,8 +1,9 @@
-import { Approval as PrismaApproval, ApprovalType } from '@prisma/client';
-import { prisma } from '@/lib/prisma';
+import { db } from '@/db';
+import { approvals, elements, projects } from '@/db/schema';
+import { eq } from 'drizzle-orm';
 
 export interface CreateApprovalData {
-  type: ApprovalType;
+  type: 'ELEMENT' | 'PROJECT';
   elementId?: string;
   projectId?: string;
   signature: string;
@@ -10,87 +11,65 @@ export interface CreateApprovalData {
 }
 
 export interface UpdateApprovalData {
-  type?: ApprovalType;
   signature?: string;
   userName?: string;
 }
 
 export class ApprovalModel {
-  static async create(data: CreateApprovalData): Promise<PrismaApproval> {
-    return await prisma.approval.create({
-      data,
-    });
+  static async create(data: CreateApprovalData) {
+    const [approval] = await db.insert(approvals).values(data).returning();
+    return approval;
   }
 
-  static async findById(id: string): Promise<PrismaApproval | null> {
-    return await prisma.approval.findUnique({
-      where: { id },
-    });
+  static async findById(id: string) {
+    const [approval] = await db
+      .select({
+        id: approvals.id,
+        type: approvals.type,
+        elementId: approvals.elementId,
+        projectId: approvals.projectId,
+        approvedAt: approvals.approvedAt,
+        signature: approvals.signature,
+        userName: approvals.userName,
+        element: elements,
+        project: projects,
+      })
+      .from(approvals)
+      .leftJoin(elements, eq(approvals.elementId, elements.id))
+      .leftJoin(projects, eq(approvals.projectId, projects.id))
+      .where(eq(approvals.id, id));
+    
+    return approval || null;
   }
 
-  static async findByElementId(elementId: string): Promise<PrismaApproval[]> {
-    return await prisma.approval.findMany({
-      where: { elementId },
-      orderBy: { createdAt: 'desc' },
-    });
+  static async update(id: string, data: UpdateApprovalData) {
+    const [approval] = await db
+      .update(approvals)
+      .set(data)
+      .where(eq(approvals.id, id))
+      .returning();
+    
+    return approval;
   }
 
-  static async findByProjectId(projectId: string): Promise<PrismaApproval[]> {
-    return await prisma.approval.findMany({
-      where: { projectId },
-      orderBy: { createdAt: 'desc' },
-    });
+  static async delete(id: string) {
+    const [approval] = await db.delete(approvals).where(eq(approvals.id, id)).returning();
+    return approval;
   }
 
-  static async update(id: string, data: UpdateApprovalData): Promise<PrismaApproval> {
-    return await prisma.approval.update({
-      where: { id },
-      data,
-    });
+  static async findByElementId(elementId: string) {
+    return await db
+      .select()
+      .from(approvals)
+      .where(eq(approvals.elementId, elementId))
+      .orderBy(approvals.approvedAt);
   }
 
-  static async delete(id: string): Promise<PrismaApproval> {
-    return await prisma.approval.delete({
-      where: { id },
-    });
-  }
-
-  static async findByType(type: ApprovalType): Promise<PrismaApproval[]> {
-    return await prisma.approval.findMany({
-      where: { type },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        element: {
-          include: {
-            review: {
-              include: {
-                project: true,
-              },
-            },
-          },
-        },
-        project: true,
-      },
-    });
-  }
-
-  static async findAll(): Promise<PrismaApproval[]> {
-    return await prisma.approval.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: {
-        element: {
-          include: {
-            review: {
-              include: {
-                project: true,
-              },
-            },
-          },
-        },
-        project: true,
-      },
-    });
+  static async findByProjectId(projectId: string) {
+    return await db
+      .select()
+      .from(approvals)
+      .where(eq(approvals.projectId, projectId))
+      .orderBy(approvals.approvedAt);
   }
 }
-
-export { ApprovalType };

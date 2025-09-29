@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { CommentModel } from '@/models/Comment'
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 import { withAuth } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
 
 // Extend global to include io
 declare global {
@@ -55,16 +56,7 @@ export const POST = withAuth(async (req: NextRequest) => {
     let projectId: string | null = null
     try {
       // Fetch the element with its review and project data
-      const elementWithProject = await prisma.element.findUnique({
-        where: { id: comment.elementId },
-        include: {
-          review: {
-            include: {
-              project: true
-            }
-          }
-        }
-      })
+      const elementWithProject = await db.element.select().from(table).where(eq(table.id, id))
       
       if (elementWithProject?.review?.project) {
         projectId = elementWithProject.review.project.id
@@ -132,16 +124,7 @@ export const PUT = withAuth(async (req: NextRequest) => {
     // Get project ID for Socket.IO emission
     let projectId: string | null = null
     try {
-      const elementWithProject = await prisma.element.findUnique({
-        where: { id: comment.elementId },
-        include: {
-          review: {
-            include: {
-              project: true
-            }
-          }
-        }
-      })
+      const elementWithProject = await db.element.select().from(table).where(eq(table.id, id))
       
       if (elementWithProject?.review?.project) {
         projectId = elementWithProject.review.project.id
@@ -194,16 +177,7 @@ export const DELETE = withAuth(async (req: NextRequest) => {
     // Get project ID for Socket.IO emission
     let projectId: string | null = null
     try {
-      const elementWithProject = await prisma.element.findUnique({
-        where: { id: deletedComment.elementId },
-        include: {
-          review: {
-            include: {
-              project: true
-            }
-          }
-        }
-      })
+      const elementWithProject = await db.element.select().from(table).where(eq(table.id, id))
       
       if (elementWithProject?.review?.project) {
         projectId = elementWithProject.review.project.id

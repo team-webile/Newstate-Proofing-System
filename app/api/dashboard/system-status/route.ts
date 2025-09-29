@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 import { withAuth, AuthUser } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
 
 async function handler(req: NextRequest, user: AuthUser) {
   try {
@@ -8,18 +10,21 @@ async function handler(req: NextRequest, user: AuthUser) {
       // Check database connection
       let dbStatus = 'operational'
       try {
-        await prisma.$queryRaw`SELECT 1`
+        await db.select().from(clients).limit(1)
       } catch (error) {
         dbStatus = 'error'
       }
 
       // Check for any critical issues
-      const criticalIssues = await prisma.comment.count({
-        where: {
-          status: 'ACTIVE',
-          type: 'APPROVAL_REQUEST'
-        }
-      })
+      const [criticalIssuesResult] = await db
+        .select({ count: count() })
+        .from(comments)
+        .where(and(
+          eq(comments.status, 'ACTIVE'),
+          eq(comments.type, 'APPROVAL_REQUEST')
+        ))
+
+      const criticalIssues = criticalIssuesResult?.count || 0
 
       // Determine overall system status
       let status: 'operational' | 'warning' | 'error' = 'operational'

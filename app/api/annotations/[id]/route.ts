@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 
 // DELETE /api/annotations/[id]
 export async function DELETE(
@@ -18,7 +18,7 @@ export async function DELETE(
       )
     }
 
-    await prisma.annotation.delete({
+    await db.annotation.delete({
       where: { id }
     })
 

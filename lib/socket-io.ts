@@ -14,7 +14,6 @@ class SocketManager {
     this.socket = io(
       process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3000",
       {
-        path: "/api/socketio",
         transports: ["websocket", "polling"],
         autoConnect: true,
         reconnection: true,

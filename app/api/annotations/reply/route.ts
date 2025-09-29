@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { NextRequest, NextResponse } from 'next/server'
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings, annotations, annotationReplies } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm';
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,10 +24,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify annotation exists
-    const annotation = await prisma.annotation.findUnique({
-      where: { id: annotationId },
-      include: { project: true },
-    });
+    const [annotation] = await db
+      .select()
+      .from(annotations)
+      .where(eq(annotations.id, annotationId));
 
     if (!annotation) {
       return NextResponse.json(
@@ -35,19 +37,44 @@ export async function POST(request: NextRequest) {
     }
 
     // Create the reply in database
-    const reply = await prisma.annotationReply.create({
-      data: {
-        annotationId,
-        projectId: annotation.projectId,
-        content,
-        addedBy,
-        addedByName: addedByName || addedBy,
-      },
-    });
+    const [reply] = await db.insert(annotationReplies).values({
+      annotationId,
+      projectId: annotation.projectId,
+      content,
+      addedBy,
+      addedByName: addedByName || addedBy,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }).returning();
 
     console.log("Reply created successfully:", reply);
 
-    // Socket event will be handled by the socket server when client emits 'addAnnotationReply'
+    // Emit socket event for real-time updates
+    try {
+      const { getSocketServer } = await import('@/lib/socket-server');
+      const io = getSocketServer();
+      
+      if (io) {
+        console.log('📡 Emitting annotationReplyAdded event for project:', annotation.projectId);
+        io.to(`project-${annotation.projectId}`).emit('annotationReplyAdded', {
+          projectId: annotation.projectId,
+          annotationId: annotationId,
+          reply: {
+            id: reply.id,
+            content: reply.content,
+            addedBy: reply.addedBy,
+            addedByName: reply.addedByName,
+            createdAt: reply.createdAt
+          },
+          timestamp: new Date().toISOString()
+        });
+        console.log('✅ Socket event emitted successfully');
+      } else {
+        console.log('⚠️ Socket server not available');
+      }
+    } catch (error) {
+      console.log("Socket emission error:", error);
+    }
 
     return NextResponse.json({
       status: "success",
@@ -59,7 +86,5 @@ export async function POST(request: NextRequest) {
       { status: "error", message: "Failed to create reply" },
       { status: 500 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }

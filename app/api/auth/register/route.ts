@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { UserModel } from '@/models/User'
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 

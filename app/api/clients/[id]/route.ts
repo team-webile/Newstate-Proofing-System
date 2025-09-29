@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ClientModel, UpdateClientData } from '@/models/Client'
-
+import { db } from '@/db'
+import { clients, projects } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 // GET - Get client by ID
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const client = await ClientModel.findById(params.id)
+    const { id } = await params
+    const [client] = await db
+      .select()
+      .from(clients)
+      .where(eq(clients.id, id))
     
     if (!client) {
       return NextResponse.json({
@@ -16,15 +21,18 @@ export async function GET(
       }, { status: 404 })
     }
 
-    // Get client with projects
-    const clientWithProjects = await ClientModel.findWithProjects(params.id)
+    // Get project count for this client
+    const [projectCount] = await db
+      .select({ count: count() })
+      .from(projects)
+      .where(eq(projects.clientId, id))
     
     return NextResponse.json({
       status: 'success',
       data: {
         ...client,
         _count: {
-          projects: clientWithProjects?.projects?.length || 0
+          projects: projectCount?.count || 0
         }
       }
     })
@@ -40,9 +48,10 @@ export async function GET(
 // PUT - Update client
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const body = await req.json()
     const { 
       name, 
@@ -62,7 +71,11 @@ export async function PUT(
     }
 
     // Check if client exists
-    const existingClient = await ClientModel.findById(params.id)
+    const [existingClient] = await db
+      .select()
+      .from(clients)
+      .where(eq(clients.id, id))
+    
     if (!existingClient) {
       return NextResponse.json({
         status: 'error',
@@ -72,7 +85,11 @@ export async function PUT(
 
     // Check if email is being changed and if new email already exists
     if (email !== existingClient.email) {
-      const emailExists = await ClientModel.findByEmail(email)
+      const [emailExists] = await db
+        .select()
+        .from(clients)
+        .where(eq(clients.email, email))
+      
       if (emailExists) {
         return NextResponse.json({
           status: 'error',
@@ -81,16 +98,19 @@ export async function PUT(
       }
     }
 
-    const updateData: UpdateClientData = {
-      name,
-      email,
-      phone,
-      company,
-      address,
-      notes
-    }
-
-    const updatedClient = await ClientModel.update(params.id, updateData)
+    const [updatedClient] = await db
+      .update(clients)
+      .set({
+        name,
+        email,
+        phone,
+        company,
+        address,
+        notes,
+        updatedAt: new Date()
+      })
+      .where(eq(clients.id, id))
+      .returning()
 
     return NextResponse.json({
       status: 'success',
@@ -109,11 +129,17 @@ export async function PUT(
 // DELETE - Delete client
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
+    
     // Check if client exists
-    const existingClient = await ClientModel.findById(params.id)
+    const [existingClient] = await db
+      .select()
+      .from(clients)
+      .where(eq(clients.id, id))
+    
     if (!existingClient) {
       return NextResponse.json({
         status: 'error',
@@ -121,7 +147,9 @@ export async function DELETE(
       }, { status: 404 })
     }
 
-    await ClientModel.delete(params.id)
+    await db
+      .delete(clients)
+      .where(eq(clients.id, id))
 
     return NextResponse.json({
       status: 'success',

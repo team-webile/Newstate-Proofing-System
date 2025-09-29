@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { LogoutButton } from "@/components/logout-button"
 import { Eye, MessageSquare, PenTool, ArrowLeft, Plus, X, MapPin, CheckCircle, AlertCircle, Download, Upload, FileText, MessageCircle } from "lucide-react"
-import io from 'socket.io-client'
+import { useUnifiedSocket } from '@/hooks/use-unified-socket'
 import { useRouter } from 'next/navigation'
 import {
   Select,
@@ -140,7 +140,6 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
   const [showAnnotationPanel, setShowAnnotationPanel] = useState(false)
   const [showAnnotationPopup, setShowAnnotationPopup] = useState(false)
   const [popupPosition, setPopupPosition] = useState<{x: number, y: number} | null>(null)
-  const [socket, setSocket] = useState<any>(null)
   const [currentUser, setCurrentUser] = useState<User | null>({
     id: 'admin-1',
     name: 'Admin User',
@@ -161,7 +160,6 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
   const [approvalComment, setApprovalComment] = useState("")
   const [showDownloadDialog, setShowDownloadDialog] = useState(false)
   const [downloadFormat, setDownloadFormat] = useState<'zip' | 'individual'>('zip')
-  const [isConnected, setIsConnected] = useState(false)
   const [lastUpdate, setLastUpdate] = useState<string | null>(null)
   const [showAnnotationChat, setShowAnnotationChat] = useState(false)
   const [selectedAnnotationChat, setSelectedAnnotationChat] = useState<Annotation | null>(null)
@@ -473,36 +471,21 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
     fetchData()
   }, [params.projectId])
 
-  // Initialize Socket.io
-  useEffect(() => {
-    if (params.projectId) {
-      const newSocket = io('http://localhost:3000', {
-        path: '/api/socketio',
-        transports: ['websocket', 'polling']
-      })
-      
-      setSocket(newSocket)
-      
-      // Handle connection status
-      newSocket.on('connect', () => {
-        console.log('Socket connected')
-        setIsConnected(true)
-      })
-      
-      newSocket.on('disconnect', () => {
-        console.log('Socket disconnected')
-        setIsConnected(false)
-      })
-      
-      // Join project room
-      newSocket.emit('join-project', params.projectId)
-      
-      // Listen for annotation updates
-      newSocket.on('annotationAdded', (data: { fileId: string, annotation: string, timestamp: string, addedBy?: string, addedByName?: string, x?: number, y?: number }) => {
+  // Initialize unified socket
+  const {
+    isConnected,
+    emitAnnotation,
+    emitAnnotationReply,
+    emitAnnotationStatusChange,
+    emitProjectStatusChange
+  } = useUnifiedSocket({
+    projectId: params.projectId,
+    events: {
+      onAnnotationAdded: (data) => {
         console.log('🔔 Admin received annotationAdded event:', data)
         const newAnnotation: Annotation = {
           id: Date.now().toString(),
-          content: data.annotation,
+          content: data.annotation || data.content,
           fileId: data.fileId,
           addedBy: data.addedBy || 'Unknown',
           addedByName: data.addedByName || 'Unknown',
@@ -520,8 +503,8 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
         const senderName = data.addedByName || data.addedBy || 'Unknown'
         const isFromAdmin = senderName.includes('Admin') || senderName === 'Admin User'
         const messageText = isFromAdmin 
-          ? `You sent: "${data.annotation}"`
-          : `Received from ${senderName}: "${data.annotation}"`
+          ? `You sent: "${data.annotation || data.content}"`
+          : `Received from ${senderName}: "${data.annotation || data.content}"`
         
         setChatMessages(prev => [...prev, {
           id: Date.now().toString(),
@@ -539,38 +522,21 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
             id: Date.now().toString(),
             type: 'annotation',
             title: 'New Annotation Added',
-            message: `${senderName} added a new annotation: "${data.annotation}"`,
+            message: `${senderName} added a new annotation: "${data.annotation || data.content}"`,
             timestamp: data.timestamp,
             fileId: data.fileId,
             x: data.x,
             y: data.y
           }
-          setNotifications(prev => [notification, ...prev.slice(0, 9)]) // Keep only last 10 notifications
+          setNotifications(prev => [notification, ...prev.slice(0, 9)])
         }
-      })
-      
-      // Listen for status changes
-      newSocket.on('statusChanged', (data: { status: string, message: string, timestamp: string }) => {
-        setChatMessages(prev => [...prev, {
-          id: Date.now().toString(),
-          type: 'status',
-          message: data.message,
-          timestamp: data.timestamp
-        }])
-        setLastUpdate(data.timestamp)
-      })
-      
-      // Listen for annotation replies
-      newSocket.on('annotationReplyAdded', (data: any) => {
+      },
+      onAnnotationReplyAdded: (data) => {
         console.log('🔔 Admin received annotation reply via socket:', data)
-        console.log('Current project ID:', params.projectId)
-        console.log('Selected annotation ID:', selectedAnnotation?.id)
-        console.log('Data annotation ID:', data.annotationId)
         
         // Handle different data structures
         let newReply;
         if (data.reply && typeof data.reply === 'object') {
-          // New structure: data.reply is an object
           newReply = {
             id: data.reply.id || Date.now().toString(),
             content: data.reply.content || 'Reply content',
@@ -579,7 +545,6 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
             createdAt: data.reply.createdAt || new Date().toISOString()
           };
         } else {
-          // Fallback structure: data.reply might be a string or missing
           newReply = {
             id: Date.now().toString(),
             content: data.reply || 'Reply content',
@@ -588,8 +553,6 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
             createdAt: data.timestamp || new Date().toISOString()
           };
         }
-        
-        console.log('🔔 Admin processed newReply:', newReply);
         
         setAnnotations(prev => prev.map(annotation => 
           annotation.id === data.annotationId 
@@ -602,7 +565,6 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
         
         // Update selectedAnnotationChat if it's the same annotation
         if (selectedAnnotationChat && selectedAnnotationChat.id === data.annotationId) {
-          console.log('🔄 Admin: Updating selectedAnnotationChat with new reply:', newReply);
           setSelectedAnnotationChat(prev => {
             if (!prev) return prev;
             return {
@@ -611,12 +573,10 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
             };
           });
           
-          // Auto-scroll to bottom when receiving new reply
           setTimeout(() => {
             scrollToBottom();
           }, 100);
         } else {
-          // Show visual notification for new reply from client (when chat is not open)
           const isFromClient = newReply.addedBy === 'Client' || newReply.addedByName === 'Client';
           if (isFromClient) {
             const notification = {
@@ -643,10 +603,8 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
           isFromAdmin: newReply.addedBy === 'admin-1'
         }])
         setLastUpdate(data.timestamp)
-      })
-      
-      // Listen for annotation status updates
-      newSocket.on('annotationStatusUpdated', (data: { annotationId: string, status: string, updatedBy?: string, updatedByName?: string, timestamp: string }) => {
+      },
+      onAnnotationStatusUpdated: (data) => {
         setAnnotations(prev => prev.map(annotation => 
           annotation.id === data.annotationId 
             ? { 
@@ -657,7 +615,6 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
             : annotation
         ))
         
-        // Add to chat messages
         const senderName = data.updatedByName || data.updatedBy || 'Unknown'
         setChatMessages(prev => [...prev, {
           id: Date.now().toString(),
@@ -669,66 +626,10 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
           isFromAdmin: data.updatedBy === 'admin-1'
         }])
         setLastUpdate(data.timestamp)
-      })
-      
-      // Listen for annotation assignments
-      newSocket.on('annotationAssigned', (data: { annotationId: string, assignedTo: string, assignedByName?: string, assignedBy?: string, timestamp: string }) => {
-        setAnnotations(prev => prev.map(annotation => 
-          annotation.id === data.annotationId 
-            ? { 
-                ...annotation, 
-                assignedTo: data.assignedTo
-              }
-            : annotation
-        ))
-        
-        // Add to chat messages
-        const senderName = data.assignedByName || data.assignedBy || 'Unknown'
-        setChatMessages(prev => [...prev, {
-          id: Date.now().toString(),
-          type: 'status',
-          message: `Annotation assigned to ${data.assignedTo} by ${senderName}`,
-          timestamp: data.timestamp,
-          addedBy: data.assignedBy,
-          senderName: senderName,
-          isFromAdmin: data.assignedBy === 'admin-1'
-        }])
-        setLastUpdate(data.timestamp)
-      })
-      
-      // Listen for annotation resolved events
-      newSocket.on('annotationResolved', (data: { annotationId: string, resolvedBy?: string, resolvedByName?: string, timestamp: string }) => {
-        setAnnotations(prev => prev.map(annotation => 
-          annotation.id === data.annotationId 
-            ? { 
-                ...annotation, 
-                status: 'COMPLETED',
-                isResolved: true,
-                resolvedBy: data.resolvedBy,
-                resolvedAt: data.timestamp
-              }
-            : annotation
-        ))
-        
-        // Add to chat messages
-        const senderName = data.resolvedByName || data.resolvedBy || 'Unknown'
-        setChatMessages(prev => [...prev, {
-          id: Date.now().toString(),
-          type: 'status',
-          message: `Annotation resolved by ${senderName}`,
-          timestamp: data.timestamp,
-          addedBy: data.resolvedBy,
-          senderName: senderName,
-          isFromAdmin: data.resolvedBy === 'admin-1'
-        }])
-        setLastUpdate(data.timestamp)
-      })
-      
-      // Listen for project status changes
-      newSocket.on('projectStatusChanged', (data: { status: string, message: string, timestamp: string, changedBy?: string, changedByName?: string }) => {
+      },
+      onProjectStatusChanged: (data) => {
         setProject(prev => prev ? { ...prev, status: data.status as any } : prev)
         
-        // Add to chat messages
         const senderName = data.changedByName || data.changedBy || 'Unknown'
         setChatMessages(prev => [...prev, {
           id: Date.now().toString(),
@@ -740,34 +641,9 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
           isFromAdmin: data.changedBy === 'admin-1'
         }])
         setLastUpdate(data.timestamp)
-      })
-      
-      // Listen for file uploads
-      newSocket.on('fileUploaded', (data: { fileId: string, fileName: string, timestamp: string, uploadedBy?: string, uploadedByName?: string }) => {
-        // Refresh files list
-        fetchProjectFiles()
-        
-        // Add to chat messages
-        const senderName = data.uploadedByName || data.uploadedBy || 'Unknown'
-        setChatMessages(prev => [...prev, {
-          id: Date.now().toString(),
-          type: 'status',
-          message: `File uploaded: ${data.fileName} by ${senderName}`,
-          timestamp: data.timestamp,
-          addedBy: data.uploadedBy,
-          senderName: senderName,
-          isFromAdmin: data.uploadedBy === 'admin-1'
-        }])
-        setLastUpdate(data.timestamp)
-      })
-      
-      
-      return () => {
-        newSocket.emit('leave-project', params.projectId)
-        newSocket.close()
       }
     }
-  }, [params.projectId])
+  })
 
   const addAnnotation = async () => {
     if (!newAnnotation.trim() || !selectedFile) return
@@ -823,18 +699,16 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
         }])
         
         // Emit to Socket.io for real-time updates
-        if (socket && params.projectId) {
-          socket.emit('addAnnotation', {
-            projectId: params.projectId,
-            fileId: selectedFile.id,
-            annotation: newAnnotation,
-            addedBy: currentUser.role,
-            addedByName: currentUser.name,
-            x: popupPosition?.x,
-            y: popupPosition?.y,
-            timestamp: new Date().toISOString()
-          })
-        }
+        emitAnnotation({
+          projectId: params.projectId,
+          fileId: selectedFile.id,
+          annotation: newAnnotation,
+          addedBy: currentUser.role,
+          addedByName: currentUser.name,
+          x: popupPosition?.x,
+          y: popupPosition?.y,
+          timestamp: new Date().toISOString()
+        })
         
         setNewAnnotation("")
         setShowAnnotationPopup(false)
@@ -968,23 +842,14 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
         }])
         
         // Emit to socket
-        if (socket) {
-          console.log('🚀 Emitting addAnnotationReply socket event:', {
-            projectId: params.projectId,
-            annotationId,
-            reply: newReply,
-            addedBy: 'Admin',
-            addedByName: 'Admin User'
-          })
-          socket.emit('addAnnotationReply', {
-            projectId: params.projectId,
-            annotationId,
-            reply: newReply,
-            addedBy: 'Admin',
-            addedByName: 'Admin User',
-            timestamp: new Date().toISOString()
-          })
-        }
+        emitAnnotationReply({
+          projectId: params.projectId,
+          annotationId,
+          reply: newReply,
+          addedBy: 'Admin',
+          addedByName: 'Admin User',
+          timestamp: new Date().toISOString()
+        })
         
         setNewReply('')
         setShowReplyInput(false)
@@ -1051,15 +916,13 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
         }])
         
         // Emit status change to socket
-        if (socket) {
-          socket.emit('annotationStatusChanged', {
-            projectId: params.projectId,
-            annotationId,
-            status,
-            updatedBy: currentUser?.name || 'Admin',
-            updatedByName: currentUser?.name || 'Admin'
-          })
-        }
+        emitAnnotationStatusChange({
+          projectId: params.projectId,
+          annotationId,
+          status,
+          updatedBy: currentUser?.name || 'Admin',
+          updatedByName: currentUser?.name || 'Admin'
+        })
       } else {
         console.error('Failed to update annotation status:', data.message)
         alert('Failed to update annotation status. Please try again.')
@@ -1191,16 +1054,14 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
         }]);
 
         // Emit to socket
-        if (socket) {
-          socket.emit('addAnnotationReply', {
-            projectId: params.projectId,
-            annotationId: selectedAnnotationChat.id,
-            reply: replyText,
-            addedBy: 'Admin',
-            addedByName: 'Admin User',
-            timestamp: new Date().toISOString()
-          });
-        }
+        emitAnnotationReply({
+          projectId: params.projectId,
+          annotationId: selectedAnnotationChat.id,
+          reply: replyText,
+          addedBy: 'Admin',
+          addedByName: 'Admin User',
+          timestamp: new Date().toISOString()
+        });
 
         setReplyText('');
         

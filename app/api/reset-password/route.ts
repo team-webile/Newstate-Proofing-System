@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 
 export async function POST(req: NextRequest) {
@@ -14,9 +16,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Find user by email
-    const user = await prisma.user.findUnique({
-      where: { email }
-    })
+    const user = await db.user.select().from(table).where(eq(table.id, id))
 
     if (!user) {
       return NextResponse.json({
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     const hashedPassword = await bcrypt.hash(newPassword, 10)
 
     // Update user password
-    await prisma.user.update({
+    await db.user.update({
       where: { id: user.id },
       data: { password: hashedPassword }
     })

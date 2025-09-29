@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ProjectModel, CreateProjectData } from '@/models/Project'
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 
 // GET - Get all projects with client information
 export async function GET(req: NextRequest) {
@@ -11,23 +13,97 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get('search') || undefined
     const status = searchParams.get('status') || undefined
     
-    let result
+    const offset = (page - 1) * limit
+    
+    let whereCondition = undefined
+    const conditions = []
+    
     if (clientId) {
-      // Get projects for specific client
-      const projects = await ProjectModel.findByClientId(clientId)
-      result = {
-        projects,
-        total: projects.length,
-        statusCounts: {
-          all: projects.length,
-          active: projects.filter(p => p.status === 'ACTIVE').length,
-          archived: projects.filter(p => p.status === 'ARCHIVED').length,
-          completed: projects.filter(p => p.status === 'COMPLETED').length,
-        }
+      conditions.push(eq(projects.clientId, clientId))
+    }
+    
+    if (status) {
+      conditions.push(eq(projects.status, status as any))
+    }
+    
+    if (search) {
+      conditions.push(
+        or(
+          like(projects.title, `%${search}%`),
+          like(projects.description, `%${search}%`)
+        )
+      )
+    }
+    
+    if (conditions.length > 0) {
+      whereCondition = and(...conditions)
+    }
+    
+    // Get projects with client info
+    const projectsData = await db
+      .select({
+        id: projects.id,
+        title: projects.title,
+        description: projects.description,
+        status: projects.status,
+        createdAt: projects.createdAt,
+        updatedAt: projects.updatedAt,
+        clientId: projects.clientId,
+        userId: projects.userId,
+        downloadEnabled: projects.downloadEnabled,
+        emailNotifications: projects.emailNotifications,
+        lastActivity: projects.lastActivity,
+        clientName: clients.name,
+        clientEmail: clients.email
+      })
+      .from(projects)
+      .leftJoin(clients, eq(projects.clientId, clients.id))
+      .where(whereCondition)
+      .orderBy(desc(projects.createdAt))
+      .limit(limit)
+      .offset(offset)
+    
+    // Get total count
+    const [totalResult] = await db
+      .select({ count: count() })
+      .from(projects)
+      .where(whereCondition)
+    
+    const total = totalResult?.count || 0
+    
+    // Get status counts
+    const [activeCount] = await db
+      .select({ count: count() })
+      .from(projects)
+      .where(and(whereCondition || undefined, eq(projects.status, 'ACTIVE')))
+    
+    const [archivedCount] = await db
+      .select({ count: count() })
+      .from(projects)
+      .where(and(whereCondition || undefined, eq(projects.status, 'ARCHIVED')))
+    
+    const [completedCount] = await db
+      .select({ count: count() })
+      .from(projects)
+      .where(and(whereCondition || undefined, eq(projects.status, 'COMPLETED')))
+    
+    const result = {
+      projects: projectsData,
+      total,
+      statusCounts: {
+        all: total,
+        active: activeCount?.count || 0,
+        archived: archivedCount?.count || 0,
+        completed: completedCount?.count || 0,
+      },
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasNext: page < Math.ceil(total / limit),
+        hasPrev: page > 1
       }
-    } else {
-      // Get all projects with pagination
-      result = await ProjectModel.findWithPagination(page, limit, search, status)
     }
     
     return NextResponse.json({
@@ -69,14 +145,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Get the first available user if no userId provided
-    // In a real app, this would come from authentication
     let adminUserId = userId
     if (!adminUserId) {
       console.log('No userId provided, finding first user...')
-      const { prisma } = await import('@/lib/prisma')
       
       try {
-        const firstUser = await prisma.user.findFirst()
+        const [firstUser] = await db.select().from(users).limit(1)
         console.log('First user found:', firstUser)
         
         if (!firstUser) {
@@ -96,20 +170,32 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const projectData: CreateProjectData = {
+    console.log('Creating project with data:', {
       title,
       description,
       clientId,
       downloadEnabled: downloadEnabled ?? true,
       userId: adminUserId,
       status: (status?.toUpperCase() as any) || 'ACTIVE',
-      emailNotifications: emailNotifications ?? true,
-      themeMode: 'system'
-    }
-
-    console.log('Creating project with data:', projectData)
+      emailNotifications: emailNotifications ?? true
+    })
     
-    const project = await ProjectModel.create(projectData)
+    const [project] = await db
+      .insert(projects)
+      .values({
+        title,
+        description,
+        clientId,
+        userId: adminUserId,
+        downloadEnabled: downloadEnabled ?? true,
+        emailNotifications: emailNotifications ?? true,
+        status: (status?.toUpperCase() as any) || 'ACTIVE',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        lastActivity: new Date()
+      })
+      .returning()
+
     console.log('Project created successfully:', project)
 
     return NextResponse.json({
@@ -126,7 +212,7 @@ export async function POST(req: NextRequest) {
       console.error('Error name:', error.name)
       console.error('Error stack:', error.stack)
       
-      // Check for specific Prisma errors
+      // Check for specific database errors
       if (error.message.includes('Foreign key constraint')) {
         return NextResponse.json({
           status: 'error',

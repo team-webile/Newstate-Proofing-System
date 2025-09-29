@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { NextRequest, NextResponse } from 'next/server'
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm';
 
 export async function PUT(
   req: NextRequest,
@@ -9,18 +11,14 @@ export async function PUT(
     const { id } = params;
 
     // Update annotation as resolved
-    const annotation = await prisma.annotation.update({
-      where: { id },
-      data: {
+    const [annotation] = await db
+      .update(annotations)
+      .set({
         isResolved: true,
         updatedAt: new Date(),
-      },
-      include: {
-        replies: {
-          orderBy: { createdAt: "asc" },
-        },
-      },
-    });
+      })
+      .where(eq(annotations.id, id))
+      .returning();
 
     return NextResponse.json({
       status: "success",

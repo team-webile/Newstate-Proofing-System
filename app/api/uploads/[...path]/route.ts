@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 import { readFile } from 'fs/promises'
 import { join } from 'path'
 

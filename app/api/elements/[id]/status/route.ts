@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 
 // PUT - Update element status
 export async function PUT(
@@ -19,16 +21,7 @@ export async function PUT(
     }
 
     // Find element
-    const element = await prisma.element.findUnique({
-      where: { id },
-      include: {
-        review: {
-          include: {
-            project: true
-          }
-        }
-      }
-    })
+    const element = await db.element.select().from(table).where(eq(table.id, id))
 
     if (!element) {
       return NextResponse.json({
@@ -38,7 +31,7 @@ export async function PUT(
     }
 
     // Update element status
-    const updatedElement = await prisma.element.update({
+    const updatedElement = await db.element.update({
       where: { id },
       data: {
         status: status as any
@@ -47,15 +40,13 @@ export async function PUT(
 
     // Add comment if provided
     if (comment) {
-      await prisma.comment.create({
-        data: {
+      await db.insert(comment).values({
           elementId: id,
           commentText: comment,
           userName: 'System',
           type: 'GENERAL',
           status: 'ACTIVE'
-        }
-      })
+        })
     }
 
     return NextResponse.json({

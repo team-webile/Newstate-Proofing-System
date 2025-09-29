@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings, versions } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 
 // POST - Create new version
 export async function POST(
@@ -19,9 +21,10 @@ export async function POST(
     }
 
     // Verify project exists
-    const project = await prisma.project.findUnique({
-      where: { id: projectId }
-    })
+    const [project] = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.id, projectId))
 
     if (!project) {
       return NextResponse.json({
@@ -31,12 +34,13 @@ export async function POST(
     }
 
     // Check if version already exists
-    const existingVersion = await prisma.version.findFirst({
-      where: {
-        projectId: projectId,
-        version: version
-      }
-    })
+    const [existingVersion] = await db
+      .select()
+      .from(versions)
+      .where(and(
+        eq(versions.projectId, projectId),
+        eq(versions.version, version)
+      ))
 
     if (existingVersion) {
       return NextResponse.json({
@@ -46,14 +50,17 @@ export async function POST(
     }
 
     // Create new version in database
-    const newVersion = await prisma.version.create({
-      data: {
+    const [newVersion] = await db
+      .insert(versions)
+      .values({
         version,
         description: description || '',
         projectId,
-        status: 'DRAFT'
-      }
-    })
+        status: 'DRAFT',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      })
+      .returning()
     
     return NextResponse.json({
       status: 'success',
@@ -79,9 +86,10 @@ export async function GET(
     const { id: projectId } = await params
 
     // Verify project exists
-    const project = await prisma.project.findUnique({
-      where: { id: projectId }
-    })
+    const [project] = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.id, projectId))
 
     if (!project) {
       return NextResponse.json({
@@ -91,27 +99,31 @@ export async function GET(
     }
 
     // Fetch versions from database
-    const versions = await prisma.version.findMany({
-      where: { projectId },
-      orderBy: { createdAt: 'asc' }
-    })
+    const versionsList = await db
+      .select()
+      .from(versions)
+      .where(eq(versions.projectId, projectId))
+      .orderBy(asc(versions.createdAt))
 
     // If no versions exist, create a default V1 version
-    if (versions.length === 0) {
-      const defaultVersion = await prisma.version.create({
-        data: {
+    if (versionsList.length === 0) {
+      const [defaultVersion] = await db
+        .insert(versions)
+        .values({
           version: 'V1',
           description: 'Initial Version',
           projectId,
-          status: 'DRAFT'
-        }
-      })
-      versions.push(defaultVersion)
+          status: 'DRAFT',
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        .returning()
+      versionsList.push(defaultVersion)
     }
 
     return NextResponse.json({
       status: 'success',
-      data: versions
+      data: versionsList
     })
 
   } catch (error) {

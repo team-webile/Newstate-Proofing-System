@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 
 // POST - Approve or reject project/file
 export async function POST(
@@ -29,9 +29,7 @@ export async function POST(
     const approverId = approvedBy || approvedByName || 'Admin'
 
     // Verify project exists
-    const project = await prisma.project.findUnique({
-      where: { id: projectId }
-    })
+    const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
 
     if (!project) {
       return NextResponse.json({
@@ -41,26 +39,23 @@ export async function POST(
     }
 
     // Create approval record
-    const approval = await prisma.approval.create({
-      data: {
-        type: fileId ? 'ELEMENT' : 'PROJECT',
-        projectId: projectId,
-        elementId: fileId,
-        userName: approvedByName || 'Admin User',
-        signature: `${approvedByName || 'Admin User'} - ${action.toUpperCase()}`
-      }
-    })
+    const [approval] = await db.insert(approvals).values({
+      type: fileId ? 'ELEMENT' : 'PROJECT',
+      projectId: projectId,
+      elementId: fileId,
+      userName: approvedByName || 'Admin User',
+      signature: `${approvedByName || 'Admin User'} - ${action.toUpperCase()}`,
+      approvedAt: new Date()
+    }).returning()
 
     // Update project status
     if (!fileId) {
       // Project-level approval
-      await prisma.project.update({
-        where: { id: projectId },
-        data: {
+      await db.update(projects).set({
           status: action === 'approve' ? 'COMPLETED' : 'REJECTED',
-          lastActivity: new Date()
-        }
-      })
+          lastActivity: new Date(),
+          updatedAt: new Date()
+        }).where(eq(projects.id, projectId))
     }
 
     // Emit socket event for real-time updates
@@ -83,8 +78,6 @@ export async function POST(
       status: 'error',
       message: 'Failed to process approval'
     }, { status: 500 })
-  } finally {
-    await prisma.$disconnect()
   }
 }
 
@@ -96,14 +89,11 @@ export async function GET(
   try {
     const { id: projectId } = await params
 
-    const approvals = await prisma.approval.findMany({
-      where: { projectId },
-      orderBy: { approvedAt: 'desc' }
-    })
+    const approvalsList = await db.select().from(approvals).where(eq(approvals.projectId, projectId)).orderBy(desc(approvals.approvedAt))
 
     return NextResponse.json({
       status: 'success',
-      data: approvals
+      data: approvalsList
     })
 
   } catch (error) {
@@ -112,7 +102,5 @@ export async function GET(
       status: 'error',
       message: 'Failed to fetch approvals'
     }, { status: 500 })
-  } finally {
-    await prisma.$disconnect()
   }
 }

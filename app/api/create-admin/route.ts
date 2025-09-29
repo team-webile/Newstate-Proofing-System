@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 
 export async function POST(req: NextRequest) {
   try {
     // Check if admin user already exists
-    const existingAdmin = await prisma.user.findFirst({
-      where: { role: 'ADMIN' }
-    })
+    const [existingAdmin] = await db.select().from(users).where(eq(users.role, 'ADMIN')).limit(1)
 
     if (existingAdmin) {
       return NextResponse.json({
@@ -23,14 +23,12 @@ export async function POST(req: NextRequest) {
     // Create new admin user
     const hashedPassword = await bcrypt.hash('admin123', 10)
     
-    const adminUser = await prisma.user.create({
-      data: {
-        email: 'admin@newstatebranding.com',
-        password: hashedPassword,
-        name: 'Admin User',
-        role: 'ADMIN'
-      }
-    })
+    const [adminUser] = await db.insert(users).values({
+      email: 'admin@newstatebranding.com',
+      password: hashedPassword,
+      name: 'Admin User',
+      role: 'ADMIN'
+    }).returning()
 
     const { password: _, ...userWithoutPassword } = adminUser
 

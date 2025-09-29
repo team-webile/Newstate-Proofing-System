@@ -1,155 +1,68 @@
-import { Element as PrismaElement, ElementStatus } from '@prisma/client';
-import { prisma } from '@/lib/prisma';
+import { db } from '@/db';
+import { elements, reviews } from '@/db/schema';
+import { eq } from 'drizzle-orm';
 
 export interface CreateElementData {
+  status?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'NEEDS_REVISION';
+  reviewId: string;
   elementName: string;
   filePath: string;
-  version: number;
-  status?: ElementStatus;
-  reviewId: string;
-  versions?: Array<{
-    version: number;
-    filename: string;
-    filePath: string;
-    fileSize: number;
-    mimeType: string;
-    createdAt: string;
-  }>;
+  version?: number;
 }
 
 export interface UpdateElementData {
+  status?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'NEEDS_REVISION';
   elementName?: string;
   filePath?: string;
   version?: number;
-  status?: ElementStatus;
 }
 
 export class ElementModel {
-  static async create(data: CreateElementData): Promise<PrismaElement> {
-    return await prisma.element.create({
-      data,
-    });
+  static async create(data: CreateElementData) {
+    const [element] = await db.insert(elements).values(data).returning();
+    return element;
   }
 
-  static async findById(id: string): Promise<PrismaElement | null> {
-    return await prisma.element.findUnique({
-      where: { id },
-    });
+  static async findById(id: string) {
+    const [element] = await db
+      .select({
+        id: elements.id,
+        status: elements.status,
+        createdAt: elements.createdAt,
+        updatedAt: elements.updatedAt,
+        reviewId: elements.reviewId,
+        elementName: elements.elementName,
+        filePath: elements.filePath,
+        version: elements.version,
+        review: reviews,
+      })
+      .from(elements)
+      .leftJoin(reviews, eq(elements.reviewId, reviews.id))
+      .where(eq(elements.id, id));
+    
+    return element || null;
   }
 
-  static async findByReviewId(reviewId: string): Promise<PrismaElement[]> {
-    return await prisma.element.findMany({
-      where: { reviewId },
-      orderBy: { createdAt: 'desc' },
-    });
+  static async update(id: string, data: UpdateElementData) {
+    const [element] = await db
+      .update(elements)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(elements.id, id))
+      .returning();
+    
+    return element;
   }
 
-  static async update(id: string, data: UpdateElementData): Promise<PrismaElement> {
-    return await prisma.element.update({
-      where: { id },
-      data,
-    });
+  static async delete(id: string) {
+    const [element] = await db.delete(elements).where(eq(elements.id, id)).returning();
+    return element;
   }
 
-  static async delete(id: string): Promise<PrismaElement> {
-    return await prisma.element.delete({
-      where: { id },
-    });
-  }
-
-  static async findWithDetails(id: string): Promise<PrismaElement | null> {
-    return await prisma.element.findUnique({
-      where: { id },
-      include: {
-        review: {
-          include: {
-            project: true,
-          },
-        },
-        versions: {
-          orderBy: { version: 'desc' },
-        },
-        comments: {
-          orderBy: { createdAt: 'desc' },
-        },
-        approvals: true,
-      },
-    });
-  }
-
-  static async updateStatus(id: string, status: ElementStatus): Promise<PrismaElement> {
-    return await prisma.element.update({
-      where: { id },
-      data: { status },
-    });
-  }
-
-  static async findAll(): Promise<PrismaElement[]> {
-    return await prisma.element.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: {
-        review: {
-          include: {
-            project: {
-              include: {
-                client: true,
-              },
-            },
-          },
-        },
-        versions: {
-          orderBy: { version: 'desc' },
-        },
-        comments: {
-          orderBy: { createdAt: 'desc' },
-        },
-        approvals: true,
-        _count: {
-          select: {
-            versions: true,
-            comments: true,
-            approvals: true,
-          },
-        },
-      },
-    });
-  }
-
-  static async findByProjectId(projectId: string): Promise<PrismaElement[]> {
-    return await prisma.element.findMany({
-      where: {
-        review: {
-          projectId: projectId,
-        },
-      },
-      include: {
-        review: {
-          include: {
-            project: {
-              include: {
-                client: true,
-              },
-            },
-          },
-        },
-        versions: {
-          orderBy: { version: 'desc' },
-        },
-        comments: {
-          orderBy: { createdAt: 'desc' },
-        },
-        approvals: true,
-        _count: {
-          select: {
-            versions: true,
-            comments: true,
-            approvals: true,
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+  static async findByReviewId(reviewId: string) {
+    return await db
+      .select()
+      .from(elements)
+      .where(eq(elements.reviewId, reviewId))
+      .orderBy(elements.createdAt);
   }
 }
-
-export { ElementStatus };

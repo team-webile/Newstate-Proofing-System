@@ -14,7 +14,6 @@ export function initializeSocketServer() {
     
     // Create Socket.io server
     io = new SocketIOServer({
-      path: '/api/socketio',
       cors: {
         origin: process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000',
         methods: ['GET', 'POST']

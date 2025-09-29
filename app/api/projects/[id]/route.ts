@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ProjectModel, UpdateProjectData } from '@/models/Project'
-import { ProjectStatus } from '@prisma/client'
+import { db } from '@/db'
+import { projects, clients, users } from '@/db/schema'
+import { eq } from 'drizzle-orm'
 
 // PUT - Update project
 export async function PUT(
@@ -12,17 +13,20 @@ export async function PUT(
     const body = await req.json()
     const { title, description, status, downloadEnabled, clientId, emailNotifications } = body
 
-    const updateData: UpdateProjectData = {
-      title,
-      description,
-      status: status as ProjectStatus,
-      downloadEnabled,
-      clientId,
-      emailNotifications,
-      lastActivity: new Date()
-    }
-
-    const project = await ProjectModel.update(id, updateData)
+    const [project] = await db
+      .update(projects)
+      .set({
+        title,
+        description,
+        status: status as any,
+        downloadEnabled,
+        clientId,
+        emailNotifications,
+        lastActivity: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(projects.id, id))
+      .returning()
 
     return NextResponse.json({
       status: 'success',
@@ -45,7 +49,33 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const project = await ProjectModel.findWithDetails(id)
+    
+    const [project] = await db
+      .select({
+        id: projects.id,
+        title: projects.title,
+        description: projects.description,
+        status: projects.status,
+        createdAt: projects.createdAt,
+        updatedAt: projects.updatedAt,
+        userId: projects.userId,
+        clientId: projects.clientId,
+        downloadEnabled: projects.downloadEnabled,
+        emailNotifications: projects.emailNotifications,
+        lastActivity: projects.lastActivity,
+        primaryColor: projects.primaryColor,
+        secondaryColor: projects.secondaryColor,
+        accentColor: projects.accentColor,
+        customCss: projects.customCss,
+        logoUrl: projects.logoUrl,
+        themeMode: projects.themeMode,
+        client: clients,
+        user: users,
+      })
+      .from(projects)
+      .leftJoin(clients, eq(projects.clientId, clients.id))
+      .leftJoin(users, eq(projects.userId, users.id))
+      .where(eq(projects.id, id))
     
     if (!project) {
       return NextResponse.json({
@@ -74,7 +104,10 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    await ProjectModel.delete(id)
+    
+    await db
+      .delete(projects)
+      .where(eq(projects.id, id))
 
     return NextResponse.json({
       status: 'success',

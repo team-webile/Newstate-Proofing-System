@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ClientModel, CreateClientData } from '@/models/Client'
-
+import { db } from '@/db'
+import { clients, projects } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 // GET - Get all clients with pagination
 export async function GET(req: NextRequest) {
   try {
@@ -13,21 +14,43 @@ export async function GET(req: NextRequest) {
     const offset = (page - 1) * limit
     
     // Get paginated clients with search
-    const result = await ClientModel.findWithPagination({
-      page,
-      limit,
-      offset,
-      search
-    })
+    let whereCondition = undefined
+    if (search) {
+      whereCondition = or(
+        like(clients.name, `%${search}%`),
+        like(clients.email, `%${search}%`),
+        like(clients.company, `%${search}%`)
+      )
+    }
+
+    const [clientsResult, totalCount] = await Promise.all([
+      db
+        .select()
+        .from(clients)
+        .where(whereCondition)
+        .limit(limit)
+        .offset(offset)
+        .orderBy(desc(clients.createdAt)),
+      db
+        .select({ count: count() })
+        .from(clients)
+        .where(whereCondition)
+    ])
+
+    const total = totalCount[0]?.count || 0
     
     // Add project count to each client
     const clientsWithCounts = await Promise.all(
-      result.clients.map(async (client) => {
-        const clientWithProjects = await ClientModel.findWithProjects(client.id)
+      clientsResult.map(async (client) => {
+        const [projectCount] = await db
+          .select({ count: count() })
+          .from(projects)
+          .where(eq(projects.clientId, client.id))
+        
         return {
           ...client,
           _count: {
-            projects: clientWithProjects?.projects?.length || 0
+            projects: projectCount?.count || 0
           }
         }
       })
@@ -40,9 +63,9 @@ export async function GET(req: NextRequest) {
         pagination: {
           page,
           limit,
-          total: result.total,
-          totalPages: Math.ceil(result.total / limit),
-          hasNext: page < Math.ceil(result.total / limit),
+          total: total,
+          totalPages: Math.ceil(total / limit),
+          hasNext: page < Math.ceil(total / limit),
           hasPrev: page > 1
         }
       }
@@ -59,7 +82,10 @@ export async function GET(req: NextRequest) {
 // POST - Create new client
 export async function POST(req: NextRequest) {
   try {
+    console.log('POST /api/clients - Starting request')
     const body = await req.json()
+    console.log('POST /api/clients - Request body:', body)
+    
     const { 
       name, 
       email, 
@@ -71,32 +97,44 @@ export async function POST(req: NextRequest) {
 
     // Validate required fields
     if (!name || !email) {
+      console.log('POST /api/clients - Missing required fields')
       return NextResponse.json({
         status: 'error',
         message: 'Client name and email are required'
       }, { status: 400 })
     }
 
+    console.log('POST /api/clients - Checking for existing client')
     // Check if client with this email already exists
-    const existingClient = await ClientModel.findByEmail(email)
+    const [existingClient] = await db
+      .select()
+      .from(clients)
+      .where(eq(clients.email, email))
+    
     if (existingClient) {
+      console.log('POST /api/clients - Client already exists')
       return NextResponse.json({
         status: 'error',
         message: 'Client with this email already exists'
       }, { status: 400 })
     }
 
-    const clientData: CreateClientData = {
-      name,
-      email,
-      phone,
-      company,
-      address,
-      notes
-    }
+    console.log('POST /api/clients - Creating new client')
+    const [client] = await db
+      .insert(clients)
+      .values({
+        name,
+        email,
+        phone,
+        company,
+        address,
+        notes,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      })
+      .returning()
 
-    const client = await ClientModel.create(clientData)
-
+    console.log('POST /api/clients - Client created successfully:', client)
     return NextResponse.json({
       status: 'success',
       message: 'Client created successfully',
@@ -106,7 +144,8 @@ export async function POST(req: NextRequest) {
     console.error('Create client error:', error)
     return NextResponse.json({
       status: 'error',
-      message: 'Failed to create client'
+      message: 'Failed to create client',
+      error: error.message
     }, { status: 500 })
   }
 }

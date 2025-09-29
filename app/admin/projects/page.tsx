@@ -14,7 +14,7 @@ import { useProjects } from "@/lib/use-projects"
 import { ProjectsSkeleton } from "@/components/projects-skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
-import { format } from "date-fns";
+import { format } from "date-fns"
 
 import {
   Pagination,
@@ -41,14 +41,12 @@ export default function ProjectsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage] = useState(6) // Show 6 projects per page
+  const [itemsPerPage] = useState(6)
   const [copiedProjectId, setCopiedProjectId] = useState<string | null>(null)
 
   const { data, loading, error, refreshProjects } = useProjects(currentPage, itemsPerPage, searchTerm, statusFilter)
   const { toast } = useToast()
 
-
-  // Show error state
   if (error) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -76,12 +74,10 @@ export default function ProjectsPage() {
   const total = data?.total || 0
   const statusCounts = data?.statusCounts || { all: 0, active: 0, archived: 0, completed: 0 }
 
-  // Pagination logic
   const totalPages = Math.ceil(total / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
 
-  // Reset to first page when filters change
   const handleSearchChange = (value: string) => {
     setSearchTerm(value)
     setCurrentPage(1)
@@ -164,8 +160,6 @@ export default function ProjectsPage() {
         return <div className="h-4 w-4"><Icons.FolderOpen /></div>
     }
   }
-
-  // Status counts are now provided by the API
 
   return (
     <div className="min-h-screen bg-background">
@@ -300,7 +294,7 @@ export default function ProjectsPage() {
                       <CardDescription className="text-muted-foreground mb-2">{project.description}</CardDescription>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Icons.User />
-                        <span>{project.client.name}</span>
+                        <span>{project.clientName}</span>
                         
                         <span>•</span>
                         <span>{project.lastActivity ? format(new Date(project.lastActivity), "dd MMM yyyy, hh:mm a") : "Unknown"}</span>
@@ -477,3 +471,4 @@ export default function ProjectsPage() {
     </div>
   )
 }
+     

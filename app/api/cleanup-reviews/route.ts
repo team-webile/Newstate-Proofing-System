@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 
 export async function POST(req: NextRequest) {
   try {
     // Find all reviews with duplicate shareLinks
-    const duplicateShareLinks = await prisma.review.groupBy({
+    const duplicateShareLinks = await db.review.groupBy({
       by: ['shareLink'],
       having: {
         shareLink: {
@@ -19,7 +21,7 @@ export async function POST(req: NextRequest) {
 
     // For each duplicate shareLink, keep the first one and update the rest
     for (const duplicate of duplicateShareLinks) {
-      const reviews = await prisma.review.findMany({
+      const reviews = await db.review.findMany({
         where: { shareLink: duplicate.shareLink },
         orderBy: { createdAt: 'asc' }
       })
@@ -27,7 +29,7 @@ export async function POST(req: NextRequest) {
       // Keep the first review, update the rest with unique shareLinks
       for (let i = 1; i < reviews.length; i++) {
         const uniqueShareLink = `${duplicate.shareLink}-${Date.now()}-${i}`
-        await prisma.review.update({
+        await db.review.update({
           where: { id: reviews[i].id },
           data: { shareLink: uniqueShareLink }
         })
@@ -36,7 +38,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Also check for reviews with the same projectId
-    const duplicateProjectIds = await prisma.review.groupBy({
+    const duplicateProjectIds = await db.review.groupBy({
       by: ['projectId'],
       having: {
         projectId: {
@@ -51,7 +53,7 @@ export async function POST(req: NextRequest) {
 
     // For each duplicate projectId, keep the first one and update the rest
     for (const duplicate of duplicateProjectIds) {
-      const reviews = await prisma.review.findMany({
+      const reviews = await db.review.findMany({
         where: { projectId: duplicate.projectId },
         orderBy: { createdAt: 'asc' }
       })
@@ -59,7 +61,7 @@ export async function POST(req: NextRequest) {
       // Keep the first review, update the rest with unique shareLinks
       for (let i = 1; i < reviews.length; i++) {
         const uniqueShareLink = `review-${duplicate.projectId}-${Date.now()}-${i}`
-        await prisma.review.update({
+        await db.review.update({
           where: { id: reviews[i].id },
           data: { shareLink: uniqueShareLink }
         })

@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 // import ImageAnnotation from "@/components/ImageAnnotation"
 import { useRealtimeComments } from "@/hooks/use-realtime-comments";
-import io from "socket.io-client";
+import { useUnifiedSocket } from '@/hooks/use-unified-socket';
 import {
   Dialog,
   DialogContent,
@@ -737,26 +737,14 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         });
 
         // Emit socket event for real-time updates
-        if (socket) {
-          console.log('📡 Emitting addAnnotationReply socket event:', {
-            projectId: params.reviewId,
-            annotationId: targetAnnotation.id,
-            reply: replyText,
-            addedBy: "Client",
-            addedByName: currentUser?.name || "Client",
-            timestamp: new Date().toISOString(),
-          });
-          socket.emit("addAnnotationReply", {
-            projectId: params.reviewId,
-            annotationId: targetAnnotation.id,
-            reply: replyText,
-            addedBy: "Client",
-            addedByName: currentUser?.name || "Client",
-            timestamp: new Date().toISOString(),
-          });
-        } else {
-          console.log('📡 No socket available for emitting addAnnotationReply');
-        }
+        emitAnnotationReply({
+          projectId: params.reviewId,
+          annotationId: targetAnnotation.id,
+          reply: replyText,
+          addedBy: "Client",
+          addedByName: currentUser?.name || "Client",
+          timestamp: new Date().toISOString(),
+        });
 
         setReplyText("");
 
@@ -900,51 +888,21 @@ export default function ReviewPage({ params }: ReviewPageProps) {
     (a) => a.fileId === currentFile
   );
 
-  // Socket connection for direct emit calls (using the socket from useRealtimeComments hook)
-  const [socket, setSocket] = useState<any>(null);
-  const [socketConnected, setSocketConnected] = useState(false);
-
-  // Initialize Socket.io for real-time updates
-  useEffect(() => {
-    if (params.reviewId && !socket) {
-      const newSocket = io('http://localhost:3000', {
-        path: '/api/socketio',
-        transports: ['websocket', 'polling'],
-        autoConnect: true,
-        reconnection: true,
-        reconnectionDelay: 2000,
-        reconnectionAttempts: 3,
-        timeout: 10000,
-        forceNew: true
-      });
-
-      setSocket(newSocket);
-
-      // Handle connection status
-      newSocket.on('connect', () => {
-        console.log('🔗 Client socket connected');
-        setSocketConnected(true);
-      });
-
-      newSocket.on('disconnect', () => {
-        console.log('🔗 Client socket disconnected');
-        setSocketConnected(false);
-      });
-
-      newSocket.on('connect_error', (error) => {
-        console.log('🔗 Client socket connection error:', error);
-        setSocketConnected(false);
-      });
-
-      // Join project room
-      newSocket.emit('join-project', params.reviewId);
-
-      // Listen for annotation updates
-      newSocket.on('annotationAdded', (data: { fileId: string, annotation: string, timestamp: string, addedBy?: string, addedByName?: string, x?: number, y?: number }) => {
+  // Initialize unified socket
+  const {
+    isConnected: socketConnected,
+    emitAnnotation,
+    emitAnnotationReply,
+    emitAnnotationStatusChange,
+    emitProjectStatusChange
+  } = useUnifiedSocket({
+    projectId: params.reviewId,
+    events: {
+      onAnnotationAdded: (data) => {
         console.log('🔔 Client received annotationAdded event:', data);
         const newAnnotation: ProjectAnnotation = {
           id: Date.now().toString(),
-          content: data.annotation,
+          content: data.annotation || data.content,
           fileId: data.fileId,
           addedBy: data.addedBy || 'Unknown',
           addedByName: data.addedByName || 'Unknown',
@@ -963,8 +921,8 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         const senderName = data.addedByName || data.addedBy || 'Unknown';
         const isFromClient = senderName.includes('Client') || senderName === 'Client';
         const messageText = isFromClient
-          ? `You sent: "${data.annotation}"`
-          : `Received from ${senderName}: "${data.annotation}"`;
+          ? `You sent: "${data.annotation || data.content}"`
+          : `Received from ${senderName}: "${data.annotation || data.content}"`;
 
         setChatMessages(prev => [...prev, {
           id: Date.now().toString(),
@@ -982,7 +940,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
             id: Date.now().toString(),
             type: 'annotation',
             title: 'New Annotation Added',
-            message: `${senderName} added a new annotation: "${data.annotation}"`,
+            message: `${senderName} added a new annotation: "${data.annotation || data.content}"`,
             timestamp: data.timestamp,
             fileId: data.fileId,
             x: data.x,
@@ -990,20 +948,13 @@ export default function ReviewPage({ params }: ReviewPageProps) {
           };
           setNotifications(prev => [notification, ...prev.slice(0, 9)]);
         }
-      });
-
-      // Listen for annotation replies
-      newSocket.on('annotationReplyAdded', (data: any) => {
+      },
+      onAnnotationReplyAdded: (data) => {
         console.log('🔔 Client received annotation reply via socket:', data);
-        console.log('🔔 Data type:', typeof data);
-        console.log('🔔 Data structure:', JSON.stringify(data, null, 2));
-        console.log('Current project ID:', params.reviewId);
-        console.log('Data annotation ID:', data.annotationId);
 
         // Handle different data structures
         let newReply;
         if (data.reply && typeof data.reply === 'object') {
-          // New structure: data.reply is an object
           newReply = {
             id: data.reply.id || Date.now().toString(),
             content: data.reply.content || 'Reply content',
@@ -1012,7 +963,6 @@ export default function ReviewPage({ params }: ReviewPageProps) {
             createdAt: data.reply.createdAt || new Date().toISOString()
           };
         } else {
-          // Fallback structure: data.reply might be a string or missing
           newReply = {
             id: Date.now().toString(),
             content: data.reply || 'Reply content',
@@ -1021,8 +971,6 @@ export default function ReviewPage({ params }: ReviewPageProps) {
             createdAt: data.timestamp || new Date().toISOString()
           };
         }
-
-        console.log('🔔 Processed newReply:', newReply);
 
         // Update annotations array
         setAnnotations(prev => prev.map(annotation =>
@@ -1037,35 +985,26 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         // Update selectedAnnotationChat if it's the same annotation AND not from current client
         const isFromCurrentClient = newReply.addedBy === 'Client' || newReply.addedByName === 'Client';
         if (selectedAnnotationChat && selectedAnnotationChat.id === data.annotationId && !isFromCurrentClient) {
-          console.log('🔄 Socket: Updating selectedAnnotationChat with new reply from other user:', newReply);
           setSelectedAnnotationChat(prev => {
             if (!prev) return prev;
-            const updatedChat = {
+            return {
               ...prev,
               replies: [...(prev.replies || []), newReply]
             };
-            console.log('🔄 Socket: Updated selectedAnnotationChat:', updatedChat);
-            return updatedChat;
           });
 
-          // Auto-scroll to bottom when receiving new reply from other users
           setTimeout(() => {
             scrollToBottom();
           }, 100);
-        } else {
-          console.log('🔄 Socket: No selectedAnnotationChat or different annotation ID or from current client');
-          console.log('🔄 Socket: selectedAnnotationChat ID:', selectedAnnotationChat?.id);
-          console.log('🔄 Socket: data.annotationId:', data.annotationId);
-          console.log('🔄 Socket: isFromCurrentClient:', isFromCurrentClient);
         }
 
-        // Add to chat messages (only if not already added)
+        // Add to chat messages
         const senderName = newReply.addedByName || newReply.addedBy || 'Unknown';
         setChatMessages(prev => {
           const messageId = `socket-reply-${newReply.id}`;
           const existingMessage = prev.find(msg => msg.id === messageId);
           if (existingMessage) {
-            return prev; // Don't add duplicate
+            return prev;
           }
           return [...prev, {
             id: messageId,
@@ -1078,10 +1017,8 @@ export default function ReviewPage({ params }: ReviewPageProps) {
           }];
         });
         setLastUpdate(data.timestamp);
-      });
-
-      // Listen for annotation status updates
-      newSocket.on('annotationStatusUpdated', (data: { annotationId: string, status: string, updatedBy?: string, updatedByName?: string, timestamp: string }) => {
+      },
+      onAnnotationStatusUpdated: (data) => {
         setAnnotations(prev => prev.map(annotation =>
           annotation.id === data.annotationId
             ? {
@@ -1092,7 +1029,6 @@ export default function ReviewPage({ params }: ReviewPageProps) {
             : annotation
         ));
 
-        // Add to chat messages
         const senderName = data.updatedByName || data.updatedBy || 'Unknown';
         setChatMessages(prev => [...prev, {
           id: Date.now().toString(),
@@ -1104,22 +1040,24 @@ export default function ReviewPage({ params }: ReviewPageProps) {
           isFromClient: data.updatedBy === 'Client'
         }]);
         setLastUpdate(data.timestamp);
-      });
-
-      return () => {
-        newSocket.emit('leave-project', params.reviewId);
-        newSocket.close();
-      };
+      },
+      onProjectStatusChanged: (data) => {
+        setProject(prev => prev ? { ...prev, status: data.status as any } : prev);
+        
+        const senderName = data.changedByName || data.changedBy || 'Unknown';
+        setChatMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          type: 'status',
+          message: `Project status changed to ${data.status} by ${senderName}`,
+          timestamp: data.timestamp,
+          addedBy: data.changedBy,
+          senderName: senderName,
+          isFromClient: data.changedBy === 'Client'
+        }]);
+        setLastUpdate(data.timestamp);
+      }
     }
-  }, [params.reviewId]);
-
-  // Additional room joining when reviewData is loaded (backup)
-  useEffect(() => {
-    if (socket && reviewData?.project?.id && reviewData.project.id !== params.reviewId) {
-      console.log("🔗 Client joining additional project room:", reviewData.project.id);
-      socket.emit("join-project", reviewData.project.id);
-    }
-  }, [socket, reviewData?.project?.id, params.reviewId]);
+  });
 
   // Update selectedAnnotationChat when annotations are updated (only for non-client messages)
   useEffect(() => {
@@ -1221,18 +1159,16 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         ]);
 
         // Emit to socket
-        if (socket && params.reviewId) {
-          socket.emit("addAnnotation", {
-            projectId: params.reviewId,
-            fileId: currentFileData.id,
-            annotation: newComment,
-            addedBy: currentClient.role,
-            addedByName: currentClient.name,
-            x: popupPosition?.x,
-            y: popupPosition?.y,
-            timestamp: new Date().toISOString(),
-          });
-        }
+        emitAnnotation({
+          projectId: params.reviewId,
+          fileId: currentFileData.id,
+          annotation: newComment,
+          addedBy: currentClient.role,
+          addedByName: currentClient.name,
+          x: popupPosition?.x,
+          y: popupPosition?.y,
+          timestamp: new Date().toISOString(),
+        });
 
         setNewComment("");
         setShowAnnotationPopup(false);
@@ -1303,16 +1239,14 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         ]);
 
         // Emit socket event for real-time updates
-        if (socket) {
-          socket.emit("addAnnotationReply", {
-            projectId: params.reviewId,
-            annotationId: selectedAnnotation.id,
-            reply: newComment,
-            addedBy: "Client",
-            addedByName: currentUser?.name || "Client",
-            timestamp: new Date().toISOString(),
-          });
-        }
+        emitAnnotationReply({
+          projectId: params.reviewId,
+          annotationId: selectedAnnotation.id,
+          reply: newComment,
+          addedBy: "Client",
+          addedByName: currentUser?.name || "Client",
+          timestamp: new Date().toISOString(),
+        });
 
         setNewComment("");
 
@@ -1354,13 +1288,11 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         }));
 
         // Emit socket event
-        if (socket) {
-          socket.emit("projectStatusChanged", {
-            projectId: params.reviewId,
-            status: "COMPLETED",
-            updatedBy: "Client",
-          });
-        }
+        emitProjectStatusChange({
+          projectId: params.reviewId,
+          status: "COMPLETED",
+          updatedBy: "Client",
+        });
 
         alert("Project approved successfully!");
         setShowSignatureDialog(false);
@@ -1400,14 +1332,12 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         }));
 
         // Emit socket event
-        if (socket) {
-          socket.emit("projectStatusChanged", {
-            projectId: params.reviewId,
-            status: "REJECTED",
-            updatedBy: "Client",
-            comments: revisionComments,
-          });
-        }
+        emitProjectStatusChange({
+          projectId: params.reviewId,
+          status: "REJECTED",
+          updatedBy: "Client",
+          comments: revisionComments,
+        });
 
         alert("Revision requested successfully!");
         setShowRevisionDialog(false);

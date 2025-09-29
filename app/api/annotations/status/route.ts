@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 import { getSocketServer } from '@/lib/socket-server'
 
 export async function PUT(request: NextRequest) {
@@ -14,7 +16,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Update annotation status
-    const annotation = await prisma.annotation.update({
+    const annotation = await db.annotation.update({
       where: { id: annotationId },
       data: {
         status: status as any,

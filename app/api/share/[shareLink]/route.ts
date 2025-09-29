@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 import { readdir, stat } from 'fs/promises'
 import { join } from 'path'
 
@@ -15,16 +17,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ shar
       const projectId = projectIdMatch[1]
       
       // Find project by ID
-      const project = await prisma.project.findUnique({
-        where: { id: projectId },
-        include: {
-          user: true,
-          client: true,
-          files: true,
-          approvals: true,
-          annotations: true
-        }
-      })
+      const project = await db.project.select().from(table).where(eq(table.id, id))
 
       if (project) {
         // Return project data for share link access
@@ -51,49 +44,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ shar
     }
 
     // If no project found, try to find review by shareLink (fallback)
-    const review = await prisma.review.findUnique({
-      where: { shareLink },
-      include: {
-        project: {
-          include: {
-            user: true,
-            client: true,
-            approvals: true,
-          }
-        },
-        elements: {
-          include: {
-            versions: true,
-            comments: true,
-            approvals: true,
-          },
-        },
-      },
-    })
+    const review = await db.review.select().from(table).where(eq(table.id, id))
 
     let project
 
     // If no review found by shareLink, try to find by project ID
     if (!review) {
-      project = await prisma.project.findUnique({
-        where: { id: shareLink },
-        include: {
-          user: true,
-          client: true,
-          approvals: true,
-          reviews: {
-            include: {
-              elements: {
-                include: {
-                  versions: true,
-                  comments: true,
-                  approvals: true,
-                },
-              },
-            },
-          },
-        },
-      })
+      project = await db.project.select().from(table).where(eq(table.id, id))
 
       if (!project) {
         return NextResponse.json({ 

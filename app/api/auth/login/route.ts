@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 
@@ -15,26 +17,23 @@ export async function POST(req: NextRequest) {
     }
 
     // First try to find user in User table
-    let user = await prisma.user.findUnique({
-      where: { email }
-    })
+    const [user] = await db.select().from(users).where(eq(users.email, email))
 
     let isClient = false
     let client = null
 
     // If not found in User table, check Client table
     if (!user) {
-      client = await prisma.client.findUnique({
-        where: { email }
-      })
+      const [clientResult] = await db.select().from(clients).where(eq(clients.email, email))
       
-      if (!client) {
+      if (!clientResult) {
         return NextResponse.json({ 
           status: 'error', 
           message: 'Invalid credentials' 
         }, { status: 401 })
       }
       
+      client = clientResult
       isClient = true
     }
 

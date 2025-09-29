@@ -13,11 +13,16 @@
 ### Code Standards
 
 #### Database & Prisma
-- Always use Prisma for database operations
-- Create separate model files in `models/` folder
+- **CRITICAL: ALWAYS use the centralized database connection from `lib/prisma.ts`**
+- **NEVER create new PrismaClient instances directly in API routes or components**
+- **ONLY import `prisma` from `@/lib/prisma` for all database operations**
+- Create separate model files in `models/` folder that use the centralized connection
 - Use proper TypeScript types for all database models
 - Always create migration files when changing schema
-- Use Neon PostgreSQL database
+- Use Neon PostgreSQL database with single connection URL in `.env.local`
+- **Database connection must be managed by the singleton pattern in `lib/prisma.ts`**
+- **All API routes must import and use the centralized `prisma` instance**
+- **No manual `$disconnect()` calls - handled automatically by the centralized connection**
 
 #### API Routes
 - Organize API routes by feature in separate folders
@@ -64,10 +69,13 @@ Organize API routes by feature:
 - Document breaking changes
 
 ### Environment Variables
-- Use `.env.local` for local development
-- Use `.env.example` as template
-- Never commit sensitive environment variables
-- Use Neon database URL format
+- **CRITICAL: Use ONLY `.env.local` for local development**
+- **Use `env.example` as template for environment setup**
+- **NEVER commit sensitive environment variables to git**
+- **Use single DATABASE_URL in `.env.local` - no multiple database connections**
+- Use Neon PostgreSQL database URL format
+- **Environment variables must be loaded from `.env.local` only**
+- **No hardcoded database URLs or connection strings in code**
 
 ### TypeScript
 - Use strict TypeScript configuration
@@ -83,10 +91,12 @@ Organize API routes by feature:
 - Use HTTPS in production
 
 ### Performance
-- Use Prisma connection pooling
+- **Use centralized Prisma client with singleton pattern for optimal performance**
+- **Leverage automatic connection pooling through centralized connection**
 - Implement proper caching strategies
 - Optimize database queries
 - Use Next.js optimization features
+- **No multiple PrismaClient instances that could cause connection pool issues**
 
 ### Testing
 - Write unit tests for utility functions
@@ -99,3 +109,46 @@ Organize API routes by feature:
 - Document database schema changes
 - Keep README updated
 - Document environment setup
+
+## Database Connection Rules (CRITICAL)
+
+### Mandatory Database Connection Usage
+- **ALL database operations MUST use `import { prisma } from '@/lib/prisma'`**
+- **NEVER use `new PrismaClient()` anywhere in the codebase**
+- **NEVER import `PrismaClient` directly from `@prisma/client`**
+- **Database connection is managed centrally in `lib/prisma.ts`**
+
+### Forbidden Patterns
+```typescript
+// ❌ FORBIDDEN - Creating new PrismaClient instances
+import { PrismaClient } from '@prisma/client'
+const prisma = new PrismaClient()
+
+// ❌ FORBIDDEN - Multiple database connections
+const db1 = new PrismaClient()
+const db2 = new PrismaClient()
+
+// ❌ FORBIDDEN - Manual disconnect calls
+await prisma.$disconnect()
+```
+
+### Required Patterns
+```typescript
+// ✅ REQUIRED - Use centralized connection
+import { prisma, checkDatabaseConnection } from '@/lib/prisma'
+
+// ✅ REQUIRED - Use helper functions when needed
+const isConnected = await checkDatabaseConnection()
+```
+
+### Environment Configuration
+- **Single source of truth: `.env.local` file**
+- **Template: `env.example` file**
+- **Database URL: `DATABASE_URL` environment variable**
+- **No multiple database configurations**
+
+### Connection Management
+- **Automatic connection pooling through singleton pattern**
+- **Graceful shutdown handling built into centralized connection**
+- **Development hot-reload protection**
+- **Production-optimized connection management**

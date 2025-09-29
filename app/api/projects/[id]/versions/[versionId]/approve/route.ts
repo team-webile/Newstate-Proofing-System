@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 
 // POST - Approve version
 export async function POST(
@@ -12,9 +14,7 @@ export async function POST(
     const { approvedBy, approvedAt } = body
 
     // Verify project exists
-    const project = await prisma.project.findUnique({
-      where: { id: projectId }
-    })
+    const project = await db.project.select().from(table).where(eq(table.id, id))
 
     if (!project) {
       return NextResponse.json({
@@ -23,7 +23,7 @@ export async function POST(
       }, { status: 404 })
     }
 
-    const updatedVersion = await prisma.version.update({
+    const updatedVersion = await db.version.update({
       where: { id: versionId, projectId: projectId },
       data: {
         status: 'APPROVED',

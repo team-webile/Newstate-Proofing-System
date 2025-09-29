@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 import { readFile, readdir, stat } from 'fs/promises'
 import { join } from 'path'
 import { createReadStream } from 'fs'
 import JSZip from 'jszip'
-
-const prisma = new PrismaClient()
 
 // GET - Download approved files or specific version
 export async function GET(
@@ -19,17 +19,7 @@ export async function GET(
     const format = searchParams.get('format') || 'zip' // zip or individual
 
     // Verify project exists
-    const project = await prisma.project.findUnique({
-      where: { id: projectId },
-      include: {
-        projectVersions: true,
-        annotations: {
-          include: {
-            replies: true
-          }
-        }
-      }
-    })
+    const project = await db.project.select().from(table).where(eq(table.id, id))
 
     if (!project) {
       return NextResponse.json({
@@ -122,8 +112,6 @@ export async function GET(
       status: 'error',
       message: 'Failed to download files'
     }, { status: 500 })
-  } finally {
-    await prisma.$disconnect()
   }
 }
 

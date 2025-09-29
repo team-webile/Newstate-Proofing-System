@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ReviewModel, UpdateReviewData } from '@/models/Review'
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 import { withAuth, AuthUser } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
 import { readdir, stat } from 'fs/promises'
 import { join } from 'path'
 
@@ -77,79 +78,25 @@ export async function GET(req: NextRequest) {
     console.log('Fetching review with ID:', id)
 
     // Enhanced review query with complete data
-    const review = await prisma.review.findUnique({
-      where: { id: id },
-      include: {
-        project: {
-          include: {
-            client: true,
-            user: true
-          }
-        },
-        elements: {
-          include: {
-            versions: {
-              orderBy: { createdAt: 'desc' }
-            },
-            comments: {
-              orderBy: { createdAt: 'desc' }
-            },
-            approvals: {
-              orderBy: { approvedAt: 'desc' }
-            }
-          },
-          orderBy: { createdAt: 'desc' }
-        }
-      }
-    })
+    const review = await db.review.select().from(table).where(eq(table.id, id))
     
     if (!review) {
       console.log('Review not found, checking if it might be a project ID...')
       
       // Check if this might be a project ID instead of review ID
-      const project = await prisma.project.findUnique({
-        where: { id: id },
-        include: {
-          client: true,
-          user: true
-        }
-      })
+      const project = await db.project.select().from(table).where(eq(table.id, id))
       
       if (project) {
         console.log('Found project, checking if review already exists...')
         
         // Check if review already exists for this project
-        const existingReview = await prisma.review.findFirst({
+        const existingReview = await db.review.findFirst({
           where: { projectId: project.id }
         })
         
         if (existingReview) {
           console.log('Review already exists, returning existing review...')
-          const existingReviewWithData = await prisma.review.findUnique({
-            where: { id: existingReview.id },
-            include: {
-              project: {
-          include: {
-            client: true,
-            user: true
-          }
-        },
-              elements: {
-                include: {
-                  versions: {
-                    orderBy: { createdAt: 'desc' }
-                  },
-                  comments: {
-                    orderBy: { createdAt: 'desc' }
-                  },
-                  approvals: {
-                    orderBy: { approvedAt: 'desc' }
-                  }
-                },
-                orderBy: { createdAt: 'desc' }
-              }
-            }
-          })
+          const existingReviewWithData = await db.review.select().from(table).where(eq(table.id, id))
 
           // Transform existing review data
           if (!existingReviewWithData) {
@@ -224,31 +171,7 @@ export async function GET(req: NextRequest) {
         })
         
         // Return the newly created review with complete data
-        const newReviewWithData = await prisma.review.findUnique({
-          where: { id: newReview.id },
-          include: {
-            project: {
-          include: {
-            client: true,
-            user: true
-          }
-        },
-            elements: {
-              include: {
-                versions: {
-                  orderBy: { createdAt: 'desc' }
-                },
-                  comments: {
-                    orderBy: { createdAt: 'desc' }
-                  },
-                  approvals: {
-                    orderBy: { approvedAt: 'desc' }
-                  }
-              },
-              orderBy: { createdAt: 'desc' }
-            }
-          }
-        })
+        const newReviewWithData = await db.review.select().from(table).where(eq(table.id, id))
 
         // Transform the new review data
         if (!newReviewWithData) {

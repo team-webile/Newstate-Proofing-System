@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { ReviewModel } from '@/models/Review'
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,13 +15,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if project exists
-    const project = await prisma.project.findUnique({
-      where: { id: projectId },
-      include: {
-        client: true,
-        user: true
-      }
-    })
+    const project = await db.project.select().from(table).where(eq(table.id, id))
 
     if (!project) {
       return NextResponse.json({
@@ -30,7 +25,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if review already exists for this project
-    const existingReview = await prisma.review.findFirst({
+    const existingReview = await db.review.findFirst({
       where: { projectId: projectId }
     })
 

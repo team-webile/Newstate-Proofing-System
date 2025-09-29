@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ProjectModel, CreateProjectData } from '@/models/Project'
-import { ClientModel } from '@/models/Client'
-
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()

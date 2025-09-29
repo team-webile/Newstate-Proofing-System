@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ElementModel, UpdateElementData } from '@/models/Element'
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 import { withAuth, AuthUser } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
 
 // Extend global to include io
 declare global {
@@ -49,16 +50,7 @@ async function handler(
       if (status) {
         try {
           // Get project ID for Socket.IO emission
-          const elementWithProject = await prisma.element.findUnique({
-            where: { id },
-            include: {
-              review: {
-                include: {
-                  project: true
-                }
-              }
-            }
-          })
+          const elementWithProject = await db.element.select().from(table).where(eq(table.id, id))
           
           if (elementWithProject?.review?.project && global.io) {
             const projectId = elementWithProject.review.project.id

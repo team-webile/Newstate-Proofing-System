@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ApprovalModel, CreateApprovalData } from '@/models/Approval'
-import { ElementModel } from '@/models/Element'
-import { ProjectModel } from '@/models/Project'
+import { db } from '@/db'
+import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
 import { withAuth, AuthUser } from '@/lib/auth'
 
 async function handler(req: NextRequest, user: AuthUser) {
