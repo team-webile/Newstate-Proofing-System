@@ -4,7 +4,7 @@ const next = require('next');
 const { Server } = require('socket.io');
 
 const dev = process.env.NODE_ENV !== 'production';
-const hostname = 'localhost';
+const hostname = process.env.HOSTNAME || (dev ? 'localhost' : '0.0.0.0');
 const port = process.env.PORT || 3000;
 
 // Create Next.js app
@@ -25,12 +25,34 @@ app.prepare().then(() => {
   });
 
   // Create Socket.IO server
+  const allowedOrigins = [
+    'https://preview.devnstage.xyz',
+    'https://www.preview.devnstage.xyz',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3001'
+  ];
+  
+  // Add environment-specific origins
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    allowedOrigins.push(process.env.NEXT_PUBLIC_APP_URL);
+    if (process.env.NEXT_PUBLIC_APP_URL.includes('preview.devnstage.xyz')) {
+      allowedOrigins.push('https://www.preview.devnstage.xyz');
+    }
+  }
+    
   const io = new Server(server, {
     cors: {
-      origin: process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000',
-      methods: ['GET', 'POST']
+      origin: allowedOrigins,
+      methods: ['GET', 'POST', 'PUT', 'DELETE'],
+      credentials: true,
+      allowedHeaders: ['Content-Type', 'Authorization']
     },
-    transports: ['websocket', 'polling']
+    transports: ['websocket', 'polling'],
+    allowEIO3: true,
+    pingTimeout: 60000,
+    pingInterval: 25000
   });
 
   // Socket.IO event handlers
@@ -175,9 +197,13 @@ app.prepare().then(() => {
   });
 
   // Start server
-  server.listen(port, (err) => {
+  server.listen(port, hostname, (err) => {
     if (err) throw err;
     console.log(`🚀 Server running on http://${hostname}:${port}`);
     console.log(`🔌 Socket.IO server running on the same port`);
+    console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
+    console.log(`🔗 CORS Origins: ${allowedOrigins.join(', ')}`);
+    console.log(`📡 Socket URL: ${process.env.NEXT_PUBLIC_SOCKET_URL || 'Not configured'}`);
+    console.log(`🌐 App URL: ${process.env.NEXT_PUBLIC_APP_URL || 'Not configured'}`);
   });
 });

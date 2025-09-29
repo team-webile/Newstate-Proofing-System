@@ -115,7 +115,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ shar
         company: project.client.company
       },
       files: files,
-      publicLink: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/client/${project.clientId}?project=${project.id}`
+      publicLink: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://preview.devnstage.xyz'}/client/${project.clientId}?project=${project.id}`
     }
 
     return NextResponse.json({

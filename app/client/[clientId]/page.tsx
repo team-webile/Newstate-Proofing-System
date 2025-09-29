@@ -193,7 +193,9 @@ export default function ClientDashboard({ params }: ClientDashboardProps) {
   // Initialize Socket.io
   useEffect(() => {
     if (projectId && params.clientId) {
-      const newSocket = io(env.NEXT_PUBLIC_SOCKET_URL, {
+      const newSocket = io(process.env.NODE_ENV === 'production' 
+        ? 'https://preview.devnstage.xyz'
+        : 'https://preview.devnstage.xyz', {
         path: "/api/socketio",
         transports: ["websocket", "polling"],
       });

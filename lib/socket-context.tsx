@@ -3,13 +3,41 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
 
+interface Annotation {
+  id: string
+  content: string
+  fileId: string
+  projectId: string
+  coordinates?: string
+  addedBy: string
+  addedByName: string
+  isResolved: boolean
+  status: string
+  createdAt: string
+  timestamp: string
+}
+
+interface AnnotationReply {
+  id: string
+  content: string
+  addedBy: string
+  addedByName: string
+  createdAt: string
+}
+
 interface SocketContextType {
-  socket: Socket | null;
-  isConnected: boolean;
-  joinProject: (projectId: string) => void;
-  leaveProject: (projectId: string) => void;
-  joinElement: (elementId: string) => void;
-  leaveElement: (elementId: string) => void;
+  socket: Socket | null
+  isConnected: boolean
+  joinProject: (projectId: string) => void
+  leaveProject: (projectId: string) => void
+  joinElement: (elementId: string) => void
+  leaveElement: (elementId: string) => void
+  // Annotation methods
+  addAnnotation: (annotation: Omit<Annotation, 'id' | 'timestamp'>) => void
+  resolveAnnotation: (annotationId: string, resolvedBy: string) => void
+  addAnnotationReply: (reply: { annotationId: string; content: string; addedBy: string; addedByName: string }) => void
+  updateAnnotationStatus: (annotationId: string, status: string, resolvedBy?: string) => void
+  sendTypingIndicator: (isTyping: boolean, user: string) => void
 }
 
 const SocketContext = createContext<SocketContextType | undefined>(undefined);
@@ -32,15 +60,21 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
   useEffect(() => {
     // Initialize socket connection
-    const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL, {
-      path: "/api/socketio",
-      transports: ["websocket", "polling"],
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL;
+    
+    if (!socketUrl) {
+      console.error('❌ NEXT_PUBLIC_SOCKET_URL is not defined in environment variables');
+      return;
+    }
+    
+    const newSocket = io(socketUrl, {
+      transports: ['websocket', 'polling'],
       timeout: 20000,
       forceNew: true,
       reconnection: true,
       reconnectionDelay: 1000,
-      reconnectionAttempts: 5,
-    });
+      reconnectionAttempts: 5
+    })
 
     newSocket.on("connect", () => {
       console.log("Connected to Socket.IO server");
@@ -113,6 +147,61 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     }
   };
 
+  // Annotation methods
+  const addAnnotation = (annotation: Omit<Annotation, 'id' | 'timestamp'>) => {
+    if (socket && isConnected) {
+      console.log('📝 Sending addAnnotation event:', annotation)
+      socket.emit('addAnnotation', {
+        ...annotation,
+        timestamp: new Date().toISOString()
+      })
+    }
+  }
+
+  const resolveAnnotation = (annotationId: string, resolvedBy: string) => {
+    if (socket && isConnected) {
+      console.log('✅ Sending resolveAnnotation event:', { annotationId, resolvedBy })
+      socket.emit('resolveAnnotation', {
+        annotationId,
+        resolvedBy,
+        timestamp: new Date().toISOString()
+      })
+    }
+  }
+
+  const addAnnotationReply = (reply: { annotationId: string; content: string; addedBy: string; addedByName: string }) => {
+    if (socket && isConnected) {
+      console.log('💬 Sending addAnnotationReply event:', reply)
+      socket.emit('addAnnotationReply', {
+        ...reply,
+        timestamp: new Date().toISOString()
+      })
+    }
+  }
+
+  const updateAnnotationStatus = (annotationId: string, status: string, resolvedBy?: string) => {
+    if (socket && isConnected) {
+      console.log('🔄 Sending annotationStatusChanged event:', { annotationId, status, resolvedBy })
+      socket.emit('annotationStatusChanged', {
+        annotationId,
+        status,
+        resolvedBy,
+        timestamp: new Date().toISOString()
+      })
+    }
+  }
+
+  const sendTypingIndicator = (isTyping: boolean, user: string) => {
+    if (socket && isConnected) {
+      console.log('⌨️ Sending typing indicator:', { isTyping, user })
+      socket.emit('typing', {
+        user,
+        isTyping,
+        timestamp: new Date().toISOString()
+      })
+    }
+  }
+
   const value: SocketContextType = {
     socket,
     isConnected,
@@ -120,7 +209,12 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     leaveProject,
     joinElement,
     leaveElement,
-  };
+    addAnnotation,
+    resolveAnnotation,
+    addAnnotationReply,
+    updateAnnotationStatus,
+    sendTypingIndicator
+  }
 
   return (
     <SocketContext.Provider value={value}>{children}</SocketContext.Provider>

@@ -11,33 +11,54 @@ class SocketManager {
       return this.socket;
     }
 
-    this.socket = io(
-      process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3000",
-      {
-        transports: ["websocket", "polling"],
-        autoConnect: true,
-        reconnection: true,
-        reconnectionAttempts: this.maxReconnectAttempts,
-        reconnectionDelay: this.reconnectDelay,
-        forceNew: true,
-      }
-    );
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL;
+    
+    if (!socketUrl) {
+      console.error('❌ NEXT_PUBLIC_SOCKET_URL is not defined in environment variables');
+      throw new Error('Socket URL not configured');
+    }
+    
+    this.socket = io(socketUrl, {
+      transports: ["websocket", "polling"],
+      autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: this.maxReconnectAttempts,
+      reconnectionDelay: this.reconnectDelay,
+      forceNew: true,
+      timeout: 20000,
+      upgrade: true,
+      rememberUpgrade: false
+    });
 
     // Connection event handlers
     this.socket.on("connect", () => {
-      console.log("Socket connected:", this.socket?.id);
+      console.log("✅ Socket connected:", this.socket?.id);
+      console.log("🔗 Socket URL:", socketUrl);
       this.reconnectAttempts = 0;
       // Join project room after connection
       this.socket?.emit("join-project", projectId);
     });
 
     this.socket.on("disconnect", (reason) => {
-      console.log("Socket disconnected:", reason);
+      console.log("❌ Socket disconnected:", reason);
     });
 
     this.socket.on("connect_error", (error) => {
-      console.error("Socket connection error:", error);
+      console.error("❌ Socket connection error:", error);
+      console.error("🔗 Attempted URL:", socketUrl);
       this.reconnectAttempts++;
+    });
+
+    this.socket.on("reconnect", (attemptNumber) => {
+      console.log("🔄 Socket reconnected after", attemptNumber, "attempts");
+    });
+
+    this.socket.on("reconnect_error", (error) => {
+      console.error("❌ Socket reconnection error:", error);
+    });
+
+    this.socket.on("reconnect_failed", () => {
+      console.error("❌ Socket reconnection failed after", this.maxReconnectAttempts, "attempts");
     });
 
     return this.socket;

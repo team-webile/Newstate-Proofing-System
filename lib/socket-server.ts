@@ -15,7 +15,7 @@ export function initializeSocketServer() {
     // Create Socket.io server
     io = new SocketIOServer({
       cors: {
-        origin: process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000',
+        origin: process.env.NEXT_PUBLIC_BASE_URL || 'https://preview.devnstage.xyz',
         methods: ['GET', 'POST']
       },
       transports: ['websocket', 'polling']

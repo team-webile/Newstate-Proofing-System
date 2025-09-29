@@ -15,7 +15,10 @@
     "db:push": "npx drizzle-kit push",
     "db:migrate": "npx drizzle-kit migrate",
     "db:studio": "npx drizzle-kit studio",
-    "test:socket": "node test-socket-connection.js"
+    "test:socket": "node test-socket-connection.js",
+    "check:env": "node check-env.js",
+    "start:prod": "NODE_ENV=production node server.js",
+    "dev:prod": "NODE_ENV=production npm run dev"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

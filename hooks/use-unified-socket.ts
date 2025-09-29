@@ -33,8 +33,12 @@ export function useUnifiedSocket({
   useEffect(() => {
     if (!autoConnect || !projectId) return;
 
-    const socketUrl =
-      process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3000";
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL;
+    
+    if (!socketUrl) {
+      console.error('❌ NEXT_PUBLIC_SOCKET_URL is not defined in environment variables');
+      return;
+    }
     const newSocket = io(socketUrl, {
       transports: ["websocket", "polling"],
       autoConnect: true,
