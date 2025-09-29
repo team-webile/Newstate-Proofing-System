@@ -16,6 +16,7 @@
     "db:migrate": "npx drizzle-kit migrate",
     "db:studio": "npx drizzle-kit studio",
     "test:socket": "node test-socket-connection.js",
+    "check:env": "node check-env.js",
     "start:prod": "NODE_ENV=production node server.js",
     "dev:prod": "NODE_ENV=production npm run dev"
   },

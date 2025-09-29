@@ -195,7 +195,7 @@ export default function ClientDashboard({ params }: ClientDashboardProps) {
     if (projectId && params.clientId) {
       const newSocket = io(process.env.NODE_ENV === 'production' 
         ? 'https://preview.devnstage.xyz'
-        : 'http://localhost:3000', {
+        : 'https://preview.devnstage.xyz', {
         path: "/api/socketio",
         transports: ["websocket", "polling"],
       });

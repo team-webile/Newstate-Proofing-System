@@ -27,7 +27,7 @@ app.prepare().then(() => {
   // Create Socket.IO server
   const allowedOrigins = process.env.NEXT_PUBLIC_APP_URL 
     ? [process.env.NEXT_PUBLIC_APP_URL, process.env.NEXT_PUBLIC_APP_URL.replace('https://', 'https://www.')]
-    : ['http://localhost:3000', 'http://127.0.0.1:3000'];
+    : ['https://preview.devnstage.xyz', 'http://127.0.0.1:3000'];
     
   const io = new Server(server, {
     cors: {
