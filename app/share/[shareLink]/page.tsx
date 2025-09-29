@@ -1,19 +1,34 @@
-"use client"
+"use client";
 
-import { useState, useRef, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Textarea } from "@/components/ui/textarea"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Icons } from "@/components/icons"
-import { Loader2 } from "lucide-react"
-import { ThemeToggle } from "@/components/theme-toggle"
-import { PenTool, X, CheckCircle, AlertCircle, MessageCircle, Upload, Download, Eye } from "lucide-react"
-import ImageAnnotation from "@/components/ImageAnnotation"
-import { useRealtimeComments } from "@/hooks/use-realtime-comments"
-import io from 'socket.io-client'
+import { useState, useRef, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Icons } from "@/components/icons";
+import { Loader2 } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
+import {
+  PenTool,
+  X,
+  CheckCircle,
+  AlertCircle,
+  MessageCircle,
+  Upload,
+  Download,
+  Eye,
+} from "lucide-react";
+import ImageAnnotation from "@/components/ImageAnnotation";
+import { useRealtimeComments } from "@/hooks/use-realtime-comments";
+import io from "socket.io-client";
 import {
   Dialog,
   DialogContent,
@@ -22,7 +37,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,95 +48,107 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 
 interface Annotation {
-  id: string
-  x: number
-  y: number
-  comment: string
-  timestamp: string
-  resolved: boolean
-  fileId: string
-  addedBy?: string
-  addedByName?: string
+  id: string;
+  x: number;
+  y: number;
+  comment: string;
+  timestamp: string;
+  resolved: boolean;
+  fileId: string;
+  addedBy?: string;
+  addedByName?: string;
 }
 
 interface ProjectFile {
-  id: string
-  name: string
-  url: string
-  fullUrl: string
-  type: string
-  size: number
-  uploadedAt: string
-  version: string
-  status?: string
+  id: string;
+  name: string;
+  url: string;
+  fullUrl: string;
+  type: string;
+  size: number;
+  uploadedAt: string;
+  version: string;
+  status?: string;
 }
 
 interface Version {
-  id: string
-  version: string
-  files: ProjectFile[]
-  status: "draft" | "pending_review" | "approved" | "rejected" | "in_revision"
-  createdAt: string
-  annotations: Annotation[]
-  revisionNotes?: string
+  id: string;
+  version: string;
+  files: ProjectFile[];
+  status: "draft" | "pending_review" | "approved" | "rejected" | "in_revision";
+  createdAt: string;
+  annotations: Annotation[];
+  revisionNotes?: string;
 }
 
 interface Revision {
-  id: string
-  version: string
-  status: "in_revision" | "pending_review" | "approved" | "rejected"
-  requestedBy: string
-  requestedAt: string
-  comments: string
+  id: string;
+  version: string;
+  status: "in_revision" | "pending_review" | "approved" | "rejected";
+  requestedBy: string;
+  requestedAt: string;
+  comments: string;
   digitalSignature?: {
-    firstName: string
-    lastName: string
-  }
-  completedAt?: string
+    firstName: string;
+    lastName: string;
+  };
+  completedAt?: string;
 }
 
 interface ReviewPageProps {
   params: {
-    shareLink: string
-  }
+    shareLink: string;
+  };
 }
 
 export default function ClientReviewPage({ params }: ReviewPageProps) {
-  const [annotations, setAnnotations] = useState<Annotation[]>([])
-  const [revisions, setRevisions] = useState<Revision[]>([])
-  const [fileAnnotations, setFileAnnotations] = useState<{ [key: string]: string[] }>({})
-  const [showAnnotationModal, setShowAnnotationModal] = useState(false)
-  const [selectedImage, setSelectedImage] = useState<ProjectFile | null>(null)
-  const [socket, setSocket] = useState<any>(null)
-  const [chatMessages, setChatMessages] = useState<Array<{id: string, type: 'annotation' | 'status', message: string, timestamp: string, addedBy?: string, senderName?: string, isFromClient?: boolean}>>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [review, setReview] = useState<any>(null)
-  const [selectedFile, setSelectedFile] = useState<ProjectFile | null>(null)
-  const [selectedVersion, setSelectedVersion] = useState<Version | null>(null)
-  const [showStatusDialog, setShowStatusDialog] = useState(false)
-  const [showRevisionDialog, setShowRevisionDialog] = useState(false)
-  const [revisionComment, setRevisionComment] = useState("")
-  const [showSignatureDialog, setShowSignatureDialog] = useState(false)
-  const [signature, setSignature] = useState({ firstName: "", lastName: "" })
-  const [isConnected, setIsConnected] = useState(false)
-  const [lastUpdate, setLastUpdate] = useState<string | null>(null)
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [revisions, setRevisions] = useState<Revision[]>([]);
+  const [fileAnnotations, setFileAnnotations] = useState<{
+    [key: string]: string[];
+  }>({});
+  const [showAnnotationModal, setShowAnnotationModal] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<ProjectFile | null>(null);
+  const [socket, setSocket] = useState<any>(null);
+  const [chatMessages, setChatMessages] = useState<
+    Array<{
+      id: string;
+      type: "annotation" | "status";
+      message: string;
+      timestamp: string;
+      addedBy?: string;
+      senderName?: string;
+      isFromClient?: boolean;
+    }>
+  >([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [review, setReview] = useState<any>(null);
+  const [selectedFile, setSelectedFile] = useState<ProjectFile | null>(null);
+  const [selectedVersion, setSelectedVersion] = useState<Version | null>(null);
+  const [showStatusDialog, setShowStatusDialog] = useState(false);
+  const [showRevisionDialog, setShowRevisionDialog] = useState(false);
+  const [revisionComment, setRevisionComment] = useState("");
+  const [showSignatureDialog, setShowSignatureDialog] = useState(false);
+  const [signature, setSignature] = useState({ firstName: "", lastName: "" });
+  const [isConnected, setIsConnected] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<string | null>(null);
 
   // Current user (Client)
   const currentUser = {
     name: "Client User",
-    role: "CLIENT"
-  }
+    role: "CLIENT",
+  };
 
   // Use real-time comments hook
   const {
@@ -136,216 +163,218 @@ export default function ClientReviewPage({ params }: ReviewPageProps) {
   } = useRealtimeComments({
     projectId: review?.project?.id || "",
     fileId: selectedFile?.id,
-    currentUser
-  })
+    currentUser,
+  });
 
   // Initialize Socket.io connection
   useEffect(() => {
-    const newSocket = io('http://localhost:3000', {
-      path: '/api/socketio',
-      transports: ['websocket', 'polling']
-    })
+    const newSocket = io(env.NEXT_PUBLIC_SOCKET_URL, {
+      path: "/api/socketio",
+      transports: ["websocket", "polling"],
+    });
 
-    setSocket(newSocket)
+    setSocket(newSocket);
 
     // Handle connection status
-    newSocket.on('connect', () => {
-      console.log('Socket connected')
-      setIsConnected(true)
-    })
+    newSocket.on("connect", () => {
+      console.log("Socket connected");
+      setIsConnected(true);
+    });
 
-    newSocket.on('disconnect', () => {
-      console.log('Socket disconnected')
-      setIsConnected(false)
-    })
+    newSocket.on("disconnect", () => {
+      console.log("Socket disconnected");
+      setIsConnected(false);
+    });
 
     // Join project room
     if (review?.project?.id) {
-      newSocket.emit('join-project', review.project.id)
+      newSocket.emit("join-project", review.project.id);
     }
 
     // Listen for real-time updates
-    newSocket.on('annotationAdded', (data) => {
-      console.log('Real-time annotation added:', data)
-      setLastUpdate(data.timestamp)
-    })
+    newSocket.on("annotationAdded", (data) => {
+      console.log("Real-time annotation added:", data);
+      setLastUpdate(data.timestamp);
+    });
 
-    newSocket.on('annotationReplyAdded', (data) => {
-      console.log('Real-time annotation reply added:', data)
-      setLastUpdate(data.timestamp)
-    })
+    newSocket.on("annotationReplyAdded", (data) => {
+      console.log("Real-time annotation reply added:", data);
+      setLastUpdate(data.timestamp);
+    });
 
-    newSocket.on('statusChanged', (data) => {
-      console.log('Real-time status changed:', data)
-      setLastUpdate(data.timestamp)
-    })
+    newSocket.on("statusChanged", (data) => {
+      console.log("Real-time status changed:", data);
+      setLastUpdate(data.timestamp);
+    });
 
     return () => {
-      newSocket.emit('leave-project', review?.project?.id)
-      newSocket.close()
-    }
-  }, [review?.project?.id])
+      newSocket.emit("leave-project", review?.project?.id);
+      newSocket.close();
+    };
+  }, [review?.project?.id]);
 
   // Fetch review data
   const fetchReview = async () => {
     try {
-      setIsLoading(true)
-      setError(null)
+      setIsLoading(true);
+      setError(null);
 
-      const response = await fetch(`/api/share/${params.shareLink}`)
-      const data = await response.json()
+      const response = await fetch(`/api/share/${params.shareLink}`);
+      const data = await response.json();
 
-      if (data.status === 'success') {
-        setReview(data.data)
+      if (data.status === "success") {
+        setReview(data.data);
         if (data.data.project.files && data.data.project.files.length > 0) {
-          setSelectedFile(data.data.project.files[0])
+          setSelectedFile(data.data.project.files[0]);
         }
       } else {
-        setError(data.message || 'Failed to load review')
+        setError(data.message || "Failed to load review");
       }
     } catch (err) {
-      console.error('Error fetching review:', err)
-      setError('Failed to load review')
+      console.error("Error fetching review:", err);
+      setError("Failed to load review");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
-    fetchReview()
-  }, [params.shareLink])
+    fetchReview();
+  }, [params.shareLink]);
 
   const handleFileSelect = (file: any) => {
-    setSelectedFile(file)
-    setSelectedImage(file)
-  }
+    setSelectedFile(file);
+    setSelectedImage(file);
+  };
 
   const handleVersionSelect = (version: Version) => {
-    setSelectedVersion(version)
+    setSelectedVersion(version);
     if (version.files && version.files.length > 0) {
-      setSelectedFile(version.files[0])
+      setSelectedFile(version.files[0]);
     }
-  }
+  };
 
   const isImageFile = (file: ProjectFile) => {
-    return file.type.startsWith('image/')
-  }
+    return file.type.startsWith("image/");
+  };
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
-      case 'approved':
-        return 'bg-green-100 text-green-800 border-green-200'
-      case 'rejected':
-        return 'bg-red-100 text-red-800 border-red-200'
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-      case 'in_revision':
-        return 'bg-blue-100 text-blue-800 border-blue-200'
+      case "approved":
+        return "bg-green-100 text-green-800 border-green-200";
+      case "rejected":
+        return "bg-red-100 text-red-800 border-red-200";
+      case "pending":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200";
+      case "in_revision":
+        return "bg-blue-100 text-blue-800 border-blue-200";
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200'
+        return "bg-gray-100 text-gray-800 border-gray-200";
     }
-  }
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status.toLowerCase()) {
-      case 'approved':
-        return <CheckCircle className="h-4 w-4" />
-      case 'rejected':
-        return <X className="h-4 w-4" />
-      case 'pending':
-        return <AlertCircle className="h-4 w-4" />
+      case "approved":
+        return <CheckCircle className="h-4 w-4" />;
+      case "rejected":
+        return <X className="h-4 w-4" />;
+      case "pending":
+        return <AlertCircle className="h-4 w-4" />;
       default:
-        return <AlertCircle className="h-4 w-4" />
+        return <AlertCircle className="h-4 w-4" />;
     }
-  }
+  };
 
   const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes'
-    const k = 1024
-    const sizes = ['Bytes', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-  }
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  };
 
   const handleStatusChange = async (newStatus: string) => {
-    if (!selectedFile) return
+    if (!selectedFile) return;
 
     try {
       const response = await fetch(`/api/elements/${selectedFile.id}/status`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
-      })
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
 
       if (response.ok) {
         // Update local state
-        setSelectedFile(prev => prev ? { ...prev, status: newStatus } : null)
-        
+        setSelectedFile((prev) =>
+          prev ? { ...prev, status: newStatus } : null
+        );
+
         // Emit socket event
         if (socket && review?.project?.id) {
-          socket.emit('updateElementStatus', {
+          socket.emit("updateElementStatus", {
             projectId: review.project.id,
             elementId: selectedFile.id,
             status: newStatus,
-            message: `Status changed to ${newStatus}`
-          })
+            message: `Status changed to ${newStatus}`,
+          });
         }
       }
     } catch (error) {
-      console.error('Error updating status:', error)
+      console.error("Error updating status:", error);
     }
-  }
+  };
 
   const handleRevisionRequest = async () => {
-    if (!revisionComment.trim()) return
+    if (!revisionComment.trim()) return;
 
     try {
-      const response = await fetch('/api/revisions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/revisions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           projectId: review.project.id,
           comment: revisionComment,
-          requestedBy: currentUser.name
-        })
-      })
+          requestedBy: currentUser.name,
+        }),
+      });
 
       if (response.ok) {
-        setShowRevisionDialog(false)
-        setRevisionComment("")
+        setShowRevisionDialog(false);
+        setRevisionComment("");
         // Refresh data
-        fetchReview()
+        fetchReview();
       }
     } catch (error) {
-      console.error('Error requesting revision:', error)
+      console.error("Error requesting revision:", error);
     }
-  }
+  };
 
   const handleApproval = async (approved: boolean) => {
-    if (!selectedFile) return
+    if (!selectedFile) return;
 
     try {
       const response = await fetch(`/api/elements/${selectedFile.id}/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           approved,
           signature: `${signature.firstName} ${signature.lastName}`,
-          comment: revisionComment
-        })
-      })
+          comment: revisionComment,
+        }),
+      });
 
       if (response.ok) {
-        setShowSignatureDialog(false)
-        setSignature({ firstName: "", lastName: "" })
-        setRevisionComment("")
+        setShowSignatureDialog(false);
+        setSignature({ firstName: "", lastName: "" });
+        setRevisionComment("");
         // Refresh data
-        fetchReview()
+        fetchReview();
       }
     } catch (error) {
-      console.error('Error approving/rejecting:', error)
+      console.error("Error approving/rejecting:", error);
     }
-  }
+  };
 
   if (isLoading) {
     return (
@@ -355,7 +384,7 @@ export default function ClientReviewPage({ params }: ReviewPageProps) {
           <p className="text-muted-foreground">Loading review...</p>
         </div>
       </div>
-    )
+    );
   }
 
   if (error) {
@@ -368,7 +397,7 @@ export default function ClientReviewPage({ params }: ReviewPageProps) {
           <Button onClick={fetchReview}>Try Again</Button>
         </div>
       </div>
-    )
+    );
   }
 
   if (!review) {
@@ -377,10 +406,12 @@ export default function ClientReviewPage({ params }: ReviewPageProps) {
         <div className="text-center">
           <AlertCircle className="h-8 w-8 text-yellow-500 mx-auto mb-4" />
           <h2 className="text-xl font-semibold mb-2">Review Not Found</h2>
-          <p className="text-muted-foreground">The review you're looking for doesn't exist.</p>
+          <p className="text-muted-foreground">
+            The review you're looking for doesn't exist.
+          </p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -391,22 +422,23 @@ export default function ClientReviewPage({ params }: ReviewPageProps) {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div className="h-8 w-8 bg-primary rounded flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-sm">NSB</span>
+                <span className="text-primary-foreground font-bold text-sm">
+                  NSB
+                </span>
               </div>
               <div>
-                <h1 className="text-xl font-semibold">{review.project.title}</h1>
+                <h1 className="text-xl font-semibold">
+                  {review.project.title}
+                </h1>
                 <p className="text-sm text-muted-foreground">
-                  Client Review - {review.project.client?.name || 'Unknown Client'}
+                  Client Review -{" "}
+                  {review.project.client?.name || "Unknown Client"}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <Badge variant="outline">
-                Client Access
-              </Badge>
-              <Badge variant="secondary">
-                {review.project.status}
-              </Badge>
+              <Badge variant="outline">Client Access</Badge>
+              <Badge variant="secondary">{review.project.status}</Badge>
               <Badge variant="outline">
                 {review.project.files?.length || 0} Files
               </Badge>
@@ -439,7 +471,9 @@ export default function ClientReviewPage({ params }: ReviewPageProps) {
                   {review.project.files?.map((file: ProjectFile) => (
                     <Button
                       key={file.id}
-                      variant={selectedFile?.id === file.id ? "default" : "outline"}
+                      variant={
+                        selectedFile?.id === file.id ? "default" : "outline"
+                      }
                       className="w-full justify-start h-auto p-3"
                       onClick={() => handleFileSelect(file)}
                     >
@@ -452,7 +486,9 @@ export default function ClientReviewPage({ params }: ReviewPageProps) {
                           )}
                         </div>
                         <div className="flex-1 text-left">
-                          <div className="font-medium text-sm truncate">{file.name}</div>
+                          <div className="font-medium text-sm truncate">
+                            {file.name}
+                          </div>
                           <div className="text-xs text-muted-foreground">
                             {formatFileSize(file.size)} • {file.type}
                           </div>
@@ -471,12 +507,14 @@ export default function ClientReviewPage({ params }: ReviewPageProps) {
                 <CardContent className="space-y-3">
                   <div>
                     <Label className="text-sm font-medium">Project</Label>
-                    <p className="text-sm text-muted-foreground">{review.project.title}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {review.project.title}
+                    </p>
                   </div>
                   <div>
                     <Label className="text-sm font-medium">Client</Label>
                     <p className="text-sm text-muted-foreground">
-                      {review.project.client?.name || 'Unknown Client'}
+                      {review.project.client?.name || "Unknown Client"}
                     </p>
                   </div>
                   <div>
@@ -504,11 +542,20 @@ export default function ClientReviewPage({ params }: ReviewPageProps) {
                     <CardTitle className="flex items-center justify-between">
                       {selectedFile.name}
                       <div className="flex gap-2">
-                        <Badge className={getStatusColor(selectedFile.status || 'pending')}>
-                          {getStatusIcon(selectedFile.status || 'pending')}
-                          <span className="ml-1">{selectedFile.status || 'Pending'}</span>
+                        <Badge
+                          className={getStatusColor(
+                            selectedFile.status || "pending"
+                          )}
+                        >
+                          {getStatusIcon(selectedFile.status || "pending")}
+                          <span className="ml-1">
+                            {selectedFile.status || "Pending"}
+                          </span>
                         </Badge>
-                        <AlertDialog open={showStatusDialog} onOpenChange={setShowStatusDialog}>
+                        <AlertDialog
+                          open={showStatusDialog}
+                          onOpenChange={setShowStatusDialog}
+                        >
                           <AlertDialogTrigger asChild>
                             <Button variant="outline" size="sm">
                               Change Status
@@ -516,7 +563,9 @@ export default function ClientReviewPage({ params }: ReviewPageProps) {
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>Change File Status</AlertDialogTitle>
+                              <AlertDialogTitle>
+                                Change File Status
+                              </AlertDialogTitle>
                               <AlertDialogDescription>
                                 Select the new status for this file.
                               </AlertDialogDescription>
@@ -529,17 +578,27 @@ export default function ClientReviewPage({ params }: ReviewPageProps) {
                                     <SelectValue placeholder="Select status" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="approved">Approved</SelectItem>
-                                    <SelectItem value="rejected">Rejected</SelectItem>
-                                    <SelectItem value="pending">Pending</SelectItem>
-                                    <SelectItem value="in_revision">In Revision</SelectItem>
+                                    <SelectItem value="approved">
+                                      Approved
+                                    </SelectItem>
+                                    <SelectItem value="rejected">
+                                      Rejected
+                                    </SelectItem>
+                                    <SelectItem value="pending">
+                                      Pending
+                                    </SelectItem>
+                                    <SelectItem value="in_revision">
+                                      In Revision
+                                    </SelectItem>
                                   </SelectContent>
                                 </Select>
                               </div>
                             </div>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => setShowStatusDialog(false)}>
+                              <AlertDialogAction
+                                onClick={() => setShowStatusDialog(false)}
+                              >
                                 Update Status
                               </AlertDialogAction>
                             </AlertDialogFooter>
@@ -548,7 +607,8 @@ export default function ClientReviewPage({ params }: ReviewPageProps) {
                       </div>
                     </CardTitle>
                     <CardDescription>
-                      Click anywhere on the image to add annotations and feedback
+                      Click anywhere on the image to add annotations and
+                      feedback
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -577,7 +637,9 @@ export default function ClientReviewPage({ params }: ReviewPageProps) {
                     <div className="flex items-center justify-center h-64 bg-muted rounded-lg">
                       <div className="text-center">
                         <Icons.FolderOpen />
-                        <p className="text-muted-foreground">Preview not available for this file type</p>
+                        <p className="text-muted-foreground">
+                          Preview not available for this file type
+                        </p>
                         <Button variant="outline" className="mt-4">
                           <Download className="h-4 w-4 mr-2" />
                           Download File
@@ -591,7 +653,9 @@ export default function ClientReviewPage({ params }: ReviewPageProps) {
                   <CardContent className="flex items-center justify-center h-64">
                     <div className="text-center">
                       <Icons.FolderOpen />
-                      <p className="text-muted-foreground">Select a file to review</p>
+                      <p className="text-muted-foreground">
+                        Select a file to review
+                      </p>
                     </div>
                   </CardContent>
                 </Card>
@@ -602,7 +666,9 @@ export default function ClientReviewPage({ params }: ReviewPageProps) {
                 <Card>
                   <CardHeader>
                     <CardTitle>Comments & Feedback</CardTitle>
-                    <CardDescription>All comments for this file</CardDescription>
+                    <CardDescription>
+                      All comments for this file
+                    </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
@@ -612,7 +678,9 @@ export default function ClientReviewPage({ params }: ReviewPageProps) {
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-2">
                                 <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                                <span className="text-sm font-medium">{comment.userName}</span>
+                                <span className="text-sm font-medium">
+                                  {comment.userName}
+                                </span>
                                 <Badge variant="secondary" className="text-xs">
                                   {comment.type}
                                 </Badge>
@@ -635,7 +703,9 @@ export default function ClientReviewPage({ params }: ReviewPageProps) {
                 <Card>
                   <CardHeader>
                     <CardTitle>Actions</CardTitle>
-                    <CardDescription>Approve, reject, or request revisions</CardDescription>
+                    <CardDescription>
+                      Approve, reject, or request revisions
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex gap-2">
@@ -680,7 +750,12 @@ export default function ClientReviewPage({ params }: ReviewPageProps) {
                 <Input
                   id="firstName"
                   value={signature.firstName}
-                  onChange={(e) => setSignature(prev => ({ ...prev, firstName: e.target.value }))}
+                  onChange={(e) =>
+                    setSignature((prev) => ({
+                      ...prev,
+                      firstName: e.target.value,
+                    }))
+                  }
                   placeholder="Enter your first name"
                 />
               </div>
@@ -689,7 +764,12 @@ export default function ClientReviewPage({ params }: ReviewPageProps) {
                 <Input
                   id="lastName"
                   value={signature.lastName}
-                  onChange={(e) => setSignature(prev => ({ ...prev, lastName: e.target.value }))}
+                  onChange={(e) =>
+                    setSignature((prev) => ({
+                      ...prev,
+                      lastName: e.target.value,
+                    }))
+                  }
                   placeholder="Enter your last name"
                 />
               </div>
@@ -705,12 +785,13 @@ export default function ClientReviewPage({ params }: ReviewPageProps) {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSignatureDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowSignatureDialog(false)}
+            >
               Cancel
             </Button>
-            <Button onClick={() => handleApproval(true)}>
-              Approve File
-            </Button>
+            <Button onClick={() => handleApproval(true)}>Approve File</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -737,15 +818,16 @@ export default function ClientReviewPage({ params }: ReviewPageProps) {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRevisionDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowRevisionDialog(false)}
+            >
               Cancel
             </Button>
-            <Button onClick={handleRevisionRequest}>
-              Request Revision
-            </Button>
+            <Button onClick={handleRevisionRequest}>Request Revision</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }
