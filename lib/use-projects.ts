@@ -20,7 +20,7 @@ export function useProjects(page: number = 1, limit: number = 10, search?: strin
       setError(err instanceof Error ? err.message : 'Failed to fetch projects')
     } finally {
       setLoading(false)
-    }
+    }   
   }
 
   const refreshProjects = async () => {
