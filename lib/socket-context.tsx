@@ -60,10 +60,12 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
   useEffect(() => {
     // Initialize socket connection
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 
-      (process.env.NODE_ENV === 'production' 
-        ? 'https://preview.devnstage.xyz'
-        : 'http://localhost:3000');
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL;
+    
+    if (!socketUrl) {
+      console.error('❌ NEXT_PUBLIC_SOCKET_URL is not defined in environment variables');
+      return;
+    }
     
     const newSocket = io(socketUrl, {
       transports: ['websocket', 'polling'],

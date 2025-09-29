@@ -25,11 +25,13 @@ app.prepare().then(() => {
   });
 
   // Create Socket.IO server
+  const allowedOrigins = process.env.NEXT_PUBLIC_APP_URL 
+    ? [process.env.NEXT_PUBLIC_APP_URL, process.env.NEXT_PUBLIC_APP_URL.replace('https://', 'https://www.')]
+    : ['http://localhost:3000', 'http://127.0.0.1:3000'];
+    
   const io = new Server(server, {
     cors: {
-      origin: process.env.NODE_ENV === 'production' 
-        ? ['https://preview.devnstage.xyz', 'https://www.preview.devnstage.xyz']
-        : ['http://localhost:3000', 'http://127.0.0.1:3000'],
+      origin: allowedOrigins,
       methods: ['GET', 'POST', 'PUT', 'DELETE'],
       credentials: true
     },
@@ -184,6 +186,8 @@ app.prepare().then(() => {
     console.log(`🚀 Server running on http://${hostname}:${port}`);
     console.log(`🔌 Socket.IO server running on the same port`);
     console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
-    console.log(`🔗 CORS Origins: ${process.env.NODE_ENV === 'production' ? 'https://preview.devnstage.xyz' : 'http://localhost:3000'}`);
+    console.log(`🔗 CORS Origins: ${allowedOrigins.join(', ')}`);
+    console.log(`📡 Socket URL: ${process.env.NEXT_PUBLIC_SOCKET_URL || 'Not configured'}`);
+    console.log(`🌐 App URL: ${process.env.NEXT_PUBLIC_APP_URL || 'Not configured'}`);
   });
 });

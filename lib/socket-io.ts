@@ -11,10 +11,12 @@ class SocketManager {
       return this.socket;
     }
 
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 
-      (process.env.NODE_ENV === 'production' 
-        ? 'https://preview.devnstage.xyz'
-        : 'http://localhost:3000');
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL;
+    
+    if (!socketUrl) {
+      console.error('❌ NEXT_PUBLIC_SOCKET_URL is not defined in environment variables');
+      throw new Error('Socket URL not configured');
+    }
     
     this.socket = io(socketUrl, {
       transports: ["websocket", "polling"],
