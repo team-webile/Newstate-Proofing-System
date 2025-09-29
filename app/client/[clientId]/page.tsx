@@ -276,7 +276,7 @@ export default function ClientDashboard({ params }: ClientDashboardProps) {
           to: string;
           timestamp: string;
         }) => {
-          console.log("💬 Received dummy success message:", data);
+          console.log("💬 CLIENT received dummy success message:", data);
           
           setChatMessages((prev) => [
             ...prev,

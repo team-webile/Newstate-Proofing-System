@@ -122,11 +122,32 @@ export default function NotificationTest({ projectId, userType }: NotificationTe
     socket.emit("reviewStatusChanged", testData);
   };
 
+  const testSocketAPI = async () => {
+    try {
+      const response = await fetch('/api/test-socket', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          projectId,
+          message: `Test message from ${userType}`,
+          userType
+        }),
+      });
+
+      const data = await response.json();
+      console.log('Test API response:', data);
+    } catch (error) {
+      console.error('Test API error:', error);
+    }
+  };
+
   return (
     <Card className="w-full max-w-2xl">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Icons.Bell />
+          <Icons.MessageCircle />
           Notification Test - {userType.toUpperCase()}
           <Badge variant={isConnected ? "default" : "destructive"}>
             {isConnected ? "Connected" : "Disconnected"}
@@ -140,6 +161,9 @@ export default function NotificationTest({ projectId, userType }: NotificationTe
           </Button>
           <Button onClick={testStatusUpdate} disabled={!isConnected}>
             Test Status Update
+          </Button>
+          <Button onClick={testSocketAPI} disabled={!isConnected}>
+            Test Socket API
           </Button>
         </div>
 

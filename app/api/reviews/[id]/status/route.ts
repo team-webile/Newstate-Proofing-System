@@ -37,13 +37,17 @@ export async function PUT(
       const io = getSocketServer();
       
       if (io) {
-        // Get the request headers to determine who is making the request
+        // Better detection of admin vs client
+        const referer = req.headers.get('referer') || '';
         const userAgent = req.headers.get('user-agent') || '';
-        const isFromAdmin = userAgent.includes('admin') || req.url.includes('/admin/');
+        const isFromAdmin = referer.includes('/admin/') || userAgent.includes('admin') || req.url.includes('/admin/');
+        
+        console.log('🔍 Status update detection:', { referer, userAgent, isFromAdmin, url: req.url });
         
         // Create status update message
         const statusMessage = `📊 Review status updated to: ${status}`;
         
+        // Emit to all clients in project room
         io.to(`project-${review.projectId}`).emit('reviewStatusUpdated', {
           reviewId: review.id,
           projectId: review.projectId,
@@ -62,6 +66,7 @@ export async function PUT(
             message: `✅ Review status updated to ${status} by Admin`,
             from: 'Admin',
             to: 'Client',
+            projectId: review.projectId,
             timestamp: new Date().toISOString()
           });
         } else {
@@ -71,6 +76,7 @@ export async function PUT(
             message: `✅ Client updated review status to ${status}`,
             from: 'Client',
             to: 'Admin',
+            projectId: review.projectId,
             timestamp: new Date().toISOString()
           });
         }
@@ -83,10 +89,21 @@ export async function PUT(
       console.log("Socket emission error:", error);
     }
 
+    // Determine if this is from admin or client for response message
+    const referer = req.headers.get('referer') || '';
+    const userAgent = req.headers.get('user-agent') || '';
+    const isFromAdmin = referer.includes('/admin/') || userAgent.includes('admin') || req.url.includes('/admin/');
+    
+    const successMessage = isFromAdmin 
+      ? `✅ Admin updated review status to ${status}! Client will be notified.`
+      : `✅ Client updated review status to ${status}! Admin will be notified.`;
+
     return NextResponse.json({
       status: "success",
-      message: "Review status updated successfully",
+      message: successMessage,
       data: review,
+      dummyMessage: successMessage,
+      isFromAdmin: isFromAdmin
     });
   } catch (error) {
     console.error("Review status update error:", error);

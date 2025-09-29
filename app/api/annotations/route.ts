@@ -156,10 +156,18 @@ export async function POST(req: NextRequest) {
       console.log("Socket emission error:", error);
     }
 
+    // Determine if this is from admin or client for response message
+    const isFromAdmin = addedBy === 'Admin' || addedByName?.includes('Admin');
+    const successMessage = isFromAdmin 
+      ? "✅ Admin annotation added successfully! Client will be notified."
+      : "✅ Client annotation added successfully! Admin will be notified.";
+
     return NextResponse.json({
       status: "success",
-      message: "Annotation added successfully",
+      message: successMessage,
       data: annotation,
+      dummyMessage: successMessage,
+      isFromAdmin: isFromAdmin
     });
   } catch (error) {
     console.error("Annotation creation error:", error);

@@ -432,7 +432,7 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
           to: string;
           timestamp: string;
         }) => {
-          console.log("💬 Admin received dummy success message:", data);
+          console.log("💬 ADMIN received dummy success message:", data);
           
           setChatMessages((prev) => [
             ...prev,
