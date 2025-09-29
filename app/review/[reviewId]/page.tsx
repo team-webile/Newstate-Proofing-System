@@ -28,7 +28,7 @@ import {
 // import ImageAnnotation from "@/components/ImageAnnotation"
 import { useRealtimeComments } from "@/hooks/use-realtime-comments";
 import { useUnifiedSocket } from '@/hooks/use-unified-socket';
-import { RealtimeImageAnnotation } from '@/components/RealtimeImageAnnotation';
+// import { RealtimeImageAnnotation } from '@/components/RealtimeImageAnnotation';
 import {
   Dialog,
   DialogContent,
@@ -221,8 +221,8 @@ export default function ReviewPage({ params }: ReviewPageProps) {
     updateElementStatus: updateRealtimeElementStatus,
   } = useRealtimeComments({
     projectId: params.reviewId, // Use the reviewId directly as projectId
-    elementId: currentFileData?.id,
-    fileId: currentFileData?.id,
+    elementId: currentFile, // Use currentFile instead of currentFileData?.id
+    fileId: currentFile, // Use currentFile instead of currentFileData?.id
     currentUser,
   });
 
@@ -890,6 +890,11 @@ export default function ReviewPage({ params }: ReviewPageProps) {
     (a) => a.fileId === currentFile
   );
 
+  // Filter realtime annotations by current file
+  const currentFileRealtimeAnnotations = realtimeAnnotations.filter(
+    (a) => a.fileId === currentFile
+  );
+
   // Initialize unified socket
   const {
     isConnected: socketConnected,
@@ -1050,9 +1055,10 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         
         // Update project status if review status affects it
         if (data.status === 'APPROVED' || data.status === 'REJECTED') {
-          setProject(prev => prev ? { 
+          // Update review data status
+          setReviewData((prev: any) => prev ? { 
             ...prev, 
-            status: data.status === 'APPROVED' ? 'completed' : 'rejected' as any 
+            status: data.status === 'APPROVED' ? 'COMPLETED' : 'REJECTED' as any 
           } : prev);
         }
         
@@ -1069,7 +1075,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         setLastUpdate(data.timestamp);
       },
       onProjectStatusChanged: (data) => {
-        setProject(prev => prev ? { ...prev, status: data.status as any } : prev);
+        setReviewData((prev: any) => prev ? { ...prev, status: data.status as any } : prev);
         
         const senderName = data.changedByName || data.changedBy || 'Unknown';
         addMessageToCurrentFile({
@@ -1859,7 +1865,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                       })}
 
                       {/* Render real-time annotations on image */}
-                      {realtimeAnnotations.map((annotation) => {
+                      {currentFileRealtimeAnnotations.map((annotation) => {
                         if (
                           annotation.x !== undefined &&
                           annotation.y !== undefined
@@ -1976,7 +1982,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
 
                       {/* Annotation counter badge */}
                       {(currentFileAnnotations.length > 0 ||
-                        realtimeAnnotations.length > 0) && (
+                        currentFileRealtimeAnnotations.length > 0) && (
                           <div className="absolute top-4 right-4">
                             <Badge
                               variant="default"
@@ -1984,9 +1990,9 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                             >
                               <MessageCircle className="h-3 w-3 mr-1" />
                               {currentFileAnnotations.length +
-                                realtimeAnnotations.length}{" "}
+                                currentFileRealtimeAnnotations.length}{" "}
                               annotation
-                              {currentFileAnnotations.length + realtimeAnnotations.length !==
+                              {currentFileAnnotations.length + currentFileRealtimeAnnotations.length !==
                                 1
                                 ? "s"
                                 : ""}
@@ -2024,7 +2030,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
 
               {/* Comments & Annotations */}
               {(realtimeComments.length > 0 ||
-                realtimeAnnotations.length > 0 ||
+                currentFileRealtimeAnnotations.length > 0 ||
                 currentFileAnnotations.length > 0) && (
                   <Card className="mt-6">
                     <CardHeader>
@@ -2032,7 +2038,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                         <MessageCircle className="h-5 w-5" />
                         Comments & Annotations (
                         {realtimeComments.length +
-                          realtimeAnnotations.length +
+                          currentFileRealtimeAnnotations.length +
                           currentFileAnnotations.length}
                         )
                       </CardTitle>
@@ -2070,7 +2076,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                         ))}
 
                         {/* Real-time Annotations */}
-                        {realtimeAnnotations.map((annotation) => (
+                        {currentFileRealtimeAnnotations.map((annotation) => (
                           <div
                             key={annotation.id}
                             className="p-4 border rounded-lg"
