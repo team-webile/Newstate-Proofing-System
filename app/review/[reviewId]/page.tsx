@@ -130,8 +130,9 @@ export default function ReviewPage({ params }: ReviewPageProps) {
   const [showAnnotationModal, setShowAnnotationModal] = useState(false);
   const [selectedImage, setSelectedImage] = useState<ProjectFile | null>(null);
   // Socket is handled by useRealtimeComments hook
-  const [chatMessages, setChatMessages] = useState<
-    Array<{
+  // File-specific chat messages - organized by fileId
+  const [chatMessages, setChatMessages] = useState<{
+    [fileId: string]: Array<{
       id: string;
       type: "annotation" | "status";
       message: string;
@@ -141,7 +142,22 @@ export default function ReviewPage({ params }: ReviewPageProps) {
       senderName?: string;
       isFromClient?: boolean;
     }>
-  >([]);
+  }>({});
+
+  // Helper function to get current file's chat messages
+  const getCurrentFileChatMessages = () => {
+    if (!selectedImage?.id) return [];
+    return chatMessages[selectedImage.id] || [];
+  };
+
+  // Helper function to add message to current file
+  const addMessageToCurrentFile = (message: any) => {
+    if (!selectedImage?.id) return;
+    setChatMessages(prev => ({
+      ...prev,
+      [selectedImage.id]: [...(prev[selectedImage.id] || []), message]
+    }));
+  };
 
   // Reply functionality state
   const [showReplyInput, setShowReplyInput] = useState(false);
@@ -717,15 +733,12 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         }
 
         // Add to chat messages for real-time updates (only if not already added)
-        setChatMessages((prev) => {
+        if (selectedImage?.id) {
           const messageId = `reply-${data.data.id}`;
-          const existingMessage = prev.find(msg => msg.id === messageId);
-          if (existingMessage) {
-            return prev; // Don't add duplicate
-          }
-          return [
-            ...prev,
-            {
+          const currentMessages = getCurrentFileChatMessages();
+          const existingMessage = currentMessages.find(msg => msg.id === messageId);
+          if (!existingMessage) {
+            addMessageToCurrentFile({
               id: messageId,
               type: "annotation",
               message: `You replied: "${replyText}"`,
@@ -733,21 +746,9 @@ export default function ReviewPage({ params }: ReviewPageProps) {
               addedBy: "Client",
               senderName: currentUser?.name || "Client",
               isFromClient: true,
-            },
-          ];
-        });
-
-        // Emit socket event for real-time updates
-        emitAnnotationReply({
-          projectId: params.reviewId,
-          annotationId: targetAnnotation.id,
-          reply: replyText,
-          addedBy: "Client",
-          addedByName: currentUser?.name || "Client",
-          timestamp: new Date().toISOString(),
-        });
-
-        setReplyText("");
+            }
+          });
+        }
 
         // Success feedback is handled by the loading state and real-time updates
 
@@ -926,15 +927,18 @@ export default function ReviewPage({ params }: ReviewPageProps) {
           ? `You sent: "${data.annotation || data.content}"`
           : `Received from ${senderName}: "${data.annotation || data.content}"`;
 
-        setChatMessages(prev => [...prev, {
-          id: Date.now().toString(),
-          type: 'annotation',
-          message: messageText,
-          timestamp: data.timestamp,
-          addedBy: senderName,
-          senderName: senderName,
-          isFromClient: isFromClient
-        }]);
+        // Only add message if it's for the current file
+        if (data.fileId === selectedImage?.id) {
+          addMessageToCurrentFile({
+            id: Date.now().toString(),
+            type: 'annotation',
+            message: messageText,
+            timestamp: data.timestamp,
+            addedBy: senderName,
+            senderName: senderName,
+            isFromClient: isFromClient
+          });
+        }
 
         // Show visual notification for new annotation from admin
         if (!isFromClient) {
@@ -1002,13 +1006,11 @@ export default function ReviewPage({ params }: ReviewPageProps) {
 
         // Add to chat messages
         const senderName = newReply.addedByName || newReply.addedBy || 'Unknown';
-        setChatMessages(prev => {
-          const messageId = `socket-reply-${newReply.id}`;
-          const existingMessage = prev.find(msg => msg.id === messageId);
-          if (existingMessage) {
-            return prev;
-          }
-          return [...prev, {
+        const messageId = `socket-reply-${newReply.id}`;
+        const currentMessages = getCurrentFileChatMessages();
+        const existingMessage = currentMessages.find(msg => msg.id === messageId);
+        if (!existingMessage) {
+          addMessageToCurrentFile({
             id: messageId,
             type: 'annotation',
             message: `Reply added by ${senderName}: ${newReply.content}`,
@@ -1016,8 +1018,8 @@ export default function ReviewPage({ params }: ReviewPageProps) {
             addedBy: newReply.addedBy,
             senderName: senderName,
             isFromClient: newReply.addedBy === 'Client'
-          }];
-        });
+          });
+        }
         setLastUpdate(data.timestamp);
       },
       onAnnotationStatusUpdated: (data) => {
@@ -1032,7 +1034,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         ));
 
         const senderName = data.updatedByName || data.updatedBy || 'Unknown';
-        setChatMessages(prev => [...prev, {
+        addMessageToCurrentFile({
           id: Date.now().toString(),
           type: 'status',
           message: `Annotation status changed to ${data.status} by ${senderName}`,
@@ -1040,7 +1042,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
           addedBy: data.updatedBy,
           senderName: senderName,
           isFromClient: data.updatedBy === 'Client'
-        }]);
+        });
         setLastUpdate(data.timestamp);
       },
       onReviewStatusUpdated: (data) => {
@@ -1055,7 +1057,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         }
         
         const senderName = data.updatedByName || data.updatedBy || 'Unknown';
-        setChatMessages(prev => [...prev, {
+        addMessageToCurrentFile({
           id: Date.now().toString(),
           type: 'status',
           message: `Review status changed to ${data.status} by ${senderName}`,
@@ -1063,14 +1065,14 @@ export default function ReviewPage({ params }: ReviewPageProps) {
           addedBy: data.updatedBy,
           senderName: senderName,
           isFromClient: data.updatedBy === 'Client'
-        }]);
+        });
         setLastUpdate(data.timestamp);
       },
       onProjectStatusChanged: (data) => {
         setProject(prev => prev ? { ...prev, status: data.status as any } : prev);
         
         const senderName = data.changedByName || data.changedBy || 'Unknown';
-        setChatMessages(prev => [...prev, {
+        addMessageToCurrentFile({
           id: Date.now().toString(),
           type: 'status',
           message: `Project status changed to ${data.status} by ${senderName}`,
@@ -1078,7 +1080,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
           addedBy: data.changedBy,
           senderName: senderName,
           isFromClient: data.changedBy === 'Client'
-        }]);
+        });
         setLastUpdate(data.timestamp);
       }
     }
@@ -1170,18 +1172,15 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         }));
 
         // Add to chat messages for real-time updates
-        setChatMessages((prev) => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            type: "annotation",
-            message: `You added annotation: "${newComment}"`,
-            timestamp: new Date().toISOString(),
-            addedBy: currentClient.role,
-            senderName: currentClient.name,
-            isFromClient: true,
-          },
-        ]);
+        addMessageToCurrentFile({
+          id: Date.now().toString(),
+          type: "annotation",
+          message: `You added annotation: "${newComment}"`,
+          timestamp: new Date().toISOString(),
+          addedBy: currentClient.role,
+          senderName: currentClient.name,
+          isFromClient: true,
+        });
 
         // Emit to socket
         emitAnnotation({
@@ -1250,18 +1249,15 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         );
 
         // Add to chat messages for real-time updates
-        setChatMessages((prev) => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            type: "annotation",
-            message: `You replied: "${newComment}"`,
-            timestamp: new Date().toISOString(),
-            addedBy: "Client",
-            senderName: currentUser?.name || "Client",
-            isFromClient: true,
-          },
-        ]);
+        addMessageToCurrentFile({
+          id: Date.now().toString(),
+          type: "annotation",
+          message: `You replied: "${newComment}"`,
+          timestamp: new Date().toISOString(),
+          addedBy: "Client",
+          senderName: currentUser?.name || "Client",
+          isFromClient: true,
+        });
 
         // Emit socket event for real-time updates
         emitAnnotationReply({
@@ -2461,7 +2457,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                     <MessageSquare className="h-4 w-4" />
                     Live Chat
                     <Badge variant="outline" className="text-xs">
-                      {chatMessages.length} messages
+                      {getCurrentFileChatMessages().length} messages
                     </Badge>
                   </CardTitle>
                   <CardDescription>
@@ -2470,8 +2466,8 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4 max-h-96 overflow-y-auto">
-                    {chatMessages.length > 0 ? (
-                      chatMessages.map((message) => (
+                    {getCurrentFileChatMessages().length > 0 ? (
+                      getCurrentFileChatMessages().map((message) => (
                         <div
                           key={message.id}
                           className={`p-3 rounded-lg ${message.isFromClient
