@@ -1,22 +1,30 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Logo } from "@/components/logo"
-import { Icons } from "@/components/icons"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Switch } from "@/components/ui/switch"
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Logo } from "@/components/logo";
+import { Icons } from "@/components/icons";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/hooks/use-toast";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -25,99 +33,104 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { useToast } from "@/hooks/use-toast"
+} from "@/components/ui/dialog";
 
 interface Client {
-  id: string
-  name: string
-  email: string
-  company?: string
+  id: string;
+  name: string;
+  email: string;
+  company?: string;
 }
 
 interface ProjectFile {
-  id: string
-  name: string
-  url: string
-  type: string
-  size: number
-  uploadedAt: string
+  id: string;
+  name: string;
+  url: string;
+  type: string;
+  size: number;
+  uploadedAt: string;
 }
 
 interface Project {
-  id: string
-  name: string
-  clientId: string
-  description: string
-  files: ProjectFile[]
-  allowDownloads: boolean
-  emailNotifications: boolean
-  publicLink: string
-  status: "draft" | "pending" | "approved" | "revisions" | "active" | "archived" | "completed"
-  createdAt: string
-  lastActivity: string
+  id: string;
+  name: string;
+  clientId: string;
+  description: string;
+  files: ProjectFile[];
+  allowDownloads: boolean;
+  emailNotifications: boolean;
+  publicLink: string;
+  status:
+    | "draft"
+    | "pending"
+    | "approved"
+    | "revisions"
+    | "active"
+    | "archived"
+    | "completed";
+  createdAt: string;
+  lastActivity: string;
 }
 
 interface ProjectEditPageProps {
   params: {
-    projectId: string
-  }
+    projectId: string;
+  };
 }
 
 export default function ProjectEditPage({ params }: ProjectEditPageProps) {
-  const { toast } = useToast()
-
-  const [project, setProject] = useState<Project | null>(null)
-  const [isUploading, setIsUploading] = useState(false)
-  const [showFileDialog, setShowFileDialog] = useState(false)
-  const [newFile, setNewFile] = useState<File | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
-  const [isCopied, setIsCopied] = useState(false)
-  const [clients, setClients] = useState<Client[]>([])
-  const [clientsLoading, setClientsLoading] = useState(true)
-  const [clientsError, setClientsError] = useState<string | null>(null)
+  const router = useRouter();
+  const { toast } = useToast();
+  const [project, setProject] = useState<Project | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [showFileDialog, setShowFileDialog] = useState(false);
+  const [newFile, setNewFile] = useState<File | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [clientsLoading, setClientsLoading] = useState(true);
+  const [clientsError, setClientsError] = useState<string | null>(null);
 
   const fetchClients = async () => {
     try {
-      setClientsLoading(true)
-      setClientsError(null)
-      
-      const response = await fetch('/api/clients')
-      const data = await response.json()
-      
-      if (data.status === 'success') {
-        setClients(data.data.clients || [])
+      setClientsLoading(true);
+      setClientsError(null);
+
+      const response = await fetch("/api/clients");
+      const data = await response.json();
+
+      if (data.status === "success") {
+        setClients(data.data.clients || []);
       } else {
-        setClientsError(data.message || 'Failed to fetch clients')
+        setClientsError(data.message || "Failed to fetch clients");
       }
     } catch (err) {
-      setClientsError('Failed to fetch clients')
+      setClientsError("Failed to fetch clients");
     } finally {
-      setClientsLoading(false)
+      setClientsLoading(false);
     }
-  }
-
+  };
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setIsLoading(true)
-        
+        setIsLoading(true);
+
         // Fetch both project and clients in parallel
         const [projectResponse, clientsResponse] = await Promise.all([
           fetch(`/api/projects/${params.projectId}`),
-          fetch('/api/clients')
-        ])
-        
+          fetch("/api/clients"),
+        ]);
+
         const [projectData, clientsData] = await Promise.all([
           projectResponse.json(),
-          clientsResponse.json()
-        ])
-        
+          clientsResponse.json(),
+        ]);
+
         // Handle project data
-        if (projectData.status === 'success') {
-          const projectInfo = projectData.data
+        if (projectData.status === "success") {
+          const projectInfo = projectData.data;
           const projectWithLink = {
             id: projectInfo.id,
             name: projectInfo.title,
@@ -129,49 +142,51 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
             publicLink: `${window.location.origin}/client/${projectInfo.clientId}?project=${projectInfo.id}`,
             status: projectInfo.status.toLowerCase(),
             createdAt: projectInfo.createdAt,
-            lastActivity: projectInfo.lastActivity ? new Date(projectInfo.lastActivity).toLocaleDateString() : "Unknown",
-          }
-          setProject(projectWithLink)
+            lastActivity: projectInfo.lastActivity
+              ? new Date(projectInfo.lastActivity).toLocaleDateString()
+              : "Unknown",
+          };
+          setProject(projectWithLink);
         } else {
-          console.error('Failed to fetch project:', projectData.message)
+          console.error("Failed to fetch project:", projectData.message);
         }
-        
+
         // Handle clients data
-        if (clientsData.status === 'success') {
-          setClients(clientsData.data.clients || [])
+        if (clientsData.status === "success") {
+          setClients(clientsData.data.clients || []);
         } else {
-          setClientsError(clientsData.message || 'Failed to fetch clients')
+          setClientsError(clientsData.message || "Failed to fetch clients");
         }
       } catch (error) {
-        console.error('Error fetching data:', error)
-        setClientsError('Failed to fetch data')
+        console.error("Error fetching data:", error);
+        setClientsError("Failed to fetch data");
       } finally {
-        setIsLoading(false)
-        setClientsLoading(false)
+        setIsLoading(false);
+        setClientsLoading(false);
       }
-    }
-    
-    fetchData()
-  }, [params.projectId])
+    };
+
+    fetchData();
+  }, [params.projectId]);
 
   const handleFileUpload = async (file: File) => {
-    if (!project) return
-    
-    setIsUploading(true)
-    
+    if (!project) return;
+
+    setIsUploading(true);
+
     try {
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('version', 'V1')
-      
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("version", "V1");
+
       const response = await fetch(`/api/projects/${project.id}/files`, {
-        method: 'POST',
+        method: "POST",
         body: formData,
-      })
-      
-      const data = await response.json()
-      
-      if (data.status === 'success') {
+      });
+
+      const data = await response.json();
+
+      if (data.status === "success") {
         const uploadedFile: ProjectFile = {
           id: data.data.id,
           name: data.data.name,
@@ -179,112 +194,123 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
           type: data.data.type,
           size: data.data.size,
           uploadedAt: data.data.uploadedAt,
-        }
+        };
 
-        setProject(prev => prev ? {
-          ...prev,
-          files: [...prev.files, uploadedFile]
-        } : null)
-        
+        setProject((prev) =>
+          prev
+            ? {
+                ...prev,
+                files: [...prev.files, uploadedFile],
+              }
+            : null
+        );
+
         toast({
-          title: "Success",
-          description: "File uploaded successfully!",
-          variant: "default"
-        })
+          title: "File Uploaded",
+          description: "File has been uploaded successfully!",
+        });
       } else {
         toast({
-          title: "Error",
-          description: data.message || 'Failed to upload file',
-          variant: "destructive"
-        })
+          title: "Upload Error",
+          description: data.message || "Failed to upload file",
+          variant: "destructive",
+        });
       }
     } catch (error) {
-      console.error('Upload error:', error)
+      console.error("Upload error:", error);
       toast({
-        title: "Error",
+        title: "Upload Error",
         description: "Failed to upload file. Please try again.",
-        variant: "destructive"
-      })
+        variant: "destructive",
+      });
     } finally {
-      setIsUploading(false)
-      setNewFile(null)
-      setShowFileDialog(false)
+      setIsUploading(false);
+      setNewFile(null);
+      setShowFileDialog(false);
     }
-  }
+  };
 
   const handleFileRemove = async (fileId: string) => {
-    if (!project) return
-    
+    if (!project) return;
+
     try {
       // Find the file to get its name
-      const fileToDelete = project.files.find(file => file.id === fileId)
-      
+      const fileToDelete = project.files.find((file) => file.id === fileId);
+
       if (!fileToDelete) {
         toast({
           title: "Error",
           description: "File not found",
-          variant: "destructive"
-        })
-        return
+          variant: "destructive",
+        });
+        return;
       }
-      
+
       // Extract filename from URL (e.g., "/uploads/projects/.../filename.jpg" -> "filename.jpg")
-      const fileName = fileToDelete.url.split('/').pop()
-      
+      const fileName = fileToDelete.url.split("/").pop();
+
       if (!fileName) {
         toast({
           title: "Error",
           description: "Invalid file name",
-          variant: "destructive"
-        })
-        return
+          variant: "destructive",
+        });
+        return;
       }
-      
+
       // Call delete API
-      const response = await fetch(`/api/projects/${project.id}/files?fileName=${encodeURIComponent(fileName)}`, {
-        method: 'DELETE',
-      })
-      
-      const data = await response.json()
-      
-      if (data.status === 'success') {
+      const response = await fetch(
+        `/api/projects/${project.id}/files?fileName=${encodeURIComponent(
+          fileName
+        )}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.status === "success") {
         // Remove file from frontend state
-        setProject(prev => prev ? {
-          ...prev,
-          files: prev.files.filter(file => file.id !== fileId)
-        } : null)
+        setProject((prev) =>
+          prev
+            ? {
+                ...prev,
+                files: prev.files.filter((file) => file.id !== fileId),
+              }
+            : null
+        );
         toast({
-          title: "Success",
-          description: "File deleted successfully!",
-          variant: "default"
-        })
+          title: "File Deleted",
+          description: "File has been deleted successfully!",
+        });
       } else {
         toast({
-          title: "Error",
-          description: data.message || 'Failed to delete file',
-          variant: "destructive"
-        })
+          title: "Delete Error",
+          description: data.message || "Failed to delete file",
+          variant: "destructive",
+        });
       }
     } catch (error) {
-      console.error('Delete error:', error)
+      console.error("Delete error:", error);
       toast({
-        title: "Error",
+        title: "Delete Error",
         description: "Failed to delete file. Please try again.",
-        variant: "destructive"
-      })
+        variant: "destructive",
+      });
     }
-  }
+  };
 
   const handleSaveProject = async () => {
-    if (!project) return
-    
+    if (!project) return;
+
     try {
-      setIsSaving(true)
-      
+      setIsSaving(true);
+
       const response = await fetch(`/api/projects/${project.id}`, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           title: project.name,
@@ -294,76 +320,78 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
           clientId: project.clientId,
           emailNotifications: project.emailNotifications,
         }),
-      })
-      
-      const data = await response.json()
-      
-      if (data.status === 'success') {
+      });
+
+      const data = await response.json();
+
+      if (data.status === "success") {
         toast({
-          title: "Success",
-          description: "Project updated successfully!",
-          variant: "default"
-        })
-        // Optionally redirect back to projects list
-        // window.location.href = '/admin/projects'
+          title: "Project Updated",
+          description: "Project has been updated successfully!",
+        });
+        router.push("/admin/projects");
       } else {
         toast({
-          title: "Error",
-          description: data.message || 'Failed to update project',
-          variant: "destructive"
-        })
+          title: "Update Error",
+          description: data.message || "Failed to update project",
+          variant: "destructive",
+        });
       }
     } catch (error) {
-      console.error('Error updating project:', error)
+      console.error("Error updating project:", error);
       toast({
-        title: "Error",
+        title: "Update Error",
         description: "Failed to update project. Please try again.",
-        variant: "destructive"
-      })
+        variant: "destructive",
+      });
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-  }
+  };
 
   const handleCopyLink = async () => {
-    if (!project) return
-    
+    if (!project) return;
+
     try {
-      await navigator.clipboard.writeText(project.publicLink)
-      setIsCopied(true)
-      setTimeout(() => setIsCopied(false), 2000) // Reset after 2 seconds
-    } catch (error) {
-      console.error('Failed to copy:', error)
+      await navigator.clipboard.writeText(project.publicLink);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000); // Reset after 2 seconds
       toast({
-        title: "Error",
+        title: "Link Copied",
+        description: "Public link has been copied to clipboard.",
+      });
+    } catch (error) {
+      console.error("Failed to copy:", error);
+      toast({
+        title: "Copy Error",
         description: "Failed to copy link. Please try again.",
-        variant: "destructive"
-      })
+        variant: "destructive",
+      });
     }
-  }
+  };
 
   const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes'
-    const k = 1024
-    const sizes = ['Bytes', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-  }
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case "pending":
-        return "bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
+        return "bg-yellow-500/10 text-yellow-500 border-yellow-500/20";
       case "approved":
-        return "bg-green-500/10 text-green-500 border-green-500/20"
+        return "bg-green-500/10 text-green-500 border-green-500/20";
       case "revisions":
-        return "bg-orange-500/10 text-orange-500 border-orange-500/20"
+        return "bg-orange-500/10 text-orange-500 border-orange-500/20";
       case "draft":
-        return "bg-gray-500/10 text-gray-500 border-gray-500/20"
+        return "bg-gray-500/10 text-gray-500 border-gray-500/20";
       default:
-        return "bg-muted text-muted-foreground"
+        return "bg-muted text-muted-foreground";
     }
-  }
+  };
 
   if (isLoading) {
     return (
@@ -373,7 +401,7 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
           <p className="text-muted-foreground">Loading project...</p>
         </div>
       </div>
-    )
+    );
   }
 
   if (!project) {
@@ -384,13 +412,15 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
             <Icons.FolderOpen />
           </div>
           <h3 className="text-lg font-medium mb-2">Project not found</h3>
-          <p className="text-muted-foreground mb-4">The project you're looking for doesn't exist.</p>
-          <Button onClick={() => window.location.href = "/admin/projects"}>
+          <p className="text-muted-foreground mb-4">
+            The project you're looking for doesn't exist.
+          </p>
+          <Button onClick={() => (window.location.href = "/admin/projects")}>
             Back to Projects
           </Button>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -439,20 +469,30 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-3xl font-bold text-foreground mb-2">
-                   {project.name}
+                  {project.name}
                 </h1>
-                <p className="text-muted-foreground">Edit project details and manage files</p>
+                <p className="text-muted-foreground">
+                  Edit project details and manage files
+                </p>
               </div>
               <div className="flex items-center gap-2">
-                <Badge className={getStatusColor(project.status)}>{project.status}</Badge>
-                <Button 
-                  variant="outline" 
+                <Badge className={getStatusColor(project.status)}>
+                  {project.status}
+                </Badge>
+                <Button
+                  variant="outline"
                   onClick={handleCopyLink}
-                  className={isCopied ? "bg-green-100 text-green-700 border-green-300" : ""}
+                  className={
+                    isCopied
+                      ? "bg-green-100 text-green-700 border-green-300"
+                      : ""
+                  }
                 >
                   {isCopied ? (
                     <>
-                      <div className="h-4 w-4 flex items-center"><Icons.CheckCircle /></div>
+                      <div className="h-4 w-4 flex items-center">
+                        <Icons.CheckCircle />
+                      </div>
                       <span className="ml-2">Copied</span>
                     </>
                   ) : (
@@ -473,7 +513,9 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
               <Card>
                 <CardHeader>
                   <CardTitle>Project Information</CardTitle>
-                  <CardDescription>Basic details about the project</CardDescription>
+                  <CardDescription>
+                    Basic details about the project
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
@@ -481,23 +523,29 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
                     <Input
                       id="projectName"
                       value={project.name}
-                      onChange={(e) => setProject(prev => prev ? { ...prev, name: e.target.value } : null)}
+                      onChange={(e) =>
+                        setProject((prev) =>
+                          prev ? { ...prev, name: e.target.value } : null
+                        )
+                      }
                     />
                   </div>
-                  
+
                   <div>
                     <Label htmlFor="client">Client</Label>
                     {clientsLoading ? (
                       <div className="flex items-center gap-2">
                         <Icons.Loader2 />
-                        <span className="text-sm text-muted-foreground">Loading clients...</span>
+                        <span className="text-sm text-muted-foreground">
+                          Loading clients...
+                        </span>
                       </div>
                     ) : clientsError ? (
                       <div className="text-sm text-destructive">
                         {clientsError}
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={fetchClients}
                           className="ml-2"
                         >
@@ -505,9 +553,13 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
                         </Button>
                       </div>
                     ) : (
-                      <Select 
-                        value={project.clientId} 
-                        onValueChange={(value) => setProject(prev => prev ? { ...prev, clientId: value } : null)}
+                      <Select
+                        value={project.clientId}
+                        onValueChange={(value) =>
+                          setProject((prev) =>
+                            prev ? { ...prev, clientId: value } : null
+                          )
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select a client" />
@@ -515,7 +567,8 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
                         <SelectContent>
                           {clients.map((client) => (
                             <SelectItem key={client.id} value={client.id}>
-                              {client.name} {client.company && `(${client.company})`}
+                              {client.name}{" "}
+                              {client.company && `(${client.company})`}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -528,16 +581,32 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
                     <Textarea
                       id="description"
                       value={project.description}
-                      onChange={(e) => setProject(prev => prev ? { ...prev, description: e.target.value } : null)}
+                      onChange={(e) =>
+                        setProject((prev) =>
+                          prev ? { ...prev, description: e.target.value } : null
+                        )
+                      }
                       rows={4}
                     />
                   </div>
 
                   <div>
                     <Label htmlFor="status">Project Status</Label>
-                    <Select 
-                      value={project.status} 
-                      onValueChange={(value) => setProject(prev => prev ? { ...prev, status: value as "active" | "archived" | "completed" } : null)}
+                    <Select
+                      value={project.status}
+                      onValueChange={(value) =>
+                        setProject((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                status: value as
+                                  | "active"
+                                  | "archived"
+                                  | "completed",
+                              }
+                            : null
+                        )
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select status" />
@@ -557,7 +626,10 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
                     Project Files ({project.files.length})
-                    <Dialog open={showFileDialog} onOpenChange={setShowFileDialog}>
+                    <Dialog
+                      open={showFileDialog}
+                      onOpenChange={setShowFileDialog}
+                    >
                       <DialogTrigger asChild>
                         <Button variant="outline" size="sm">
                           <Icons.Plus />
@@ -580,17 +652,20 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
                               multiple
                               accept="image/*,.pdf,.psd,.ai,.eps"
                               onChange={(e) => {
-                                const file = e.target.files?.[0]
-                                if (file) setNewFile(file)
+                                const file = e.target.files?.[0];
+                                if (file) setNewFile(file);
                               }}
                             />
                           </div>
                         </div>
                         <DialogFooter>
-                          <Button variant="outline" onClick={() => setShowFileDialog(false)}>
+                          <Button
+                            variant="outline"
+                            onClick={() => setShowFileDialog(false)}
+                          >
                             Cancel
                           </Button>
-                          <Button 
+                          <Button
                             onClick={() => newFile && handleFileUpload(newFile)}
                             disabled={!newFile || isUploading}
                           >
@@ -601,13 +676,17 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
                     </Dialog>
                   </CardTitle>
                   <CardDescription>
-                    Manage design files for client review. You can add more files at any time.
+                    Manage design files for client review. You can add more
+                    files at any time.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
                     {project.files.map((file) => (
-                      <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div
+                        key={file.id}
+                        className="flex items-center justify-between p-3 border rounded-lg"
+                      >
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-muted rounded flex items-center justify-center">
                             <Icons.FolderOpen />
@@ -615,7 +694,8 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
                           <div>
                             <p className="font-medium">{file.name}</p>
                             <p className="text-sm text-muted-foreground">
-                              {formatFileSize(file.size)} • {new Date(file.uploadedAt).toLocaleDateString()}
+                              {formatFileSize(file.size)} •{" "}
+                              {new Date(file.uploadedAt).toLocaleDateString()}
                             </p>
                           </div>
                         </div>
@@ -623,7 +703,7 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => window.open(file.url, '_blank')}
+                            onClick={() => window.open(file.url, "_blank")}
                           >
                             <Icons.ExternalLink />
                           </Button>
@@ -655,24 +735,36 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
                   <div className="flex items-center justify-between">
                     <div>
                       <Label htmlFor="downloads">Allow Downloads</Label>
-                      <p className="text-sm text-muted-foreground">Clients can download files</p>
+                      <p className="text-sm text-muted-foreground">
+                        Clients can download files
+                      </p>
                     </div>
                     <Switch
                       id="downloads"
                       checked={project.allowDownloads}
-                      onCheckedChange={(checked) => setProject(prev => prev ? { ...prev, allowDownloads: checked } : null)}
+                      onCheckedChange={(checked) =>
+                        setProject((prev) =>
+                          prev ? { ...prev, allowDownloads: checked } : null
+                        )
+                      }
                     />
                   </div>
-                  
+
                   <div className="flex items-center justify-between">
                     <div>
                       <Label htmlFor="notifications">Email Notifications</Label>
-                      <p className="text-sm text-muted-foreground">Send email updates</p>
+                      <p className="text-sm text-muted-foreground">
+                        Send email updates
+                      </p>
                     </div>
                     <Switch
                       id="notifications"
                       checked={project.emailNotifications}
-                      onCheckedChange={(checked) => setProject(prev => prev ? { ...prev, emailNotifications: checked } : null)}
+                      onCheckedChange={(checked) =>
+                        setProject((prev) =>
+                          prev ? { ...prev, emailNotifications: checked } : null
+                        )
+                      }
                     />
                   </div>
                 </CardContent>
@@ -682,41 +774,51 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
               <Card>
                 <CardHeader>
                   <CardTitle>Project Information</CardTitle>
-                  <CardDescription>Project details and statistics</CardDescription>
+                  <CardDescription>
+                    Project details and statistics
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
                     <Label className="text-sm font-medium">Project ID</Label>
-                    <p className="text-sm text-muted-foreground">{project.id}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {project.id}
+                    </p>
                   </div>
-                  
+
                   <div>
                     <Label className="text-sm font-medium">Client</Label>
                     <p className="text-sm text-muted-foreground">
-                      {clients.find(c => c.id === project.clientId)?.name}
+                      {clients.find((c) => c.id === project.clientId)?.name}
                     </p>
                   </div>
-                  
+
                   <div>
                     <Label className="text-sm font-medium">Files Count</Label>
-                    <p className="text-sm text-muted-foreground">{project.files.length} files</p>
+                    <p className="text-sm text-muted-foreground">
+                      {project.files.length} files
+                    </p>
                   </div>
-                  
+
                   <div>
                     <Label className="text-sm font-medium">Created</Label>
                     <p className="text-sm text-muted-foreground">
                       {new Date(project.createdAt).toLocaleDateString()}
                     </p>
                   </div>
-                  
+
                   <div>
                     <Label className="text-sm font-medium">Last Activity</Label>
-                    <p className="text-sm text-muted-foreground">{new Date(project.lastActivity).toLocaleDateString()}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {new Date(project.lastActivity).toLocaleDateString()}
+                    </p>
                   </div>
-                  
+
                   <div>
                     <Label className="text-sm font-medium">Status</Label>
-                    <Badge className={getStatusColor(project.status)}>{project.status}</Badge>
+                    <Badge className={getStatusColor(project.status)}>
+                      {project.status}
+                    </Badge>
                   </div>
                 </CardContent>
               </Card>
@@ -725,22 +827,32 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
               <Card>
                 <CardHeader>
                   <CardTitle>Shareable Link</CardTitle>
-                  <CardDescription>Share this link with your client</CardDescription>
+                  <CardDescription>
+                    Share this link with your client
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="p-3 bg-muted rounded-lg">
-                    <p className="text-sm font-mono break-all">{project.publicLink}</p>
+                    <p className="text-sm font-mono break-all">
+                      {project.publicLink}
+                    </p>
                   </div>
                   <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={handleCopyLink} 
-                      className={`flex-1 ${isCopied ? "bg-green-100 text-green-700 border-green-300" : ""}`}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCopyLink}
+                      className={`flex-1 ${
+                        isCopied
+                          ? "bg-green-100 text-green-700 border-green-300"
+                          : ""
+                      }`}
                     >
                       {isCopied ? (
                         <>
-                          <div className="h-4 w-4 flex items-center"><Icons.CheckCircle /></div>
+                          <div className="h-4 w-4 flex items-center">
+                            <Icons.CheckCircle />
+                          </div>
                           <span className="ml-2">Copied</span>
                         </>
                       ) : (
@@ -750,7 +862,11 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
                         </>
                       )}
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => window.open(project.publicLink, '_blank')}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(project.publicLink, "_blank")}
+                    >
                       <Icons.ExternalLink />
                     </Button>
                   </div>
@@ -777,5 +893,5 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
         </div>
       </main>
     </div>
-  )
+  );
 }
