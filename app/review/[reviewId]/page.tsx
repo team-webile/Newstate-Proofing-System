@@ -1841,8 +1841,7 @@ console.log(reviewData,'reviewData')
                               <div className={`w-8 h-8 rounded flex items-center justify-center ${
                                 currentFile === file.id ? "bg-primar" : "bg-muted"
                               }`}>
-                                <Icons.Image  style={{MarginLeft: '10px'}}/>
-                                </div>
+                                 </div>
                               <div className="text-left flex-1">
                                 <p className="font-medium">
                                   {file.name.length > 5
