@@ -1,53 +1,57 @@
-import { ProjectModel, CreateProjectData, UpdateProjectData } from '@/models/Project'
+import {
+  ProjectModel,
+  CreateProjectData,
+  UpdateProjectData,
+} from "@/models/Project";
 
 export interface ProjectWithDetails {
-  id: string
-  title: string
-  description?: string
-  status: 'ACTIVE' | 'ARCHIVED' | 'COMPLETED'
-  createdAt: Date
-  updatedAt: Date
-  userId: string
-  clientId: string
-  downloadEnabled: boolean
-  primaryColor?: string
-  secondaryColor?: string
-  accentColor?: string
-  customCss?: string
-  logoUrl?: string
-  themeMode: string
+  id: string;
+  title: string;
+  description?: string;
+  status: "ACTIVE" | "ARCHIVED" | "COMPLETED";
+  createdAt: Date;
+  updatedAt: Date;
+  userId: string;
+  clientId: string;
+  downloadEnabled: boolean;
+  primaryColor?: string;
+  secondaryColor?: string;
+  accentColor?: string;
+  customCss?: string;
+  logoUrl?: string;
+  themeMode: string;
   client: {
-    id: string
-    name: string
-    email: string
-    company?: string
-  }
+    id: string;
+    name: string;
+    email: string;
+    company?: string;
+  };
   user: {
-    id: string
-    name: string
-    email: string
-  }
+    id: string;
+    name: string;
+    email: string;
+  };
   _count: {
-    reviews: number
-    approvals: number
-  }
-  lastActivity?: string
-  filesCount?: number
-  thumbnail?: string
-  publicLink?: string
+    reviews: number;
+    approvals: number;
+  };
+  lastActivity?: string;
+  filesCount?: number;
+  thumbnail?: string;
+  publicLink?: string;
 }
 
 export interface ProjectListResponse {
-  projects: ProjectWithDetails[]
-  total: number
-  page: number
-  limit: number
+  projects: ProjectWithDetails[];
+  total: number;
+  page: number;
+  limit: number;
   statusCounts: {
-    all: number
-    active: number
-    archived: number
-    completed: number
-  }
+    all: number;
+    active: number;
+    archived: number;
+    completed: number;
+  };
 }
 
 export class ProjectsAPI {
@@ -55,9 +59,9 @@ export class ProjectsAPI {
    * Get all projects with pagination, search, and filters
    */
   static async getProjects(
-    page: number = 1, 
-    limit: number = 10, 
-    search?: string, 
+    page: number = 1,
+    limit: number = 10,
+    search?: string,
     status?: string
   ): Promise<ProjectListResponse> {
     try {
@@ -65,26 +69,26 @@ export class ProjectsAPI {
         page: page.toString(),
         limit: limit.toString(),
         ...(search && { search }),
-        ...(status && status !== 'all' && { status })
-      })
-      
-      const response = await fetch(`/api/projects?${params}`)
-      const data = await response.json()
-      
-      if (data.status === 'success') {
-        return data.data
+        ...(status && status !== "all" && { status }),
+      });
+
+      const response = await fetch(`/api/projects?${params}`);
+      const data = await response.json();
+
+      if (data.status === "success") {
+        return data.data;
       }
-      
-      throw new Error(data.message || 'Failed to fetch projects')
+
+      throw new Error(data.message || "Failed to fetch projects");
     } catch (error) {
-      console.error('Error fetching projects:', error)
+      console.error("Error fetching projects:", error);
       return {
         projects: [],
         total: 0,
         page: 1,
         limit: 10,
-        statusCounts: { all: 0, active: 0, archived: 0, completed: 0 }
-      }
+        statusCounts: { all: 0, active: 0, archived: 0, completed: 0 },
+      };
     }
   }
 
@@ -93,69 +97,74 @@ export class ProjectsAPI {
    */
   static async getProject(id: string): Promise<ProjectWithDetails | null> {
     try {
-      const response = await fetch(`/api/projects/${id}`)
-      const data = await response.json()
-      
-      if (data.status === 'success') {
-        return data.data
+      const response = await fetch(`/api/projects/${id}`);
+      const data = await response.json();
+
+      if (data.status === "success") {
+        return data.data;
       }
-      
-      throw new Error(data.message || 'Failed to fetch project')
+
+      throw new Error(data.message || "Failed to fetch project");
     } catch (error) {
-      console.error('Error fetching project:', error)
-      return null
+      console.error("Error fetching project:", error);
+      return null;
     }
   }
 
   /**
    * Create new project
    */
-  static async createProject(projectData: CreateProjectData): Promise<ProjectWithDetails | null> {
+  static async createProject(
+    projectData: CreateProjectData
+  ): Promise<ProjectWithDetails | null> {
     try {
-      const response = await fetch('/api/projects', {
-        method: 'POST',
+      const response = await fetch("/api/projects", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(projectData),
-      })
-      
-      const data = await response.json()
-      
-      if (data.status === 'success') {
-        return data.data
+      });
+
+      const data = await response.json();
+
+      if (data.status === "success") {
+        return data.data;
       }
-      
-      throw new Error(data.message || 'Failed to create project')
+
+      throw new Error(data.message || "Failed to create project");
     } catch (error) {
-      console.error('Error creating project:', error)
-      return null
+      console.error("Error creating project:", error);
+      return null;
     }
   }
 
   /**
    * Update project
    */
-  static async updateProject(id: string, projectData: UpdateProjectData): Promise<ProjectWithDetails | null> {
+  static async updateProject(
+    id: string,
+    projectData: UpdateProjectData
+  ): Promise<ProjectWithDetails | null> {
     try {
       const response = await fetch(`/api/projects/${id}`, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(projectData),
-      })
-      
-      const data = await response.json()
-      
-      if (data.status === 'success') {
-        return data.data
+      });
+
+      const data = await response.json();
+
+      if (data.status === "success") {
+        return data.data;
       }
-      
-      throw new Error(data.message || 'Failed to update project')
+
+      throw new Error(data.message || "Failed to update project");
     } catch (error) {
-      console.error('Error updating project:', error)
-      return null
+      console.error("Error updating project:", error);
+      return null;
     }
   }
 
@@ -165,64 +174,112 @@ export class ProjectsAPI {
   static async deleteProject(id: string): Promise<boolean> {
     try {
       const response = await fetch(`/api/projects/${id}`, {
-        method: 'DELETE',
-      })
-      
-      const data = await response.json()
-      
-      if (data.status === 'success') {
-        return true
+        method: "DELETE",
+      });
+
+      const data = await response.json();
+
+      if (data.status === "success") {
+        return true;
       }
-      
-      throw new Error(data.message || 'Failed to delete project')
+
+      throw new Error(data.message || "Failed to delete project");
     } catch (error) {
-      console.error('Error deleting project:', error)
-      return false
+      console.error("Error deleting project:", error);
+      return false;
     }
   }
 
   /**
    * Get projects by client ID
    */
-  static async getProjectsByClient(clientId: string): Promise<ProjectWithDetails[]> {
+  static async getProjectsByClient(
+    clientId: string
+  ): Promise<ProjectWithDetails[]> {
     try {
-      const response = await fetch(`/api/clients/${clientId}/projects`)
-      const data = await response.json()
-      
-      if (data.status === 'success') {
-        return data.data
+      const response = await fetch(`/api/clients/${clientId}/projects`);
+      const data = await response.json();
+
+      if (data.status === "success") {
+        return data.data;
       }
-      
-      throw new Error(data.message || 'Failed to fetch client projects')
+
+      throw new Error(data.message || "Failed to fetch client projects");
     } catch (error) {
-      console.error('Error fetching client projects:', error)
-      return []
+      console.error("Error fetching client projects:", error);
+      return [];
     }
   }
 
   /**
    * Update project status
    */
-  static async updateProjectStatus(id: string, status: string): Promise<boolean> {
+  static async updateProjectStatus(
+    id: string,
+    status: string
+  ): Promise<boolean> {
     try {
       const response = await fetch(`/api/projects/${id}/status`, {
-        method: 'PATCH',
+        method: "PATCH",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ status }),
-      })
-      
-      const data = await response.json()
-      
-      if (data.status === 'success') {
-        return true
+      });
+
+      const data = await response.json();
+
+      if (data.status === "success") {
+        return true;
       }
-      
-      throw new Error(data.message || 'Failed to update project status')
+
+      throw new Error(data.message || "Failed to update project status");
     } catch (error) {
-      console.error('Error updating project status:', error)
-      return false
+      console.error("Error updating project status:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Export projects as CSV
+   */
+  static async exportProjectsCSV(
+    search?: string,
+    status?: string
+  ): Promise<void> {
+    try {
+      const params = new URLSearchParams();
+      if (search) params.append("search", search);
+      if (status && status !== "all") params.append("status", status);
+
+      const queryString = params.toString();
+      const response = await fetch(
+        `/api/projects/export${queryString ? `?${queryString}` : ""}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to export projects");
+      }
+
+      // Get the filename from the response headers
+      const contentDisposition = response.headers.get("content-disposition");
+      const filename = contentDisposition
+        ? contentDisposition.split("filename=")[1]?.replace(/"/g, "")
+        : "projects-export.csv";
+
+      // Create blob and download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error exporting projects:", error);
+      throw error;
     }
   }
 }
