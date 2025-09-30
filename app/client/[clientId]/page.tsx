@@ -16,7 +16,9 @@ import {
   Sun,
   PenTool,
   X,
+  ZoomIn,
 } from "lucide-react";
+import Lightbox from "@/components/Lightbox";
 // Dialog imports removed - no longer using annotation modal
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -79,6 +81,9 @@ export default function ClientDashboard({ params }: ClientDashboardProps) {
   >([]);
   const [showChat, setShowChat] = useState(true);
   const [files, setFiles] = useState<ProjectFile[]>([]);
+  const [showLightbox, setShowLightbox] = useState(false);
+  const [lightboxImages, setLightboxImages] = useState<string[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
 
   // Get project ID from URL search params
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -352,6 +357,17 @@ export default function ClientDashboard({ params }: ClientDashboardProps) {
     }));
   };
 
+  const handleLightboxOpen = (imageUrl: string, allImages?: string[]) => {
+    if (allImages && allImages.length > 0) {
+      setLightboxImages(allImages);
+      setLightboxIndex(allImages.indexOf(imageUrl));
+    } else {
+      setLightboxImages([imageUrl]);
+      setLightboxIndex(0);
+    }
+    setShowLightbox(true);
+  };
+
   // Loading state
   if (isLoading) {
     return (
@@ -528,7 +544,14 @@ export default function ClientDashboard({ params }: ClientDashboardProps) {
                     <img
                       src={element.thumbnail || "/placeholder.svg"}
                       alt={element.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200 cursor-zoom-in"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const allImages = projectElements
+                          ?.filter((el: any) => el.thumbnail)
+                          ?.map((el: any) => el.thumbnail) || [];
+                        handleLightboxOpen(element.thumbnail, allImages);
+                      }}
                     />
                     <div className="absolute top-2 right-2">
                       {getStatusIcon(element.status)}
@@ -538,12 +561,16 @@ export default function ClientDashboard({ params }: ClientDashboardProps) {
                         <Button
                           size="sm"
                           variant="secondary"
-                          onClick={() =>
-                            window.open(element.thumbnail, "_blank")
-                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const allImages = projectElements
+                              ?.filter((el: any) => el.thumbnail)
+                              ?.map((el: any) => el.thumbnail) || [];
+                            handleLightboxOpen(element.thumbnail, allImages);
+                          }}
                         >
-                          <Eye className="h-4 w-4 mr-2" />
-                          View
+                          <ZoomIn className="h-4 w-4 mr-2" />
+                          Zoom
                         </Button>
                         <Button
                           size="sm"
@@ -684,6 +711,18 @@ export default function ClientDashboard({ params }: ClientDashboardProps) {
       </main>
 
       {/* Annotation Modal removed - now using review page */}
+
+      {/* Lightbox */}
+      <Lightbox
+        isOpen={showLightbox}
+        onClose={() => setShowLightbox(false)}
+        images={lightboxImages}
+        currentIndex={lightboxIndex}
+        onIndexChange={setLightboxIndex}
+        imageAlt="Project Element"
+        showNavigation={lightboxImages.length > 1}
+        showThumbnails={lightboxImages.length > 1}
+      />
     </div>
   );
 }

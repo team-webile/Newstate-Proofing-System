@@ -17,7 +17,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { LogoutButton } from "@/components/logout-button";
-import { Eye, MessageSquare, PenTool, X, FileText } from "lucide-react";
+import { Eye, MessageSquare, PenTool, X, FileText, ZoomIn } from "lucide-react";
+import Lightbox from "@/components/Lightbox";
 import io from "socket.io-client";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
@@ -96,8 +97,18 @@ interface Project {
 
 interface Client {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
   company?: string;
+  address?: string;
+  notes?: string;
+  logoUrl?: string;
+  brandColor?: string;
+  themeMode: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface ProjectFilesPageProps {
@@ -115,7 +126,7 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
       id: "1",
       version: "V1",
       files: [],
-      status: "draft",
+      status: "DRAFT",
       createdAt: new Date().toISOString(),
     },
   ]);
@@ -124,8 +135,10 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
   const [showFileDialog, setShowFileDialog] = useState(false);
   const [showVersionDialog, setShowVersionDialog] = useState(false);
   const [newFile, setNewFile] = useState<File | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [newVersionName, setNewVersionName] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isPublishing, setIsPublishing] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
   const [clientsLoading, setClientsLoading] = useState(true);
   const [clientsError, setClientsError] = useState<string | null>(null);
@@ -137,6 +150,9 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
   const [showViewDetailsModal, setShowViewDetailsModal] = useState(false);
   const [selectedFileForDetails, setSelectedFileForDetails] =
     useState<ProjectFile | null>(null);
+  const [showLightbox, setShowLightbox] = useState(false);
+  const [lightboxImages, setLightboxImages] = useState<string[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
   const [socket, setSocket] = useState<any>(null);
   const [chatMessages, setChatMessages] = useState<
     Array<{
@@ -337,6 +353,17 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
     }
   };
 
+  const handleLightboxOpen = (imageUrl: string, allImages?: string[]) => {
+    if (allImages && allImages.length > 0) {
+      setLightboxImages(allImages);
+      setLightboxIndex(allImages.indexOf(imageUrl));
+    } else {
+      setLightboxImages([imageUrl]);
+      setLightboxIndex(0);
+    }
+    setShowLightbox(true);
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       await Promise.all([
@@ -476,7 +503,7 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
 
           // Update project status
           setProject((prev) =>
-            prev ? { ...prev, status: data.status } : null
+            prev ? { ...prev, status: data.status as any } : null
           );
         }
       );
@@ -488,69 +515,87 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
     }
   }, [params.projectId]);
 
-  const handleFileUpload = async (file: File) => {
-    if (!project) return;
+  const handleFileSelection = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    
+    const fileArray = Array.from(files);
+    setPendingFiles(prev => [...prev, ...fileArray]);
+    setShowFileDialog(false);
+    
+    toast({
+      title: "Files Added",
+      description: `${fileArray.length} file(s) added to pending uploads. Click "Publish Files" to upload.`,
+    });
+  };
 
-    setIsUploading(true);
+  const removePendingFile = (index: number) => {
+    setPendingFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handlePublishFiles = async () => {
+    if (!project || pendingFiles.length === 0) return;
+
+    setIsPublishing(true);
 
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("version", currentVersion);
+      const uploadPromises = pendingFiles.map(async (file) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("version", currentVersion);
 
-      const response = await fetch(`/api/projects/${project.id}/files`, {
-        method: "POST",
-        body: formData,
+        const response = await fetch(`/api/projects/${project.id}/files`, {
+          method: "POST",
+          body: formData,
+        });
+
+        const data = await response.json();
+
+        if (data.status === "success") {
+          return {
+            id: data.data.id,
+            name: data.data.name,
+            url: data.data.url,
+            type: data.data.type,
+            size: data.data.size,
+            uploadedAt: data.data.uploadedAt,
+            version: currentVersion,
+          } as ProjectFile;
+        } else {
+          throw new Error(data.message || "Failed to upload file");
+        }
       });
 
-      const data = await response.json();
+      const uploadedFiles = await Promise.all(uploadPromises);
 
-      if (data.status === "success") {
-        const uploadedFile: ProjectFile = {
-          id: data.data.id,
-          name: data.data.name,
-          url: data.data.url,
-          type: data.data.type,
-          size: data.data.size,
-          uploadedAt: data.data.uploadedAt,
-          version: currentVersion, // Use current version instead of server response
-        };
+      // Add files to the current version
+      setVersions((prev) =>
+        prev.map((v) =>
+          v.version === currentVersion
+            ? { ...v, files: [...v.files, ...uploadedFiles] }
+            : v
+        )
+      );
 
-        // Add file only to the current version
-        setVersions((prev) =>
-          prev.map((v) =>
-            v.version === currentVersion
-              ? { ...v, files: [...v.files, uploadedFile] }
-              : v
-          )
-        );
+      // Clear pending files
+      setPendingFiles([]);
 
-        // Show success message
-        toast({
-          title: "Success",
-          description: "File uploaded successfully!",
-        });
+      // Show success message
+      toast({
+        title: "Success",
+        description: `${uploadedFiles.length} file(s) published successfully!`,
+      });
 
-        // Refresh files after successful upload
-        await fetchProjectFiles();
-      } else {
-        toast({
-          title: "Error",
-          description: data.message || "Failed to upload file",
-          variant: "destructive",
-        });
-      }
+      // Refresh files after successful upload
+      await fetchProjectFiles();
     } catch (error) {
-      console.error("Upload error:", error);
+      console.error("Publish error:", error);
       toast({
         title: "Error",
-        description: "Failed to upload file. Please try again.",
+        description: "Failed to publish files. Please try again.",
         variant: "destructive",
       });
     } finally {
-      setIsUploading(false);
-      setNewFile(null);
-      setShowFileDialog(false);
+      setIsPublishing(false);
     }
   };
 
@@ -1046,13 +1091,7 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
           </div>
           <div className="flex items-center gap-4">
             <LogoutButton />
-            <Button
-              onClick={handleSaveProject}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              <Icons.Save />
-              <span className="ml-2">Save Changes</span>
-            </Button>
+            
           </div>
         </div>
       </header>
@@ -1176,7 +1215,7 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                               onClick={() => handleApproveVersion(version.id)}
                               className="text-green-600 hover:text-green-700"
                             >
-                              <Icons.CheckCircle className="h-3 w-3" />
+                              <Icons.CheckCircle />
                             </Button>
                             <Button
                               variant="outline"
@@ -1191,7 +1230,7 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                               }}
                               className="text-red-600 hover:text-red-700"
                             >
-                              <Icons.XCircle className="h-3 w-3" />
+                              <Icons.XCircle />
                             </Button>
                           </div>
                         )}
@@ -1219,9 +1258,9 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                         </DialogTrigger>
                         <DialogContent>
                           <DialogHeader>
-                            <DialogTitle>Upload Files</DialogTitle>
+                            <DialogTitle>Add Files</DialogTitle>
                             <DialogDescription>
-                              Upload design files for {currentVersion} review
+                              Select design files for {currentVersion} review. Files will be added to pending uploads.
                             </DialogDescription>
                           </DialogHeader>
                           <div className="space-y-4">
@@ -1232,10 +1271,7 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                                 type="file"
                                 multiple
                                 accept="image/*,.pdf,.psd,.ai,.eps"
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) setNewFile(file);
-                                }}
+                                onChange={(e) => handleFileSelection(e.target.files)}
                               />
                             </div>
                           </div>
@@ -1246,27 +1282,24 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                             >
                               Cancel
                             </Button>
-                            <Button
-                              onClick={() =>
-                                newFile && handleFileUpload(newFile)
-                              }
-                              disabled={!newFile || isUploading}
-                            >
-                              {isUploading ? "Uploading..." : "Upload"}
-                            </Button>
                           </DialogFooter>
                         </DialogContent>
                       </Dialog>
-                      {currentVersionData?.files &&
-                        currentVersionData.files.length > 0 && (
+                      
                           <Button
-                            onClick={handlePublishVersion}
                             className="bg-green-600 hover:bg-green-700"
+                            onClick={handlePublishFiles}
+                            disabled={pendingFiles.length === 0 || isPublishing}
                           >
                             <Icons.CheckCircle />
-                            <span className="ml-2">Publish for Review</span>
+                            <span className="ml-2">
+                              {isPublishing 
+                                ? "Publishing..." 
+                                : `Publish Files ${pendingFiles.length > 0 ? `(${pendingFiles.length})` : ""}`
+                              }
+                            </span>
                           </Button>
-                        )}
+                         
                     </div>
                   </CardTitle>
                   <CardDescription>
@@ -1275,6 +1308,67 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
+                  {/* Pending Files Section */}
+                  {pendingFiles.length > 0 && (
+                    <div className="mb-6">
+                      <h4 className="text-sm font-medium mb-3 text-orange-600">
+                        Pending Uploads ({pendingFiles.length})
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {pendingFiles.map((file, index) => (
+                          <div
+                            key={index}
+                            className="border border-orange-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow bg-orange-50 dark:bg-orange-900/20"
+                          >
+                            {/* File Preview */}
+                            <div className="relative aspect-[4/3] bg-muted">
+                              {file.type.startsWith("image/") ? (
+                                <img
+                                  src={URL.createObjectURL(file)}
+                                  alt={file.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <div className="h-12 w-12 text-muted-foreground flex items-center justify-center">
+                                    <Icons.FolderOpen />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* File Info */}
+                            <div className="p-3">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1 min-w-0">
+                                  <p
+                                    className="font-medium text-sm truncate"
+                                    title={file.name}
+                                  >
+                                    {file.name}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {formatFileSize(file.size)} • Pending Upload
+                                  </p>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removePendingFile(index)}
+                                  className="text-destructive hover:text-destructive ml-2"
+                                >
+                                  <div className="h-4 w-4 flex items-center justify-center">
+                                    <Icons.Trash />
+                                  </div>
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {currentVersionData && currentVersionData.files.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {currentVersionData.files.map((file) => (
@@ -1288,7 +1382,13 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                               <img
                                 src={file.url}
                                 alt={file.name}
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-cover cursor-zoom-in"
+                                onClick={() => {
+                                  const allImages = currentVersionData?.files
+                                    ?.filter((f: any) => isImageFile(f))
+                                    ?.map((f: any) => f.url) || [];
+                                  handleLightboxOpen(file.url, allImages);
+                                }}
                                 onError={(e) => {
                                   e.currentTarget.style.display = "none";
                                   e.currentTarget.nextElementSibling?.classList.remove(
@@ -1362,10 +1462,10 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                       <div className="h-12 w-12 mx-auto mb-4 opacity-50">
                         <Icons.FolderOpen />
                       </div>
-                      <p>No files uploaded yet</p>
+                      <p>No files published yet</p>
                       <p className="text-sm">
-                        Click "Add Files" to upload design files for{" "}
-                        {currentVersion}
+                        Click "Add Files" to select design files for{" "}
+                        {currentVersion}, then click "Publish Files" to upload them.
                       </p>
                     </div>
                   )}
@@ -1377,7 +1477,7 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <Icons.Compare className="h-5 w-5" />
+                      <Icons.Compare />
                       Version Comparison
                     </CardTitle>
                     <CardDescription>
@@ -1406,11 +1506,17 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                                   <img
                                     src={file.url}
                                     alt={file.name}
-                                    className="w-8 h-8 object-cover rounded"
+                                    className="w-8 h-8 object-cover rounded cursor-zoom-in"
+                                    onClick={() => {
+                                      const allImages = version.files
+                                        ?.filter((f: any) => isImageFile(f))
+                                        ?.map((f: any) => f.url) || [];
+                                      handleLightboxOpen(file.url, allImages);
+                                    }}
                                   />
                                 ) : (
                                   <div className="w-8 h-8 bg-muted rounded flex items-center justify-center">
-                                    <Icons.File className="h-4 w-4" />
+                                    <Icons.File />
                                   </div>
                                 )}
                                 <span className="truncate">{file.name}</span>
@@ -1664,7 +1770,13 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                 <img
                   src={selectedImage.url}
                   alt={selectedImage.name}
-                  className="w-full h-auto max-h-[300px] object-contain"
+                  className="w-full h-auto max-h-[300px] object-contain cursor-zoom-in"
+                  onClick={() => {
+                    const allImages = currentVersionData?.files
+                      ?.filter((f: any) => isImageFile(f))
+                      ?.map((f: any) => f.url) || [];
+                    handleLightboxOpen(selectedImage.url, allImages);
+                  }}
                 />
               </div>
 
@@ -1783,7 +1895,13 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                   <img
                     src={selectedFileForDetails.url}
                     alt={selectedFileForDetails.name}
-                    className="w-full h-auto max-h-[300px] object-contain"
+                    className="w-full h-auto max-h-[300px] object-contain cursor-zoom-in"
+                    onClick={() => {
+                      const allImages = currentVersionData?.files
+                        ?.filter((f: any) => isImageFile(f))
+                        ?.map((f: any) => f.url) || [];
+                      handleLightboxOpen(selectedFileForDetails.url, allImages);
+                    }}
                   />
                 ) : (
                   <div className="flex items-center justify-center h-48">
@@ -1888,6 +2006,18 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Lightbox */}
+      <Lightbox
+        isOpen={showLightbox}
+        onClose={() => setShowLightbox(false)}
+        images={lightboxImages}
+        currentIndex={lightboxIndex}
+        onIndexChange={setLightboxIndex}
+        imageAlt="Project Image"
+        showNavigation={lightboxImages.length > 1}
+        showThumbnails={lightboxImages.length > 1}
+      />
     </div>
   );
 }

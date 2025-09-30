@@ -122,6 +122,7 @@ interface ReviewPageProps {
 }
 
 export default function ReviewPage({ params }: ReviewPageProps) {
+  const { toast } = useToast();
   const [annotations, setAnnotations] = useState<ProjectAnnotation[]>([]);
   const [revisions, setRevisions] = useState<Revision[]>([]);
   const [fileAnnotations, setFileAnnotations] = useState<{
@@ -129,6 +130,9 @@ export default function ReviewPage({ params }: ReviewPageProps) {
   }>({});
   const [showAnnotationModal, setShowAnnotationModal] = useState(false);
   const [selectedImage, setSelectedImage] = useState<ProjectFile | null>(null);
+  const [showLightbox, setShowLightbox] = useState(false);
+  const [lightboxImages, setLightboxImages] = useState<string[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
   // Socket is handled by useRealtimeComments hook
   // File-specific chat messages - organized by fileId
   const [chatMessages, setChatMessages] = useState<{
@@ -197,7 +201,8 @@ export default function ReviewPage({ params }: ReviewPageProps) {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
   const imageRef = useRef<HTMLDivElement>(null);
-  const [isProjectDetailsCollapsed, setIsProjectDetailsCollapsed] = useState(false);
+  const [isProjectDetailsCollapsed, setIsProjectDetailsCollapsed] =
+    useState(false);
 
   const currentVersionData = versions.find((v) => v.version === currentVersion);
   const currentFileData =
@@ -428,6 +433,8 @@ export default function ReviewPage({ params }: ReviewPageProps) {
   const [fetchTimeout, setFetchTimeout] = useState<NodeJS.Timeout | null>(null);
   const [isFetchingAnnotations, setIsFetchingAnnotations] = useState(false);
   const [isSubmittingReply, setIsSubmittingReply] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
+  const [isRejecting, setIsRejecting] = useState(false);
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom of chat
@@ -456,7 +463,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
     // If forced, fetch immediately
     await performFetchAnnotations();
   };
-
+  console.log(reviewData, "reviewData");
   const performFetchAnnotations = async () => {
     // Prevent multiple simultaneous requests
     if (isFetchingAnnotations) {
@@ -608,6 +615,17 @@ export default function ReviewPage({ params }: ReviewPageProps) {
     setNewComment("");
     setPopupPosition({ x, y });
     setShowAnnotationPopup(true);
+  };
+
+  const handleLightboxOpen = (imageUrl: string, allImages?: string[]) => {
+    if (allImages && allImages.length > 0) {
+      setLightboxImages(allImages);
+      setLightboxIndex(allImages.indexOf(imageUrl));
+    } else {
+      setLightboxImages([imageUrl]);
+      setLightboxIndex(0);
+    }
+    setShowLightbox(true);
   };
 
   // Check if all annotations are completed or rejected
@@ -784,7 +802,12 @@ export default function ReviewPage({ params }: ReviewPageProps) {
           }
         }
 
-        // Success feedback is handled by the loading state and real-time updates
+        // Success feedback
+        toast({
+          title: "Success",
+          description: "Reply added successfully!",
+          variant: "default",
+        });
 
         // Close only the legacy reply popup, keep chat popup open
         if (selectedAnnotationForReply) {
@@ -794,11 +817,19 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         // Keep chat popup open to show the updated conversation
       } else {
         console.error("Failed to add reply:", data.message);
-        alert("Failed to add reply. Please try again.");
+        toast({
+          title: "Error",
+          description: "Failed to add reply. Please try again.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error("Error submitting reply:", error);
-      alert("Failed to add reply. Please try again.");
+      toast({
+        title: "Error",
+        description: "Failed to add reply. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsSubmittingReply(false);
     }
@@ -1198,7 +1229,10 @@ export default function ReviewPage({ params }: ReviewPageProps) {
     try {
       // Get current client info
       const currentClient = {
-        name: reviewData?.project?.client?.name || "Client",
+        name:
+          reviewData?.project?.client?.firstName +
+            " " +
+            reviewData?.project?.client?.lastName || "Client",
         role: "Client",
       };
 
@@ -1271,13 +1305,27 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         setNewComment("");
         setShowAnnotationPopup(false);
         setPopupPosition(null);
+
+        toast({
+          title: "Success",
+          description: "Annotation added successfully!",
+          variant: "default",
+        });
       } else {
         console.error("Failed to save annotation:", data.message);
-        alert("Failed to save annotation. Please try again.");
+        toast({
+          title: "Error",
+          description: "Failed to save annotation. Please try again.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error("Error saving annotation:", error);
-      alert("Failed to save annotation. Please try again.");
+      toast({
+        title: "Error",
+        description: "Failed to save annotation. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -1349,17 +1397,43 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         fetchAnnotations();
       } else {
         console.error("Failed to add reply:", data.message);
-        alert("Failed to add reply. Please try again.");
+        toast({
+          title: "Error",
+          description: "Failed to add reply. Please try again.",
+          variant: "destructive",
+        });
+        setShowAnnotationChat(false);
       }
     } catch (error) {
       console.error("Error submitting reply:", error);
-      alert("Failed to add reply. Please try again.");
+      toast({
+        title: "Error",
+        description: "Failed to add reply. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
   // Handle approval
   const handleApproval = async () => {
+    setIsApproving(true);
     try {
+      // Validate digital signature
+      const clientName = `${reviewData?.project?.client?.firstName} ${reviewData?.project?.client?.lastName}`;
+      const signatureName = `${digitalSignature.firstName} ${digitalSignature.lastName}`;
+
+      if (
+        clientName.toLowerCase().trim() !== signatureName.toLowerCase().trim()
+      ) {
+        toast({
+          title: "Signature Mismatch",
+          description:
+            "Digital signature name does not match the client name. Please check your name and try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const response = await fetch(`/api/projects/${params.reviewId}/approve`, {
         method: "POST",
         headers: {
@@ -1368,7 +1442,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         body: JSON.stringify({
           action: "approve",
           approvedBy: "Client",
-          approvedByName: reviewData?.project?.client?.name || "Client",
+          approvedByName: signatureName,
           comments: "Approved by client",
         }),
       });
@@ -1389,21 +1463,52 @@ export default function ReviewPage({ params }: ReviewPageProps) {
           updatedBy: "Client",
         });
 
-        alert("Project approved successfully!");
+        toast({
+          title: "Success",
+          description: "Project approved successfully!",
+          variant: "default",
+        });
         setShowSignatureDialog(false);
       } else {
         console.error("Failed to approve project:", data.message);
-        alert("Failed to approve project. Please try again.");
+        toast({
+          title: "Error",
+          description: "Failed to approve project. Please try again.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error("Error approving project:", error);
-      alert("Error approving project. Please try again.");
+      toast({
+        title: "Error",
+        description: "Error approving project. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsApproving(false);
     }
   };
 
   // Handle revision request
   const handleRequestRevision = async () => {
+    setIsRejecting(true);
     try {
+      // Validate digital signature for rejection as well
+      const clientName = `${reviewData?.project?.client?.firstName} ${reviewData?.project?.client?.lastName}`;
+      const signatureName = `${digitalSignature.firstName} ${digitalSignature.lastName}`;
+
+      if (
+        clientName.toLowerCase().trim() !== signatureName.toLowerCase().trim()
+      ) {
+        toast({
+          title: "Signature Mismatch",
+          description:
+            "Digital signature name does not match the client name. Please check your name and try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const response = await fetch(`/api/projects/${params.reviewId}/approve`, {
         method: "POST",
         headers: {
@@ -1412,7 +1517,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         body: JSON.stringify({
           action: "reject",
           approvedBy: "Client",
-          approvedByName: reviewData?.project?.client?.name || "Client",
+          approvedByName: signatureName,
           comments: revisionComments,
         }),
       });
@@ -1434,16 +1539,30 @@ export default function ReviewPage({ params }: ReviewPageProps) {
           comments: revisionComments,
         });
 
-        alert("Revision requested successfully!");
+        toast({
+          title: "Success",
+          description: "Revision requested successfully!",
+          variant: "default",
+        });
         setShowRevisionDialog(false);
         setRevisionComments("");
       } else {
         console.error("Failed to request revision:", data.message);
-        alert("Failed to request revision. Please try again.");
+        toast({
+          title: "Error",
+          description: "Failed to request revision. Please try again.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error("Error requesting revision:", error);
-      alert("Error requesting revision. Please try again.");
+      toast({
+        title: "Error",
+        description: "Error requesting revision. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRejecting(false);
     }
   };
 
@@ -1684,7 +1803,19 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                                       <img
                                         src={file.url}
                                         alt={file.name}
-                                        className="w-full h-32 object-cover rounded border"
+                                        className="w-full h-32 object-cover rounded border cursor-zoom-in"
+                                        onClick={() => {
+                                          const allImages =
+                                            currentVersionData?.files
+                                              ?.filter((f: any) =>
+                                                f.type?.startsWith("image/")
+                                              )
+                                              ?.map((f: any) => f.url) || [];
+                                          handleLightboxOpen(
+                                            file.url,
+                                            allImages
+                                          );
+                                        }}
                                         onError={(e) => {
                                           e.currentTarget.style.display =
                                             "none";
@@ -1916,6 +2047,27 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                           handleImageClick(e);
                         }}
                       />
+
+                      {/* Lightbox trigger overlay for completed/rejected reviews */}
+                      {(reviewData.status === "COMPLETED" ||
+                        reviewData.status === "REJECTED") && (
+                        <div
+                          className="absolute top-10 right-4 bg-black/70 text-white px-3 py-2 rounded-lg text-sm cursor-pointer hover:bg-black/80 transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const allImages =
+                              currentVersionData?.files
+                                ?.filter((file: any) => isImageFile(file))
+                                ?.map((file: any) => file.url) || [];
+                            handleLightboxOpen(currentFileData.url, allImages);
+                          }}
+                        >
+                          <div className="flex items-center gap-1">
+                            <ZoomIn className="h-4 w-4" />
+                            <span>Click to zoom</span>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Render existing annotations on image */}
                       {currentFileAnnotations.map((annotation) => {
@@ -2527,15 +2679,17 @@ export default function ReviewPage({ params }: ReviewPageProps) {
             <div className="space-y-6">
               {/* Project Info - Collapsible */}
               <Card>
-                <CardHeader 
+                <CardHeader
                   className="cursor-pointer hover:bg-muted/50 transition-colors"
-                  onClick={() => setIsProjectDetailsCollapsed(!isProjectDetailsCollapsed)}
+                  onClick={() =>
+                    setIsProjectDetailsCollapsed(!isProjectDetailsCollapsed)
+                  }
                 >
                   <CardTitle className="flex items-center justify-between">
                     Project Details
-                    <ChevronDown 
+                    <ChevronDown
                       className={`h-4 w-4 transition-transform duration-200 ${
-                        isProjectDetailsCollapsed ? 'rotate-180' : ''
+                        isProjectDetailsCollapsed ? "rotate-180" : ""
                       }`}
                     />
                   </CardTitle>
@@ -2543,7 +2697,9 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                 {!isProjectDetailsCollapsed && (
                   <CardContent className="space-y-4">
                     <div>
-                      <Label className="text-sm font-medium">Project Name</Label>
+                      <Label className="text-sm font-medium">
+                        Project Name
+                      </Label>
                       <p className="text-sm text-muted-foreground">
                         {reviewData.project?.title || reviewData.reviewName}
                       </p>
@@ -2563,22 +2719,26 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                       </p>
                     </div>
                     <div>
-                      <Label className="text-sm font-medium">Current File</Label>
+                      <Label className="text-sm font-medium">
+                        Current File
+                      </Label>
                       <p className="text-sm text-muted-foreground">
                         {currentFileData?.name || "No file selected"}
                       </p>
                     </div>
                     <div>
-                      <Label className="text-sm font-medium">Review Status</Label>
+                      <Label className="text-sm font-medium">
+                        Review Status
+                      </Label>
                       <Badge
                         variant={
                           reviewData.status === "COMPLETED"
                             ? "default"
                             : reviewData.status === "REJECTED"
-                              ? "destructive"
-                              : reviewData.status === "IN_PROGRESS"
-                                ? "secondary"
-                                : "outline"
+                            ? "destructive"
+                            : reviewData.status === "IN_PROGRESS"
+                            ? "secondary"
+                            : "outline"
                         }
                       >
                         {reviewData.status?.toLowerCase()}
@@ -2587,17 +2747,16 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                     <div>
                       <Label className="text-sm font-medium">Created</Label>
                       <p className="text-sm text-muted-foreground">
-                        {reviewData.createdAt ?
-                          new Date(reviewData.createdAt).toLocaleDateString(
-                            "en-US",
-                            {
-                              year: "numeric",
-                              month: "2-digit",
-                              day: "2-digit",
-                            }
-                          ) :
-                          "Date not available"
-                        }
+                        {reviewData.createdAt
+                          ? new Date(reviewData.createdAt).toLocaleDateString(
+                              "en-US",
+                              {
+                                year: "numeric",
+                                month: "2-digit",
+                                day: "2-digit",
+                              }
+                            )
+                          : "Date not available"}
                       </p>
                     </div>
                   </CardContent>
@@ -2703,12 +2862,46 @@ export default function ReviewPage({ params }: ReviewPageProps) {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <Textarea
-              placeholder="Describe the changes you are rejecting..."
-              value={revisionComments}
-              onChange={(e) => setRevisionComments(e.target.value)}
-              rows={6}
-            />
+            <div>
+              <Label htmlFor="revisionComments">Rejection Comments</Label>
+              <Textarea
+                id="revisionComments"
+                placeholder="Describe the changes you are rejecting..."
+                value={revisionComments}
+                onChange={(e) => setRevisionComments(e.target.value)}
+                rows={4}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="rejectFirstName">First Name</Label>
+                <Input
+                  id="rejectFirstName"
+                  value={digitalSignature.firstName}
+                  onChange={(e) =>
+                    setDigitalSignature({
+                      ...digitalSignature,
+                      firstName: e.target.value,
+                    })
+                  }
+                  placeholder="Enter your first name"
+                />
+              </div>
+              <div>
+                <Label htmlFor="rejectLastName">Last Name</Label>
+                <Input
+                  id="rejectLastName"
+                  value={digitalSignature.lastName}
+                  onChange={(e) =>
+                    setDigitalSignature({
+                      ...digitalSignature,
+                      lastName: e.target.value,
+                    })
+                  }
+                  placeholder="Enter your last name"
+                />
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button
@@ -2717,8 +2910,20 @@ export default function ReviewPage({ params }: ReviewPageProps) {
             >
               Cancel
             </Button>
-            <Button onClick={handleRequestRevision} variant="destructive">
-              Submit Reject
+            <Button
+              onClick={handleRequestRevision}
+              variant="destructive"
+              disabled={isRejecting}
+              className="disabled:opacity-50"
+            >
+              {isRejecting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Rejecting...
+                </>
+              ) : (
+                "Submit Reject"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2729,14 +2934,12 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Digital Signature Required</DialogTitle>
-            <DialogDescription>
-              Please enter your first and last name to approve this design. This
-              serves as your digital signature.
-            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="firstName">First Name</Label>
+              <Label htmlFor="firstName" className="mb-2">
+                First Name
+              </Label>
               <Input
                 id="firstName"
                 value={digitalSignature.firstName}
@@ -2750,7 +2953,9 @@ export default function ReviewPage({ params }: ReviewPageProps) {
               />
             </div>
             <div>
-              <Label htmlFor="lastName">Last Name</Label>
+              <Label htmlFor="lastName" className="mb-2">
+                Last Name
+              </Label>
               <Input
                 id="lastName"
                 value={digitalSignature.lastName}
@@ -2771,7 +2976,20 @@ export default function ReviewPage({ params }: ReviewPageProps) {
             >
               Cancel
             </Button>
-            <Button onClick={handleApproval}>Continue to Approval</Button>
+            <Button
+              onClick={handleApproval}
+              disabled={isApproving}
+              className="disabled:opacity-50"
+            >
+              {isApproving ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Approving...
+                </>
+              ) : (
+                "Continue to Approval"
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -3416,6 +3634,18 @@ export default function ReviewPage({ params }: ReviewPageProps) {
           </div>
         </div>
       )}
+
+      {/* Lightbox */}
+      <Lightbox
+        isOpen={showLightbox}
+        onClose={() => setShowLightbox(false)}
+        images={lightboxImages}
+        currentIndex={lightboxIndex}
+        onIndexChange={setLightboxIndex}
+        imageAlt="Review Image"
+        showNavigation={lightboxImages.length > 1}
+        showThumbnails={lightboxImages.length > 1}
+      />
     </div>
   );
 }

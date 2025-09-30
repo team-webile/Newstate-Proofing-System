@@ -28,6 +28,60 @@ export async function PUT(
       .where(eq(projects.id, id))
       .returning()
 
+    // Emit socket event for real-time updates
+    try {
+      // Get socket server from global (set by server.js)
+      const io = (global as any).socketServer;
+      
+      if (io) {
+        // Determine if this is from admin or client
+        const referer = req.headers.get('referer') || ''
+        const userAgent = req.headers.get('user-agent') || ''
+        const isFromAdmin = referer.includes('/admin/') || userAgent.includes('admin') || req.url.includes('/admin/')
+        
+        console.log('🔍 Project status update detection:', { referer, userAgent, isFromAdmin, url: req.url })
+        
+        // Emit project status change event
+        io.to(`project-${id}`).emit('projectStatusChanged', {
+          projectId: id,
+          status: status,
+          changedBy: isFromAdmin ? 'Admin' : 'Client',
+          changedByName: isFromAdmin ? 'Admin' : 'Client',
+          timestamp: new Date().toISOString(),
+          isFromAdmin: isFromAdmin
+        })
+        
+        // Send notification to opposite user type
+        if (isFromAdmin) {
+          // Admin changed project status, notify client
+          io.to(`project-${id}`).emit('statusNotification', {
+            type: 'project_status_changed',
+            message: `Admin updated project status to ${status}`,
+            from: 'Admin',
+            to: 'Client',
+            projectId: id,
+            status: status,
+            timestamp: new Date().toISOString()
+          })
+        } else {
+          // Client changed project status, notify admin
+          io.to(`project-${id}`).emit('statusNotification', {
+            type: 'project_status_changed',
+            message: `Client updated project status to ${status}`,
+            from: 'Client',
+            to: 'Admin',
+            projectId: id,
+            status: status,
+            timestamp: new Date().toISOString()
+          })
+        }
+        
+        console.log(`📡 Emitted projectStatusChanged for project ${id}`)
+      }
+    } catch (error) {
+      console.error('Error emitting socket event:', error)
+    }
+
     return NextResponse.json({
       status: 'success',
       message: 'Project updated successfully',

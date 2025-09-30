@@ -33,8 +33,8 @@ export async function PUT(
 
     // Emit socket event for real-time updates
     try {
-      const { getSocketServer } = await import('@/lib/socket-server');
-      const io = getSocketServer();
+      // Get socket server from global (set by server.js)
+      const io = (global as any).socketServer;
       
       if (io) {
         // Better detection of admin vs client
