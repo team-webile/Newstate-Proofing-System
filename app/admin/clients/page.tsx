@@ -382,12 +382,16 @@ export default function ClientsPage() {
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <div className="text-sm text-muted-foreground max-w-[150px] truncate cursor-help">
-                                {client.notes || "No notes"}
+                                {client.notes?.slice(0, 150) || "No notes"}
                               </div>
                             </TooltipTrigger>
                             {client.notes && (
                               <TooltipContent>
-                                <p className="max-w-xs">{client.notes}</p>
+                                <p className="max-w-xs whitespace-pre-wrap">
+                                  {client.notes.length > 150
+                                    ? client.notes.slice(0, 150) + "..."
+                                    : client.notes}
+                                </p>
                               </TooltipContent>
                             )}
                           </Tooltip>
