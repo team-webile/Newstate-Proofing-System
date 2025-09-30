@@ -1,3 +1,6 @@
+// DISABLED: Theme toggle removed - application now uses dark theme only
+// This component is kept for reference but should not be used
+
 "use client"
 
 import * as React from "react"

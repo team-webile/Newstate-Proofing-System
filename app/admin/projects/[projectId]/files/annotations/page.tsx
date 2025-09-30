@@ -9,7 +9,6 @@ import { Icons } from "@/components/icons"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { ThemeToggle } from "@/components/theme-toggle"
 import { LogoutButton } from "@/components/logout-button"
 import { Eye, MessageSquare, PenTool, ArrowLeft, Plus, X, MapPin, CheckCircle, AlertCircle, Download, Upload, FileText, MessageCircle } from "lucide-react"
 import { useUnifiedSocket } from '@/hooks/use-unified-socket'
@@ -1275,7 +1274,6 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
               Last update: {new Date(lastUpdate).toLocaleTimeString()}
             </Badge>
           )}
-            <ThemeToggle />
             <LogoutButton />
           </div>
         </div>

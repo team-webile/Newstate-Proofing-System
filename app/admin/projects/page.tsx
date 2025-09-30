@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ThemeToggle } from "@/components/theme-toggle";
+;
 import { LogoutButton } from "@/components/logout-button";
 import { useProjects } from "@/lib/use-projects";
 import { ProjectsSkeleton } from "@/components/projects-skeleton";
@@ -301,7 +301,6 @@ export default function ProjectsPage() {
                 </SelectItem>
               </SelectContent>
             </Select>
-            <ThemeToggle />
             <LogoutButton />
             <Button
               onClick={() => (window.location.href = "/admin/projects/new")}
@@ -399,7 +398,11 @@ export default function ProjectsPage() {
                         {project.title}
                       </CardTitle>
                       <CardDescription className="text-muted-foreground mb-2">
-                        {project.description}
+                        {project.description ? (
+                          project.description.length > 100 ? 
+                            `${project.description.slice(0, 100)}...` : 
+                            project.description
+                        ) : 'N/A'}
                       </CardDescription>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Icons.User />

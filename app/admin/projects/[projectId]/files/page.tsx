@@ -16,7 +16,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { LogoutButton } from "@/components/logout-button";
 import { Eye, MessageSquare, PenTool, X, FileText } from "lucide-react";
 import io from "socket.io-client";
@@ -1046,7 +1045,6 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
             <Logo />
           </div>
           <div className="flex items-center gap-4">
-            <ThemeToggle />
             <LogoutButton />
             <Button
               onClick={handleSaveProject}

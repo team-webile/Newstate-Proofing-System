@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge"
 import { Logo } from "@/components/logo"
 import { Icons } from "@/components/icons"
 import { Input } from "@/components/ui/input"
-import { ThemeToggle } from "@/components/theme-toggle"
 import { LogoutButton } from "@/components/logout-button"
 import { useDashboardData } from "@/lib/use-dashboard-data"
 import { DashboardSkeleton } from "@/components/dashboard-skeleton"
@@ -80,7 +79,6 @@ export default function AdminDashboard() {
             >
               <Icons.Refresh />
             </Button>
-            <ThemeToggle />
             <LogoutButton />
              
           </div>

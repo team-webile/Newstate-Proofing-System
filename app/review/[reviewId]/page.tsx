@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Icons } from "@/components/icons";
-import { ThemeToggle } from "@/components/theme-toggle";
+;
 import {
   PenTool,
   X,
@@ -1459,7 +1459,6 @@ export default function ReviewPage({ params }: ReviewPageProps) {
               </Badge>
             )}
             <Badge variant="outline">{currentVersion}</Badge>
-            <ThemeToggle />
           </div>
         </div>
       </header>

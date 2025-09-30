@@ -11,7 +11,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { ThemeToggle } from "@/components/theme-toggle"
 import { LogoutButton } from "@/components/logout-button"
 import { useToast } from "@/hooks/use-toast"
 import {
@@ -164,7 +163,6 @@ export default function NewProjectPage() {
             <Logo />
           </div>
           <div className="flex items-center gap-4">
-            <ThemeToggle />
             <LogoutButton />
           </div>
         </div>

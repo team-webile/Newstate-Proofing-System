@@ -15,7 +15,7 @@ export function ThemeSettings() {
   const { themeSettings, loading, error, updateThemeSettings } = useThemeSettings()
   const { toast } = useToast()
   const [formData, setFormData] = useState({
-    themeMode: 'system',
+    themeMode: 'dark', // Fixed to dark theme only
     primaryColor: '',
     secondaryColor: '',
     accentColor: '',
@@ -29,7 +29,7 @@ export function ThemeSettings() {
   useEffect(() => {
     if (themeSettings) {
       setFormData({
-        themeMode: themeSettings.themeMode || 'system',
+        themeMode: 'dark', // Always use dark theme
         primaryColor: themeSettings.primaryColor || '',
         secondaryColor: themeSettings.secondaryColor || '',
         accentColor: themeSettings.accentColor || '',
@@ -63,7 +63,7 @@ export function ThemeSettings() {
 
   const handleReset = () => {
     setFormData({
-      themeMode: 'system',
+      themeMode: 'dark', // Always reset to dark theme
       primaryColor: '',
       secondaryColor: '',
       accentColor: '',
@@ -94,22 +94,13 @@ export function ThemeSettings() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Theme Mode */}
+            {/* Theme Mode - DISABLED: Dark theme only */}
             <div className="space-y-2">
               <Label htmlFor="themeMode">Theme Mode</Label>
-              <Select
-                value={formData.themeMode}
-                onValueChange={(value) => setFormData({ ...formData, themeMode: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select theme mode" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="light">Light</SelectItem>
-                  <SelectItem value="dark">Dark</SelectItem>
-                  <SelectItem value="system">System</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex items-center space-x-2 p-3 bg-muted rounded-md">
+                <span className="text-sm text-muted-foreground">🌙 Dark Theme (Fixed)</span>
+                <span className="text-xs text-muted-foreground">Theme switching is disabled</span>
+              </div>
             </div>
 
             <Separator />
