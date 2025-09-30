@@ -13,7 +13,8 @@ export async function GET(req: NextRequest) {
     let whereCondition = undefined;
     if (search) {
       whereCondition = or(
-        like(clients.name, `%${search}%`),
+        like(clients.firstName, `%${search}%`),
+        like(clients.lastName, `%${search}%`),
         like(clients.email, `%${search}%`),
         like(clients.company, `%${search}%`)
       );
@@ -44,7 +45,8 @@ export async function GET(req: NextRequest) {
 
     // Create CSV content
     const csvHeaders = [
-      "Name",
+      "First Name",
+      "Last Name",
       "Email",
       "Phone",
       "Company",
@@ -56,7 +58,8 @@ export async function GET(req: NextRequest) {
     ];
 
     const csvRows = clientsWithCounts.map((client) => [
-      `"${client.name || ""}"`,
+      `"${client.firstName || ""}"`,
+      `"${client.lastName || ""}"`,
       `"${client.email || ""}"`,
       `"${client.phone || ""}"`,
       `"${client.company || ""}"`,
