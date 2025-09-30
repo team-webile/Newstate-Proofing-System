@@ -17,7 +17,8 @@ export async function GET(req: NextRequest) {
     let whereCondition = undefined
     if (search) {
       whereCondition = or(
-        like(clients.name, `%${search}%`),
+        like(clients.firstName, `%${search}%`),
+        like(clients.lastName, `%${search}%`),
         like(clients.email, `%${search}%`),
         like(clients.company, `%${search}%`)
       )
@@ -87,7 +88,8 @@ export async function POST(req: NextRequest) {
     console.log('POST /api/clients - Request body:', body)
     
     const { 
-      name, 
+      firstName, 
+      lastName, 
       email, 
       phone, 
       company, 
@@ -96,11 +98,11 @@ export async function POST(req: NextRequest) {
     } = body
 
     // Validate required fields
-    if (!name || !email) {
+    if (!firstName || !lastName || !email) {
       console.log('POST /api/clients - Missing required fields')
       return NextResponse.json({
         status: 'error',
-        message: 'Client name and email are required'
+        message: 'Client first name, last name and email are required'
       }, { status: 400 })
     }
 
@@ -123,7 +125,8 @@ export async function POST(req: NextRequest) {
     const [client] = await db
       .insert(clients)
       .values({
-        name,
+        firstName,
+        lastName,
         email,
         phone,
         company,

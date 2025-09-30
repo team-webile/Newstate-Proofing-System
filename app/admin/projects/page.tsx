@@ -403,7 +403,7 @@ export default function ProjectsPage() {
                       </CardDescription>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Icons.User />
-                        <span>{project.clientName}</span>
+                        <span>{project.clientFirstName} {project.clientLastName}</span>
 
                         <span>•</span>
                         <span>

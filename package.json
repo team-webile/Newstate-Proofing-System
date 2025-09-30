@@ -4,10 +4,13 @@
   "private": true,
   "scripts": {
     "build": "next build",
-    "dev": "node server.js",
+    "dev": "npm run dev:next & npm run dev:socket",
     "dev:next": "next dev",
+    "dev:socket": "node socket-server.js",
     "lint": "next lint",
-    "start": "cross-env NODE_ENV=production node server.js",
+    "start": "cross-env NODE_ENV=production npm run start:next & npm run start:socket",
+    "start:next": "next start",
+    "start:socket": "cross-env NODE_ENV=production node socket-server.js",
     "setup:db": "node setup-database.js",
     "create:admin": "node create-admin-user.js",
     "test:db": "node test-database-connection.js",
@@ -17,7 +20,7 @@
     "db:studio": "npx drizzle-kit studio",
     "test:socket": "node test-socket-connection.js",
     "check:env": "node check-env.js",
-    "start:prod": "NODE_ENV=production node server.js",
+    "start:prod": "NODE_ENV=production npm run start",
     "dev:prod": "NODE_ENV=production npm run dev"
   },
   "dependencies": {

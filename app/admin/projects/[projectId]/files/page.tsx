@@ -358,7 +358,7 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
   // Initialize Socket.io
   useEffect(() => {
     if (params.projectId) {
-      const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000', {
+      const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001', {
         path: "/api/socketio",
         transports: ["websocket", "polling"],
       });
@@ -1486,8 +1486,10 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                       {clientsLoading
                         ? "Loading..."
                         : (Array.isArray(clients)
-                            ? clients.find((c) => c.id === project.clientId)
-                                ?.name
+                            ? (() => {
+                                const client = clients.find((c) => c.id === project.clientId);
+                                return client ? `${client.firstName} ${client.lastName}` : "Unknown Client";
+                              })()
                             : "Unknown Client") || "Unknown Client"}
                     </p>
                   </div>

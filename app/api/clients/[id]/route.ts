@@ -54,7 +54,8 @@ export async function PUT(
     const { id } = await params
     const body = await req.json()
     const { 
-      name, 
+      firstName, 
+      lastName, 
       email, 
       phone, 
       company, 
@@ -63,10 +64,10 @@ export async function PUT(
     } = body
 
     // Validate required fields
-    if (!name || !email) {
+    if (!firstName || !lastName || !email) {
       return NextResponse.json({
         status: 'error',
-        message: 'Client name and email are required'
+        message: 'Client first name, last name and email are required'
       }, { status: 400 })
     }
 
@@ -101,7 +102,8 @@ export async function PUT(
     const [updatedClient] = await db
       .update(clients)
       .set({
-        name,
+        firstName,
+        lastName,
         email,
         phone,
         company,

@@ -507,7 +507,7 @@ export default function ClientDashboard({ params }: ClientDashboardProps) {
               "Please review the project files and provide your feedback."}
           </p>
           <div className="mt-4 flex items-center gap-4 text-sm text-muted-foreground dark:text-gray-400">
-            <span>Client: {project.client.name}</span>
+            <span>Client: {project.client.firstName} {project.client.lastName}</span>
             <span>•</span>
             <span>Status: {project.status}</span>
             <span>•</span>

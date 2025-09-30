@@ -432,7 +432,9 @@ export default function ClientReviewPage({ params }: ReviewPageProps) {
                 </h1>
                 <p className="text-sm text-muted-foreground">
                   Client Review -{" "}
-                  {review.project.client?.name || "Unknown Client"}
+                  {review.project.client?.firstName && review.project.client?.lastName 
+                    ? `${review.project.client.firstName} ${review.project.client.lastName}`
+                    : "Unknown Client"}
                 </p>
               </div>
             </div>

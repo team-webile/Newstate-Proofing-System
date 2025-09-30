@@ -218,7 +218,119 @@ export default function ClientsPage() {
             <p className="text-muted-foreground">Manage your client profiles</p>
           </div>
 
-          {/* Clients Table */}
+        {/* Clients Table */}
+        <Card className="border-border bg-card">
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[200px]">Client</TableHead>
+                  <TableHead className="w-[200px]">Company</TableHead>
+                  <TableHead className="w-[200px]">Contact</TableHead>
+                  <TableHead className="w-[150px]">Notes</TableHead>
+                  <TableHead className="w-[120px]">Projects</TableHead>
+                  <TableHead className="w-[120px]">Last Activity</TableHead>
+                  <TableHead className="w-[200px] text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {clients.map((client) => (
+                  <TableRow key={client.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Icons.User />
+                        </div>
+                        <div>
+                          <div className="font-medium text-foreground">{client.firstName} {client.lastName}</div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-muted-foreground">{client.company || "N/A"}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <div className="text-sm text-foreground">{client.email}</div>
+                        <div className="text-xs text-muted-foreground">{client.phone || "No phone"}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="text-sm text-muted-foreground max-w-[150px] truncate cursor-help">
+                              {client.notes || "No notes"}
+                            </div>
+                          </TooltipTrigger>
+                          {client.notes && (
+                            <TooltipContent>
+                              <p className="max-w-xs">{client.notes}</p>
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
+                      </TooltipProvider>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm text-foreground">
+                        {client._count?.projects || 0} project{(client._count?.projects || 0) !== 1 ? "s" : ""}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm text-muted-foreground">
+                        {new Date(client.updatedAt).toLocaleDateString()}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => router.push(`/admin/clients/${client.id}/edit`)}
+                        >
+                          <Icons.Edit />
+                          <span className="ml-2">Edit</span>
+                        </Button>
+                        
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Icons.Trash />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Client</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete {client.firstName} {client.lastName}? This action cannot be undone and will also
+                                delete all associated projects.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDeleteClient(client.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        {clients.length === 0 && (
           <Card className="border-border bg-card">
             <CardContent className="p-0">
               <Table>

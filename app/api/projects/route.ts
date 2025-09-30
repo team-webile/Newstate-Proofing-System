@@ -62,7 +62,8 @@ export async function GET(req: NextRequest) {
         downloadEnabled: projects.downloadEnabled,
         emailNotifications: projects.emailNotifications,
         lastActivity: projects.lastActivity,
-        clientName: clients.name,
+        clientFirstName: clients.firstName,
+        clientLastName: clients.lastName,
         clientEmail: clients.email,
       })
       .from(projects)

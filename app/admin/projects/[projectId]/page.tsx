@@ -154,7 +154,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
               <div>
                 <h1 className="text-3xl font-bold text-foreground">{project.title}</h1>
                 <p className="text-muted-foreground">
-                  {project.client?.name} {project.client?.company && `(${project.client.company})`}
+                  {project.client?.firstName} {project.client?.lastName} {project.client?.company && `(${project.client.company})`}
                 </p>
               </div>
             </div>
