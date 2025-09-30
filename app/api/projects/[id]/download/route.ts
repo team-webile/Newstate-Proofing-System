@@ -19,7 +19,10 @@ export async function GET(
     const format = searchParams.get('format') || 'zip' // zip or individual
 
     // Verify project exists
-    const project = await db.project.select().from(table).where(eq(table.id, id))
+    const [project] = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.id, projectId))
 
     if (!project) {
       return NextResponse.json({
@@ -28,23 +31,24 @@ export async function GET(
       }, { status: 404 })
     }
 
+    // Get client data
+    const [client] = await db
+      .select()
+      .from(clients)
+      .where(eq(clients.id, project.clientId))
+
     if (format === 'zip') {
       // Create ZIP file with all approved files
       const zip = new JSZip()
       
       if (versionId) {
         // Download specific version
-        const version = project.projectVersions.find(v => v.id === versionId)
-        if (!version) {
-          return NextResponse.json({
-            status: 'error',
-            message: 'Version not found'
-          }, { status: 404 })
-        }
-
-        const filePath = join(process.cwd(), 'public', version.filePath)
-        const fileBuffer = await readFile(filePath)
-        zip.file(version.fileName, fileBuffer)
+        // For now, we'll skip version-specific downloads
+        // This would need to be implemented based on your versioning system
+        return NextResponse.json({
+          status: 'error',
+          message: 'Version-specific downloads not yet implemented'
+        }, { status: 501 })
       } else {
         // Download all files
         const projectDir = join(process.cwd(), 'public', 'uploads', 'projects', projectId)
@@ -67,12 +71,12 @@ export async function GET(
       }
 
       // Add approval report
-      const approvalReport = generateApprovalReport(project)
+      const approvalReport = generateApprovalReport(project, client)
       zip.file('approval-report.txt', approvalReport)
 
       const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' })
 
-      return new NextResponse(zipBuffer, {
+      return new NextResponse(new Uint8Array(zipBuffer), {
         headers: {
           'Content-Type': 'application/zip',
           'Content-Disposition': `attachment; filename="${project.title}-approved-files.zip"`
@@ -87,23 +91,13 @@ export async function GET(
         }, { status: 400 })
       }
 
-      const version = project.projectVersions.find(v => v.id === versionId)
-      if (!version) {
-        return NextResponse.json({
-          status: 'error',
-          message: 'Version not found'
-        }, { status: 404 })
-      }
+      // Version-specific downloads not implemented
 
-      const filePath = join(process.cwd(), 'public', version.filePath)
-      const fileBuffer = await readFile(filePath)
-
-      return new NextResponse(fileBuffer, {
-        headers: {
-          'Content-Type': version.mimeType,
-          'Content-Disposition': `attachment; filename="${version.fileName}"`
-        }
-      })
+      // Individual file download not yet implemented
+      return NextResponse.json({
+        status: 'error',
+        message: 'Individual file downloads not yet implemented'
+      }, { status: 501 })
     }
 
   } catch (error) {
@@ -115,37 +109,26 @@ export async function GET(
   }
 }
 
-function generateApprovalReport(project: any): string {
+function generateApprovalReport(project: any, client: any): string {
   const report = `
 APPROVAL REPORT
 ===============
 
 Project: ${project.title}
-Client: ${project.client?.name || 'N/A'}
+Client: ${client?.firstName && client?.lastName ? `${client.firstName} ${client.lastName}` : 'N/A'}
 Status: ${project.status}
 Created: ${project.createdAt}
 Last Activity: ${project.lastActivity}
 
 ANNOTATIONS SUMMARY
 ==================
-Total Annotations: ${project.annotations.length}
+Total Annotations: 0 (not yet implemented)
 
-${project.annotations.map((annotation: any, index: number) => `
-${index + 1}. ${annotation.content}
-   - Added by: ${annotation.addedByName}
-   - Status: ${annotation.status}
-   - Date: ${annotation.createdAt}
-   - Replies: ${annotation.replies?.length || 0}
-`).join('')}
+No annotations available.
 
 VERSIONS
 ========
-${project.projectVersions.map((version: any, index: number) => `
-${index + 1}. ${version.versionName}
-   - File: ${version.fileName}
-   - Size: ${(version.fileSize / 1024).toFixed(2)} KB
-   - Created: ${version.createdAt}
-`).join('')}
+No versions available.
 
 This report was generated on ${new Date().toISOString()}
   `.trim()

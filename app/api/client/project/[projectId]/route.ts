@@ -35,7 +35,8 @@ export async function GET(
         emailNotifications: projects.emailNotifications,
         clientId: projects.clientId,
         userId: projects.userId,
-        clientName: clients.name,
+        clientFirstName: clients.firstName,
+        clientLastName: clients.lastName,
         clientEmail: clients.email,
         userName: users.name,
         userEmail: users.email
@@ -86,7 +87,8 @@ export async function GET(
       lastActivity: project.lastActivity,
       client: {
         id: project.clientId,
-        name: project.clientName,
+        firstName: project.clientFirstName,
+        lastName: project.clientLastName,
         email: project.clientEmail
       },
       user: {
@@ -112,12 +114,12 @@ export async function GET(
 
   } catch (error) {
     console.error('Client project fetch error:', error)
-    console.error('Error details:', error.message)
-    console.error('Error stack:', error.stack)
+    console.error('Error details:', error instanceof Error ? error.message : 'Unknown error')
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace')
     return NextResponse.json({
       status: 'error',
       message: 'Failed to fetch project',
-      error: error.message
+      error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
 }

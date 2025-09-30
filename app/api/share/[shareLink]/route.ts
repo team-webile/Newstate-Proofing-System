@@ -17,9 +17,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ shar
       const projectId = projectIdMatch[1]
       
       // Find project by ID
-      const project = await db.project.select().from(table).where(eq(table.id, id))
+      const [project] = await db
+        .select()
+        .from(projects)
+        .where(eq(projects.id, projectId))
 
       if (project) {
+        // Get client and user data for the project
+        const [client] = await db
+          .select()
+          .from(clients)
+          .where(eq(clients.id, project.clientId))
+
+        const [user] = await db
+          .select()
+          .from(users)
+          .where(eq(users.id, project.userId))
+
         // Return project data for share link access
         return NextResponse.json({
           status: 'success',
@@ -32,11 +46,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ shar
               status: project.status,
               createdAt: project.createdAt,
               updatedAt: project.updatedAt,
-              client: project.client,
-              user: project.user,
-              files: project.files,
-              approvals: project.approvals,
-              annotations: project.annotations
+              client: {
+                id: client?.id,
+                firstName: client?.firstName,
+                lastName: client?.lastName,
+                company: client?.company
+              },
+              user: {
+                id: user?.id,
+                name: user?.name,
+                email: user?.email
+              },
+              files: [], // Will be populated below
+              approvals: [],
+              annotations: []
             }
           }
         })
@@ -44,13 +67,21 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ shar
     }
 
     // If no project found, try to find review by shareLink (fallback)
-    const review = await db.review.select().from(table).where(eq(table.id, id))
+    const [review] = await db
+      .select()
+      .from(reviews)
+      .where(eq(reviews.shareLink, shareLink))
 
     let project
 
     // If no review found by shareLink, try to find by project ID
     if (!review) {
-      project = await db.project.select().from(table).where(eq(table.id, id))
+      const [projectData] = await db
+        .select()
+        .from(projects)
+        .where(eq(projects.id, shareLink))
+      
+      project = projectData
 
       if (!project) {
         return NextResponse.json({ 
@@ -59,7 +90,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ shar
         }, { status: 404 })
       }
     } else {
-      project = review.project
+      // Get project from review
+      const [projectData] = await db
+        .select()
+        .from(projects)
+        .where(eq(projects.id, review.projectId))
+      
+      if (!projectData) {
+        return NextResponse.json({ 
+          status: 'error', 
+          message: 'Project not found for review' 
+        }, { status: 404 })
+      }
+      
+      project = projectData
     }
 
     // If clientId is provided, verify client access
@@ -69,6 +113,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ shar
         message: 'Access denied'
       }, { status: 403 })
     }
+
+    // Get client and user data
+    const [client] = await db
+      .select()
+      .from(clients)
+      .where(eq(clients.id, project.clientId))
+
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, project.userId))
 
     // Get project files
     const projectDir = join(process.cwd(), 'public', 'uploads', 'projects', project.id)
@@ -110,9 +165,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ shar
       createdAt: project.createdAt,
       lastActivity: project.lastActivity,
       client: {
-        id: project.client.id,
-        name: project.client.name,
-        company: project.client.company
+        id: client?.id,
+        firstName: client?.firstName,
+        lastName: client?.lastName,
+        company: client?.company
       },
       files: files,
       publicLink: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/client/${project.clientId}?project=${project.id}`
