@@ -68,30 +68,7 @@ export async function POST(req: NextRequest) {
     
     console.log('Annotations POST - Annotation created:', annotation);
 
-    // Create a dummy message for the annotation conversation
-    try {
-      const { annotationReplies } = await import('@/db/schema');
-      
-      console.log('📝 Creating dummy message for annotation:', annotation.id);
-      
-      // Add dummy message: "No replies yet. Be the first to respond!"
-      const [dummyReply] = await db.insert(annotationReplies).values({
-        annotationId: annotation.id,
-        projectId: annotation.projectId,
-        content: "No replies yet. Be the first to respond!",
-        addedBy: "system",
-        addedByName: "System",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }).returning();
-      
-      console.log('📝 Created dummy message for annotation:', dummyReply);
-      console.log('📝 Dummy message ID:', dummyReply?.id);
-      console.log('📝 Dummy message content:', dummyReply?.content);
-    } catch (error) {
-      console.log("❌ Error creating dummy message:", error);
-      console.log("❌ Error details:", error instanceof Error ? error.message : 'Unknown error');
-    }
+    // No dummy messages - clean annotation system
 
     // Emit socket event for real-time updates
     try {
@@ -104,11 +81,7 @@ export async function POST(req: NextRequest) {
         // Determine if this is from admin or client
         const isFromAdmin = addedBy === 'Admin' || addedByName?.includes('Admin');
         
-        // Create dummy success message based on who added the annotation
-        const dummyMessage = isFromAdmin 
-          ? `✅ Admin added annotation: "${annotation.content}"`
-          : `✅ Client added annotation: "${annotation.content}"`;
-        
+        // Clean annotation data without dummy messages
         io.to(`project-${projectId}`).emit('annotationAdded', {
           id: annotation.id,
           content: annotation.content,
@@ -121,29 +94,28 @@ export async function POST(req: NextRequest) {
           status: annotation.status,
           createdAt: annotation.createdAt,
           timestamp: new Date().toISOString(),
-          // Include dummy message in the annotation data
-          hasDummyMessage: true,
-          dummyMessage: dummyMessage,
           isFromAdmin: isFromAdmin
         });
         
-        // Send dummy success message to opposite user type
+        // Send notification to opposite user type
         if (isFromAdmin) {
-          // Admin added annotation, send success message to client
-          io.to(`project-${projectId}`).emit('dummySuccessMessage', {
+          // Admin added annotation, notify client
+          io.to(`project-${projectId}`).emit('annotationNotification', {
             type: 'annotation_added',
-            message: `✅ Your annotation has been added successfully!`,
+            message: `New annotation from Admin: "${annotation.content}"`,
             from: 'Admin',
             to: 'Client',
+            annotationId: annotation.id,
             timestamp: new Date().toISOString()
           });
         } else {
-          // Client added annotation, send success message to admin
-          io.to(`project-${projectId}`).emit('dummySuccessMessage', {
+          // Client added annotation, notify admin
+          io.to(`project-${projectId}`).emit('annotationNotification', {
             type: 'annotation_added',
-            message: `✅ Client annotation received and saved!`,
+            message: `New annotation from Client: "${annotation.content}"`,
             from: 'Client',
             to: 'Admin',
+            annotationId: annotation.id,
             timestamp: new Date().toISOString()
           });
         }
@@ -166,7 +138,6 @@ export async function POST(req: NextRequest) {
       status: "success",
       message: successMessage,
       data: annotation,
-      dummyMessage: successMessage,
       isFromAdmin: isFromAdmin
     });
   } catch (error) {

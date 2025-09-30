@@ -16,7 +16,8 @@ async function handler(req: NextRequest, user: AuthUser) {
           id: projects.id,
           title: projects.title,
           updatedAt: projects.updatedAt,
-          clientName: clients.name,
+          clientFirstName: clients.firstName,
+          clientLastName: clients.lastName,
           clientId: clients.id
         })
         .from(projects)
@@ -63,7 +64,7 @@ async function handler(req: NextRequest, user: AuthUser) {
           return {
             id: project.id,
             name: project.title,
-            client: project.clientName,
+            client: `${project.clientFirstName} ${project.clientLastName}`,
             status,
             daysAgo,
             thumbnail: `/placeholder.svg` // You can add thumbnail logic here

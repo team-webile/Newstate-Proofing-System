@@ -6,8 +6,8 @@ let io: SocketIOServer | null = null
 
 export function getSocketServer(): SocketIOServer | null {
   // First try to get from global (set by server.js)
-  if (typeof global !== 'undefined' && global.socketServer) {
-    return global.socketServer;
+  if (typeof global !== 'undefined' && (global as any).socketServer) {
+    return (global as any).socketServer;
   }
   
   // Fallback to local instance
@@ -157,6 +157,36 @@ export function initializeSocketServer() {
         console.log('Typing indicator:', data)
         // Broadcast to all other clients in the project room
         socket.to(`project-${data.projectId}`).emit('typing', {
+          ...data,
+          timestamp: new Date().toISOString()
+        })
+      })
+
+      // Annotation notification events
+      socket.on('annotationNotification', (data) => {
+        console.log('💬 Annotation notification:', data)
+        // Broadcast to all clients in the project room
+        socket.to(`project-${data.projectId}`).emit('annotationNotification', {
+          ...data,
+          timestamp: new Date().toISOString()
+        })
+      })
+
+      // Reply notification events
+      socket.on('replyNotification', (data) => {
+        console.log('💬 Reply notification:', data)
+        // Broadcast to all clients in the project room
+        socket.to(`project-${data.projectId}`).emit('replyNotification', {
+          ...data,
+          timestamp: new Date().toISOString()
+        })
+      })
+
+      // Status notification events
+      socket.on('statusNotification', (data) => {
+        console.log('📊 Status notification:', data)
+        // Broadcast to all clients in the project room
+        socket.to(`project-${data.projectId}`).emit('statusNotification', {
           ...data,
           timestamp: new Date().toISOString()
         })

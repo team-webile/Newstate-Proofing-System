@@ -1083,7 +1083,7 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                   }
                 >
                   <FileText className="h-4 w-4 mr-2" />
-                  View Annotations
+                  Client Feedback
                 </Button>
               </div>
             </div>
@@ -1271,7 +1271,7 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                   </CardTitle>
                   <CardDescription>
                     Upload and manage design files for client review. Supported
-                    formats: JPG, PNG, PDF, PSD, AI, EPS
+                    formats: JPG, PNG
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -1526,7 +1526,7 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                 </CardContent>
               </Card>
 
-              {/* Shareable Link */}
+              {/* Shareable Link */}  
               <Card>
                 <CardHeader>
                   <CardTitle>Shareable Link</CardTitle>
@@ -1544,9 +1544,24 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => window.open(project.publicLink, "_blank")}
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(project.publicLink);
+                          toast({
+                            title: "Link Copied!",
+                            description: "Public link has been copied to clipboard.",
+                          });
+                        } catch (error) {
+                          toast({
+                            title: "Copy Failed",
+                            description: "Failed to copy link to clipboard.",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
                     >
-                      <Icons.ExternalLink />
+                      <Icons.Copy />
+                      <span className="ml-2">Copy Link</span>
                     </Button>
                   </div>
                 </CardContent>

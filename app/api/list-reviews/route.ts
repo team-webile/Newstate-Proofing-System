@@ -28,7 +28,8 @@ export async function GET(req: NextRequest) {
           title: projects.title,
           client: {
             id: clients.id,
-            name: clients.name,
+            firstName: clients.firstName,
+            lastName: clients.lastName,
           },
         },
       })
