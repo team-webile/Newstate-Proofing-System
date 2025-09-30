@@ -1835,7 +1835,9 @@ console.log(reviewData,'reviewData')
                             onClick={() => handleFileChange(file.id)}
                           >
                             <div className="flex items-center gap-3 w-full">
-                              <div className="w-8 h-8 bg-muted rounded flex items-center justify-center">
+                              <div className={`w-8 h-8 rounded flex items-center justify-center ${
+                                currentFile === file.id ? "bg-primary text-white" : "bg-muted"
+                              }`}>
                                 <Icons.FolderOpen />
                               </div>
                               <div className="text-left flex-1">
