@@ -27,6 +27,7 @@ import { ProjectsSkeleton } from "@/components/projects-skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { ProjectsAPI } from "@/lib/projects-api";
 
 import {
   Pagination,
@@ -55,6 +56,7 @@ export default function ProjectsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(6);
   const [copiedProjectId, setCopiedProjectId] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   const { data, loading, error, refreshProjects } = useProjects(
     currentPage,
@@ -138,6 +140,26 @@ export default function ProjectsPage() {
         description: "Failed to delete project. Please try again.",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleExportProjects = async () => {
+    try {
+      setIsExporting(true);
+      await ProjectsAPI.exportProjectsCSV(searchTerm, statusFilter);
+      toast({
+        title: "Export Successful",
+        description: "Projects have been exported to CSV successfully.",
+      });
+    } catch (error) {
+      console.error("Export error:", error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to export projects. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -233,6 +255,21 @@ export default function ProjectsPage() {
             <Logo />
           </div>
           <div className="flex items-center gap-4">
+            {/* Export Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportProjects}
+              disabled={isExporting}
+              className="bg-transparent"
+            >
+              <Icons.Download />
+              <span className="ml-2">
+                {isExporting ? "Exporting..." : "Export"}
+              </span>
+            </Button>
+
+            {/* Search Field */}
             <div className="relative">
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                 <Icons.Search />
@@ -356,15 +393,6 @@ export default function ProjectsPage() {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {/* Project Thumbnail */}
-                    <div className="aspect-video rounded-lg overflow-hidden bg-muted">
-                      <img
-                        src={project.thumbnail || "/placeholder.svg"}
-                        alt={project.title}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-
                     {/* Project Info */}
                     <div>
                       <CardTitle className="text-lg text-card-foreground mb-1">
@@ -431,7 +459,7 @@ export default function ProjectsPage() {
                         </div>
                         Manage Files
                       </Button>
-                      <Button
+                      {/* <Button
                         variant="outline"
                         size="sm"
                         onClick={() => {
@@ -441,7 +469,7 @@ export default function ProjectsPage() {
                         title="Open Public Link"
                       >
                         <Icons.ExternalLink />
-                      </Button>
+                      </Button> */}
                       <Button
                         variant="outline"
                         size="sm"
