@@ -26,7 +26,7 @@ export async function POST(
     }
 
     // Generate client URL format
-    const clientUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://preview.devnstage.xyz'}/client/${project.clientId}?project=${projectId}`
+    const clientUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/client/${project.clientId}?project=${projectId}`
 
     return NextResponse.json({
       status: 'success',

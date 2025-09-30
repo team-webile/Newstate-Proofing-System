@@ -4,7 +4,7 @@ const next = require('next');
 const { Server } = require('socket.io');
 
 const dev = process.env.NODE_ENV !== 'production';
-const hostname = process.env.HOSTNAME || (dev ? 'localhost' : 'preview.devnstage.xyz');
+const hostname = process.env.HOSTNAME || (dev ? 'localhost' : 'localhost:3000');
 const port = process.env.PORT || 3000;
 
 // Create Next.js app
@@ -23,10 +23,10 @@ app.prepare().then(() => {
       res.end('internal server error');
     }
   });
-
+ 
   // Create Socket.IO server
   const allowedOrigins = [
-    'http://preview.devnstage.xyz',
+    'http://localhost:3000',
   ];
   
   // Add environment-specific origins

@@ -26,7 +26,7 @@ export default function NotificationTest({ projectId, userType }: NotificationTe
   useEffect(() => {
     if (!projectId) return;
 
-    const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://preview.devnstage.xyz', {
+    const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000', {
       path: "/api/socketio",
       transports: ["websocket", "polling"],
     });
