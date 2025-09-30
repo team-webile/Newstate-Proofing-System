@@ -909,7 +909,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
       onAnnotationAdded: (data) => {
         console.log('🔔 Client received annotationAdded event:', data);
         const newAnnotation: ProjectAnnotation = {
-          id: Date.now().toString(),
+          id: data.id || Date.now().toString(), // Use database ID if available
           content: data.annotation || data.content,
           fileId: data.fileId,
           addedBy: data.addedBy || 'Unknown',
@@ -967,7 +967,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         let newReply;
         if (data.reply && typeof data.reply === 'object') {
           newReply = {
-            id: data.reply.id || Date.now().toString(),
+            id: data.reply.id || Date.now().toString(), // Use database ID if available
             content: data.reply.content || 'Reply content',
             addedBy: data.reply.addedBy || 'Unknown',
             addedByName: data.reply.addedByName || 'Unknown',
@@ -975,7 +975,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
           };
         } else {
           newReply = {
-            id: Date.now().toString(),
+            id: data.replyId || Date.now().toString(), // Use database ID if available
             content: data.reply || 'Reply content',
             addedBy: data.addedBy || 'Unknown',
             addedByName: data.addedByName || 'Unknown',
