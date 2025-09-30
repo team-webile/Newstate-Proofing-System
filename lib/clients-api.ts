@@ -1,54 +1,64 @@
-import { ClientModel, CreateClientData, UpdateClientData } from '@/models/Client'
+import {
+  ClientModel,
+  CreateClientData,
+  UpdateClientData,
+} from "@/models/Client";
 
 export interface ClientWithStats {
-  id: string
-  name: string
-  email: string
-  phone?: string
-  company?: string
-  address?: string
-  notes?: string
-  logoUrl?: string
-  brandColor?: string
-  themeMode: string
-  projectsCount: number
-  activeProjects: number
-  lastActivity: string
-  createdAt: Date
-  updatedAt: Date
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  company?: string;
+  address?: string;
+  notes?: string;
+  logoUrl?: string;
+  brandColor?: string;
+  themeMode: string;
+  projectsCount: number;
+  activeProjects: number;
+  lastActivity: string;
+  createdAt: Date;
+  updatedAt: Date;
   _count?: {
-    projects: number
-  }
+    projects: number;
+  };
 }
 
 export interface ClientListResponse {
-  clients: ClientWithStats[]
+  clients: ClientWithStats[];
   pagination: {
-    page: number
-    limit: number
-    total: number
-    totalPages: number
-    hasNext: boolean
-    hasPrev: boolean
-  }
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
 }
 
 export class ClientsAPI {
   /**
    * Get all clients with pagination and search
    */
-  static async getClients(page: number = 1, limit: number = 10, search?: string): Promise<ClientListResponse> {
+  static async getClients(
+    page: number = 1,
+    limit: number = 10,
+    search?: string
+  ): Promise<ClientListResponse> {
     try {
-      const response = await fetch(`/api/clients?page=${page}&limit=${limit}&search=${search || ''}`)
-      const data = await response.json()
-      
-      if (data.status === 'success') {
-        return data.data
+      const response = await fetch(
+        `/api/clients?page=${page}&limit=${limit}&search=${search || ""}`
+      );
+      const data = await response.json();
+
+      if (data.status === "success") {
+        return data.data;
       }
-      
-      throw new Error(data.message || 'Failed to fetch clients')
+
+      throw new Error(data.message || "Failed to fetch clients");
     } catch (error) {
-      console.error('Error fetching clients:', error)
+      console.error("Error fetching clients:", error);
       return {
         clients: [],
         pagination: {
@@ -57,9 +67,9 @@ export class ClientsAPI {
           total: 0,
           totalPages: 0,
           hasNext: false,
-          hasPrev: false
-        }
-      }
+          hasPrev: false,
+        },
+      };
     }
   }
 
@@ -68,69 +78,74 @@ export class ClientsAPI {
    */
   static async getClient(id: string): Promise<ClientWithStats | null> {
     try {
-      const response = await fetch(`/api/clients/${id}`)
-      const data = await response.json()
-      
-      if (data.status === 'success') {
-        return data.data
+      const response = await fetch(`/api/clients/${id}`);
+      const data = await response.json();
+
+      if (data.status === "success") {
+        return data.data;
       }
-      
-      throw new Error(data.message || 'Failed to fetch client')
+
+      throw new Error(data.message || "Failed to fetch client");
     } catch (error) {
-      console.error('Error fetching client:', error)
-      return null
+      console.error("Error fetching client:", error);
+      return null;
     }
   }
 
   /**
    * Create new client
    */
-  static async createClient(clientData: CreateClientData): Promise<ClientWithStats | null> {
+  static async createClient(
+    clientData: CreateClientData
+  ): Promise<ClientWithStats | null> {
     try {
-      const response = await fetch('/api/clients', {
-        method: 'POST',
+      const response = await fetch("/api/clients", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(clientData),
-      })
-      
-      const data = await response.json()
-      
-      if (data.status === 'success') {
-        return data.data
+      });
+
+      const data = await response.json();
+
+      if (data.status === "success") {
+        return data.data;
       }
-      
-      throw new Error(data.message || 'Failed to create client')
+
+      throw new Error(data.message || "Failed to create client");
     } catch (error) {
-      console.error('Error creating client:', error)
-      return null
+      console.error("Error creating client:", error);
+      return null;
     }
   }
 
   /**
    * Update client
    */
-  static async updateClient(id: string, clientData: UpdateClientData): Promise<ClientWithStats | null> {
+  static async updateClient(
+    id: string,
+    clientData: UpdateClientData
+  ): Promise<ClientWithStats | null> {
     try {
       const response = await fetch(`/api/clients/${id}`, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(clientData),
-      })
-      
-      const data = await response.json()
-      
-      if (data.status === 'success') {
-        return data.data
+      });
+
+      const data = await response.json();
+
+      if (data.status === "success") {
+        return data.data;
       }
-      
-      throw new Error(data.message || 'Failed to update client')
+
+      throw new Error(data.message || "Failed to update client");
     } catch (error) {
-      console.error('Error updating client:', error)
-      return null
+      console.error("Error updating client:", error);
+      return null;
     }
   }
 
@@ -140,19 +155,19 @@ export class ClientsAPI {
   static async deleteClient(id: string): Promise<boolean> {
     try {
       const response = await fetch(`/api/clients/${id}`, {
-        method: 'DELETE',
-      })
-      
-      const data = await response.json()
-      
-      if (data.status === 'success') {
-        return true
+        method: "DELETE",
+      });
+
+      const data = await response.json();
+
+      if (data.status === "success") {
+        return true;
       }
-      
-      throw new Error(data.message || 'Failed to delete client')
+
+      throw new Error(data.message || "Failed to delete client");
     } catch (error) {
-      console.error('Error deleting client:', error)
-      return false
+      console.error("Error deleting client:", error);
+      return false;
     }
   }
 
@@ -161,17 +176,53 @@ export class ClientsAPI {
    */
   static async searchClients(query: string): Promise<ClientWithStats[]> {
     try {
-      const response = await fetch(`/api/clients/search?q=${encodeURIComponent(query)}`)
-      const data = await response.json()
-      
-      if (data.status === 'success') {
-        return data.data
+      const response = await fetch(
+        `/api/clients/search?q=${encodeURIComponent(query)}`
+      );
+      const data = await response.json();
+
+      if (data.status === "success") {
+        return data.data;
       }
-      
-      throw new Error(data.message || 'Failed to search clients')
+
+      throw new Error(data.message || "Failed to search clients");
     } catch (error) {
-      console.error('Error searching clients:', error)
-      return []
+      console.error("Error searching clients:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Export clients as CSV
+   */
+  static async exportClientsCSV(search?: string): Promise<void> {
+    try {
+      const searchParam = search ? `?search=${encodeURIComponent(search)}` : "";
+      const response = await fetch(`/api/clients/export${searchParam}`);
+
+      if (!response.ok) {
+        throw new Error("Failed to export clients");
+      }
+
+      // Get the filename from the response headers
+      const contentDisposition = response.headers.get("content-disposition");
+      const filename = contentDisposition
+        ? contentDisposition.split("filename=")[1]?.replace(/"/g, "")
+        : "clients-export.csv";
+
+      // Create blob and download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error exporting clients:", error);
+      throw error;
     }
   }
 }
