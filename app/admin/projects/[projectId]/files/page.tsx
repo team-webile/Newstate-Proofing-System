@@ -17,7 +17,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { LogoutButton } from "@/components/logout-button";
-import { Eye, MessageSquare, PenTool, X, FileText } from "lucide-react";
+import { Eye, MessageSquare, PenTool, X, FileText, ZoomIn } from "lucide-react";
+import Lightbox from "@/components/Lightbox";
 import io from "socket.io-client";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
@@ -115,7 +116,7 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
       id: "1",
       version: "V1",
       files: [],
-      status: "draft",
+      status: "DRAFT",
       createdAt: new Date().toISOString(),
     },
   ]);
@@ -137,6 +138,9 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
   const [showViewDetailsModal, setShowViewDetailsModal] = useState(false);
   const [selectedFileForDetails, setSelectedFileForDetails] =
     useState<ProjectFile | null>(null);
+  const [showLightbox, setShowLightbox] = useState(false);
+  const [lightboxImages, setLightboxImages] = useState<string[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
   const [socket, setSocket] = useState<any>(null);
   const [chatMessages, setChatMessages] = useState<
     Array<{
@@ -337,6 +341,17 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
     }
   };
 
+  const handleLightboxOpen = (imageUrl: string, allImages?: string[]) => {
+    if (allImages && allImages.length > 0) {
+      setLightboxImages(allImages);
+      setLightboxIndex(allImages.indexOf(imageUrl));
+    } else {
+      setLightboxImages([imageUrl]);
+      setLightboxIndex(0);
+    }
+    setShowLightbox(true);
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       await Promise.all([
@@ -476,7 +491,7 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
 
           // Update project status
           setProject((prev) =>
-            prev ? { ...prev, status: data.status } : null
+            prev ? { ...prev, status: data.status as any } : null
           );
         }
       );
@@ -1288,7 +1303,13 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                               <img
                                 src={file.url}
                                 alt={file.name}
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-cover cursor-zoom-in"
+                                onClick={() => {
+                                  const allImages = currentVersionData?.files
+                                    ?.filter((f: any) => isImageFile(f))
+                                    ?.map((f: any) => f.url) || [];
+                                  handleLightboxOpen(file.url, allImages);
+                                }}
                                 onError={(e) => {
                                   e.currentTarget.style.display = "none";
                                   e.currentTarget.nextElementSibling?.classList.remove(
@@ -1406,11 +1427,17 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                                   <img
                                     src={file.url}
                                     alt={file.name}
-                                    className="w-8 h-8 object-cover rounded"
+                                    className="w-8 h-8 object-cover rounded cursor-zoom-in"
+                                    onClick={() => {
+                                      const allImages = version.files
+                                        ?.filter((f: any) => isImageFile(f))
+                                        ?.map((f: any) => f.url) || [];
+                                      handleLightboxOpen(file.url, allImages);
+                                    }}
                                   />
                                 ) : (
                                   <div className="w-8 h-8 bg-muted rounded flex items-center justify-center">
-                                    <Icons.File className="h-4 w-4" />
+                                    <Icons.File />
                                   </div>
                                 )}
                                 <span className="truncate">{file.name}</span>
@@ -1664,7 +1691,13 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                 <img
                   src={selectedImage.url}
                   alt={selectedImage.name}
-                  className="w-full h-auto max-h-[300px] object-contain"
+                  className="w-full h-auto max-h-[300px] object-contain cursor-zoom-in"
+                  onClick={() => {
+                    const allImages = currentVersionData?.files
+                      ?.filter((f: any) => isImageFile(f))
+                      ?.map((f: any) => f.url) || [];
+                    handleLightboxOpen(selectedImage.url, allImages);
+                  }}
                 />
               </div>
 
@@ -1783,7 +1816,13 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                   <img
                     src={selectedFileForDetails.url}
                     alt={selectedFileForDetails.name}
-                    className="w-full h-auto max-h-[300px] object-contain"
+                    className="w-full h-auto max-h-[300px] object-contain cursor-zoom-in"
+                    onClick={() => {
+                      const allImages = currentVersionData?.files
+                        ?.filter((f: any) => isImageFile(f))
+                        ?.map((f: any) => f.url) || [];
+                      handleLightboxOpen(selectedFileForDetails.url, allImages);
+                    }}
                   />
                 ) : (
                   <div className="flex items-center justify-center h-48">
@@ -1888,6 +1927,18 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Lightbox */}
+      <Lightbox
+        isOpen={showLightbox}
+        onClose={() => setShowLightbox(false)}
+        images={lightboxImages}
+        currentIndex={lightboxIndex}
+        onIndexChange={setLightboxIndex}
+        imageAlt="Project Image"
+        showNavigation={lightboxImages.length > 1}
+        showThumbnails={lightboxImages.length > 1}
+      />
     </div>
   );
 }

@@ -36,8 +36,8 @@ export async function PUT(request: NextRequest) {
 
     // Emit socket event for real-time updates
     try {
-      const { getSocketServer } = await import('@/lib/socket-server')
-      const io = getSocketServer()
+      // Get socket server from global (set by server.js)
+      const io = (global as any).socketServer;
       
       if (io) {
         // Determine if this is from admin or client

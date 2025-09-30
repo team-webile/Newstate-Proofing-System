@@ -11,6 +11,7 @@ import { useDashboardData } from "@/lib/use-dashboard-data"
 import { DashboardSkeleton } from "@/components/dashboard-skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useToast } from "@/hooks/use-toast"
+import Link from "next/link"
 
 export default function AdminDashboard() {
   const { data, loading, error, refreshData } = useDashboardData()
@@ -257,9 +258,11 @@ export default function AdminDashboard() {
                     <div className="flex items-center gap-4">
                       <Badge className={getStatusColor(project.status)}>{project.status}</Badge>
                       <span className="text-sm text-muted-foreground">{project.daysAgo}d ago</span>
-                      <Button variant="ghost" size="sm">
-                        View
-                      </Button>
+                      <Link href={`/admin/projects/${project.id}/files`}>
+                        <Button variant="ghost" size="sm">
+                          View
+                        </Button>
+                      </Link>
                     </div>
                   </div>
                 ))}

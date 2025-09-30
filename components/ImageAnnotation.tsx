@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Icons } from "@/components/icons";
-import { PenTool, X, CheckCircle, AlertCircle } from "lucide-react";
+import { PenTool, X, CheckCircle, AlertCircle, ZoomIn } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -16,6 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import Lightbox from "@/components/Lightbox";
 
 interface AnnotationReply {
   id: string;
@@ -54,6 +55,7 @@ interface ImageAnnotationProps {
   };
   annotationsDisabled?: boolean;
   reviewStatus?: string;
+  additionalImages?: string[];
 }
 
 export default function ImageAnnotation({
@@ -69,6 +71,7 @@ export default function ImageAnnotation({
   currentUser = { name: "User", role: "Client" },
   annotationsDisabled = false,
   reviewStatus = "PENDING",
+  additionalImages = [],
 }: ImageAnnotationProps) {
   const [isAddingAnnotation, setIsAddingAnnotation] = useState(false);
   const [selectedAnnotation, setSelectedAnnotation] =
@@ -79,10 +82,17 @@ export default function ImageAnnotation({
   const [replyText, setReplyText] = useState("");
   const [replyingToAnnotation, setReplyingToAnnotation] =
     useState<Annotation | null>(null);
+  const [showLightbox, setShowLightbox] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
   const imageRef = useRef<HTMLDivElement>(null);
 
   const handleImageClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isAddingAnnotation) return;
+    if (!isAddingAnnotation) {
+      // If not in annotation mode, open lightbox
+      setLightboxIndex(0);
+      setShowLightbox(true);
+      return;
+    }
 
     const rect = e.currentTarget.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * 100;
@@ -158,7 +168,7 @@ export default function ImageAnnotation({
         <img
           src={imageUrl}
           alt={imageAlt}
-          className="w-full h-auto max-h-[600px] object-contain"
+          className="w-full h-auto max-h-[600px] object-contain cursor-zoom-in"
           draggable={false}
           onError={(e) => {
             e.currentTarget.style.display = "none";
@@ -167,7 +177,7 @@ export default function ImageAnnotation({
         />
 
         {/* Fallback for broken images */}
-        <div className="hidden w-full h-64 flex items-center justify-center text-muted-foreground">
+        <div className="hidden w-full h-64 items-center justify-center text-muted-foreground">
           <div className="text-center">
             <div className="h-12 w-12 mx-auto mb-2">
               <Icons.FolderOpen />
@@ -182,9 +192,19 @@ export default function ImageAnnotation({
           <p className="font-medium">{imageAlt}</p>
         </div>
 
+        {/* Lightbox trigger overlay */}
+        {!isAddingAnnotation && (
+          <div className="absolute top-4 right-4 bg-black/70 text-white px-3 py-2 rounded-lg text-sm cursor-pointer hover:bg-black/80 transition-colors">
+            <div className="flex items-center gap-1">
+              <ZoomIn className="h-4 w-4" />
+              <span>Click to zoom</span>
+            </div>
+          </div>
+        )}
+
         {/* Annotation count overlay */}
         {annotations.length > 0 && (
-          <div className="absolute top-4 right-4 bg-blue-500 text-white px-3 py-2 rounded-lg text-sm">
+          <div className="absolute bottom-4 right-4 bg-blue-500 text-white px-3 py-2 rounded-lg text-sm">
             <div className="flex items-center gap-1">
               <Icons.MessageCircle />
               <span>{annotations.length} annotations</span>
@@ -491,6 +511,18 @@ export default function ImageAnnotation({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Lightbox */}
+      <Lightbox
+        isOpen={showLightbox}
+        onClose={() => setShowLightbox(false)}
+        images={[imageUrl, ...additionalImages]}
+        currentIndex={lightboxIndex}
+        onIndexChange={setLightboxIndex}
+        imageAlt={imageAlt}
+        showNavigation={additionalImages.length > 0}
+        showThumbnails={additionalImages.length > 0}
+      />
     </div>
   );
 }

@@ -10,9 +10,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { LogoutButton } from "@/components/logout-button"
-import { Eye, MessageSquare, PenTool, ArrowLeft, Plus, X, MapPin, CheckCircle, AlertCircle, Download, Upload, FileText, MessageCircle } from "lucide-react"
+import { Eye, MessageSquare, PenTool, ArrowLeft, Plus, X, MapPin, CheckCircle, AlertCircle, Download, Upload, FileText, MessageCircle, ZoomIn } from "lucide-react"
+import Lightbox from "@/components/Lightbox"
 import { useUnifiedSocket } from '@/hooks/use-unified-socket'
 import { useRouter } from 'next/navigation'
+import { useToast } from "@/hooks/use-toast"
 import {
   Select,
   SelectContent,
@@ -73,6 +75,12 @@ interface Project {
   status: "draft" | "pending" | "approved" | "revisions" | "active" | "archived" | "completed" | "rejected"
   createdAt: string
   lastActivity: string
+  client: {
+    id: string
+    firstName: string
+    lastName: string
+    email: string
+  }
 }
 
 interface Client {
@@ -121,6 +129,7 @@ interface ProjectAnnotationsPageProps {
 }
 
 export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPageProps) {
+  const { toast } = useToast()
   const router = useRouter()
   const [project, setProject] = useState<Project | null>(null)
   const [files, setFiles] = useState<ProjectFile[]>([])
@@ -157,6 +166,9 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
   const [showApprovalDialog, setShowApprovalDialog] = useState(false)
   const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>('approve')
   const [approvalComment, setApprovalComment] = useState("")
+  const [showLightbox, setShowLightbox] = useState(false)
+  const [lightboxImages, setLightboxImages] = useState<string[]>([])
+  const [lightboxIndex, setLightboxIndex] = useState(0)
   const [isApproving, setIsApproving] = useState(false)
   const [showDownloadDialog, setShowDownloadDialog] = useState(false)
   const [downloadFormat, setDownloadFormat] = useState<'zip' | 'individual'>('zip')
@@ -165,6 +177,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
   const [selectedAnnotationChat, setSelectedAnnotationChat] = useState<Annotation | null>(null)
   const [replyText, setReplyText] = useState("")
   const [isSubmittingReply, setIsSubmittingReply] = useState(false)
+  const [isAddingAnnotation, setIsAddingAnnotation] = useState(false)
   const chatScrollRef = useRef<HTMLDivElement>(null)
 
   // Auto-scroll to bottom of chat
@@ -219,10 +232,17 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
       
       if (data.status === 'success') {
         const projectInfo = data.data
+        console.log('Project info:', projectInfo)
         const projectWithLink = {
           id: projectInfo.id,
           name: projectInfo.title,
-          clientId: projectInfo.clientId,
+          client: {
+            id: projectInfo.client.clientId,
+            firstName: projectInfo.client.firstName,
+            lastName: projectInfo.client.lastName,
+            email: projectInfo.client.email
+          },
+          clientId: projectInfo.client.clientId,
           description: projectInfo.description || '',
           allowDownloads: projectInfo.downloadEnabled,
           emailNotifications: projectInfo.emailNotifications ?? true,
@@ -256,6 +276,8 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
           annotations: []
         }))
         setVersions(versionsFromDb)
+        // Ensure V1 is selected by default
+        setCurrentVersion("V1")
       } else {
         // If no versions from database, initialize with default V1
         setVersions([
@@ -268,6 +290,8 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
             annotations: []
           }
         ])
+        // Ensure V1 is selected by default
+        setCurrentVersion("V1")
       }
     } catch (error) {
       console.error('Error fetching versions:', error)
@@ -282,6 +306,8 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
           annotations: []
         }
       ])
+      // Ensure V1 is selected by default
+      setCurrentVersion("V1")
     }
   }
 
@@ -321,6 +347,11 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
           })))
           
           setFiles(files)
+          
+          // Auto-select first file from V1 version if no file is selected
+          if (!selectedFile && filesByVersion['V1'] && filesByVersion['V1'].length > 0) {
+            setSelectedFile(filesByVersion['V1'][0])
+          }
         }
       }
     } catch (error) {
@@ -624,6 +655,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
         setLastUpdate(data.timestamp)
       },
       onAnnotationStatusUpdated: (data) => {
+        console.log('🔔 Admin received annotationStatusUpdated event:', data)
         setAnnotations(prev => prev.map(annotation => 
           annotation.id === data.annotationId 
             ? { 
@@ -647,28 +679,25 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
         setLastUpdate(data.timestamp)
       },
       onReviewStatusUpdated: (data) => {
-        console.log('🔔 Admin received reviewStatusUpdated event:', data)
-        
-        // Update project status if review status affects it
-        if (data.status === 'APPROVED' || data.status === 'REJECTED') {
-          setProject(prev => prev ? { 
-            ...prev, 
-            status: data.status === 'APPROVED' ? 'completed' : 'rejected' as any 
-          } : prev)
-        }
-        
-        const senderName = data.updatedByName || data.updatedBy || 'Unknown'
-        setChatMessages(prev => [...prev, {
-          id: Date.now().toString(),
-          type: 'status',
-          message: `Review status changed to ${data.status} by ${senderName}`,
-          timestamp: data.timestamp,
-          addedBy: data.updatedBy,
-          senderName: senderName,
-          isFromAdmin: data.updatedBy === 'admin-1'
-        }])
-        setLastUpdate(data.timestamp)
+        // Updates project status in real-time
+        setProject(prev => prev ? { 
+          ...prev, 
+          status: data.status === 'APPROVED' ? 'completed' : 'rejected' as any 
+        } : prev)
       },
+        
+      //   const senderName = data.updatedByName || data.updatedBy || 'Unknown'
+      //   setChatMessages(prev => [...prev, {
+      //     id: Date.now().toString(),
+      //     type: 'status',
+      //     message: `Review status changed to ${data.status} by ${senderName}`,
+      //     timestamp: data.timestamp,
+      //     addedBy: data.updatedBy,
+      //     senderName: senderName,
+      //     isFromAdmin: data.updatedBy === 'admin-1'
+      //   }])
+      //   setLastUpdate(data.timestamp)
+      // },
       onProjectStatusChanged: (data) => {
         setProject(prev => prev ? { ...prev, status: data.status as any } : prev)
         
@@ -685,30 +714,13 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
         setLastUpdate(data.timestamp)
       }
     },
-    onDummySuccessMessage: (data: {
-      type: string;
-      message: string;
-      from: string;
-      to: string;
-      timestamp: string;
-    }) => {
-      console.log('💬 Admin received dummy success message:', data);
-      
-      setChatMessages(prev => [...prev, {
-        id: Date.now().toString(),
-        type: 'status',
-        message: data.message,
-        timestamp: data.timestamp,
-        addedBy: data.from,
-        senderName: data.from,
-        isFromAdmin: data.to === 'Admin'
-      }]);
-    }
+    // onDummySuccessMessage removed - not supported by useUnifiedSocket
   })
 
   const addAnnotation = async () => {
     if (!newAnnotation.trim() || !selectedFile) return
     
+    setIsAddingAnnotation(true);
     try {
       const currentUser = {
         name: 'Admin User',
@@ -774,13 +786,29 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
         setNewAnnotation("")
         setShowAnnotationPopup(false)
         setPopupPosition(null)
+        
+        toast({
+          title: "Success",
+          description: "Annotation added successfully!",
+          variant: "default",
+        });
       } else {
         console.error('Failed to save annotation:', data.message)
-        alert('Failed to save annotation. Please try again.')
+        toast({
+          title: "Error",
+          description: "Failed to save annotation. Please try again.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error('Error saving annotation:', error)
-      alert('Failed to save annotation. Please try again.')
+      toast({
+        title: "Error",
+        description: "Failed to save annotation. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAddingAnnotation(false);
     }
   }
 
@@ -794,12 +822,26 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
       
       if (data.status === 'success') {
         setAnnotations(prev => prev.filter(ann => ann.id !== annotationId))
+        
+        toast({
+          title: "Success",
+          description: "Annotation deleted successfully!",
+          variant: "default",
+        });
       } else {
-        alert('Failed to delete annotation. Please try again.')
+        toast({
+          title: "Error",
+          description: "Failed to delete annotation. Please try again.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error('Error deleting annotation:', error)
-      alert('Failed to delete annotation. Please try again.')
+      toast({
+        title: "Error",
+        description: "Failed to delete annotation. Please try again.",
+        variant: "destructive",
+      });
     }
   }
 
@@ -856,6 +898,17 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
     setPopupPosition(null)
     setNewAnnotation("")
   }
+
+  const handleLightboxOpen = (imageUrl: string, allImages?: string[]) => {
+    if (allImages && allImages.length > 0) {
+      setLightboxImages(allImages);
+      setLightboxIndex(allImages.indexOf(imageUrl));
+    } else {
+      setLightboxImages([imageUrl]);
+      setLightboxIndex(0);
+    }
+    setShowLightbox(true);
+  };
 
   const addReply = async (annotationId: string) => {
     if (!newReply.trim()) return
@@ -916,13 +969,27 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
         setNewReply('')
         setShowReplyInput(false)
         setSelectedAnnotationForReply(null)
+        
+        toast({
+          title: "Success",
+          description: "Reply added successfully!",
+          variant: "default",
+        });
       } else {
         console.error('Failed to save reply:', data.message)
-        alert('Failed to save reply. Please try again.')
+        toast({
+          title: "Error",
+          description: "Failed to save reply. Please try again.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error('Error saving reply:', error)
-      alert('Failed to save reply. Please try again.')
+      toast({
+        title: "Error",
+        description: "Failed to save reply. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsSubmittingReply(false);
     }
@@ -987,13 +1054,27 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
           updatedBy: currentUser?.name || 'Admin',
           updatedByName: currentUser?.name || 'Admin'
         })
+        
+        toast({
+          title: "Success",
+          description: `Annotation status updated to ${status}!`,
+          variant: "default",
+        });
       } else {
         console.error('Failed to update annotation status:', data.message)
-        alert('Failed to update annotation status. Please try again.')
+        toast({
+          title: "Error",
+          description: "Failed to update annotation status. Please try again.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error('Error updating annotation status:', error)
-      alert('Failed to update annotation status. Please try again.')
+      toast({
+        title: "Error",
+        description: "Failed to update annotation status. Please try again.",
+        variant: "destructive",
+      });
     }
   }
 
@@ -1142,17 +1223,31 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
 
         setReplyText('');
         
+        toast({
+          title: "Success",
+          description: "Reply added successfully!",
+          variant: "default",
+        });
+        
         // Auto-scroll to bottom after sending reply
         setTimeout(() => {
           scrollToBottom();
         }, 100);
       } else {
         console.error('Failed to save reply:', data.message);
-        alert('Failed to save reply. Please try again.');
+        toast({
+          title: "Error",
+          description: "Failed to save reply. Please try again.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error('Error saving reply:', error);
-      alert('Failed to save reply. Please try again.');
+      toast({
+        title: "Error",
+        description: "Failed to save reply. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsSubmittingReply(false);
     }
@@ -1452,16 +1547,37 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                             <img
                               src={selectedFile.url}
                               alt={selectedFile.name}
-                        className={`w-full h-auto max-h-[500px] object-contain ${(project?.status === 'completed' || (project?.status as string) === "rejected") ? 'cursor-not-allowed' : 'cursor-crosshair'
+                        className={`w-full h-auto max-h-[500px] object-contain ${(project?.status === 'completed' || (project?.status as string) === "rejected") ? 'cursor-zoom-in' : 'cursor-crosshair'
                           }`}
                         onClick={(e) => {
                           if (project?.status === 'completed' || (project?.status as string) === "rejected") {
-                            e.preventDefault();
+                            // Open lightbox for completed/rejected projects
+                            const allImages = files
+                              ?.filter((f: any) => isImageFile(f))
+                              ?.map((f: any) => f.url) || [];
+                            handleLightboxOpen(selectedFile.url, allImages);
                             return;
                           }
                           handleImageClick(e);
                         }}
                             />
+
+                            {/* Lightbox trigger overlay for completed/rejected projects */}
+                            {(project?.status === 'completed' || (project?.status as string) === "rejected") && (
+                              <div className="absolute top-4 right-10 bg-black/70 text-white px-3 py-2 rounded-lg text-sm cursor-pointer hover:bg-black/80 transition-colors"
+                                   onClick={(e) => {
+                                     e.stopPropagation();
+                                     const allImages = files
+                                       ?.filter((f: any) => isImageFile(f))
+                                       ?.map((f: any) => f.url) || [];
+                                     handleLightboxOpen(selectedFile.url, allImages);
+                                   }}>
+                                <div className="flex items-center gap-1">
+                                  <ZoomIn className="h-4 w-4" />
+                                  <span>Click to zoom</span>
+                                </div>
+                              </div>
+                            )}
                             
                             {/* Render existing annotations on image */}
                             {getFileAnnotations(selectedFile.id).map((annotation) => {
@@ -1730,7 +1846,12 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                   </div>
                   <div>
                     <Label className="text-sm font-medium">Client</Label>
-                    <p className="text-sm text-muted-foreground">N/A</p>
+                    <p className="text-sm text-muted-foreground">
+                      {project?.client?.firstName && project?.client?.lastName 
+                        ? `${project.client.firstName} ${project.client.lastName}`
+                        : 'Unknown Client'
+                      }
+                    </p>
                   </div>
                   <div>
                     <Label className="text-sm font-medium">Status</Label>
@@ -2022,7 +2143,8 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50"
+                  disabled={isAddingAnnotation}
                   onClick={() => {
                     setNewAnnotation(prev => prev + '😊')
                   }}
@@ -2034,7 +2156,8 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50"
+                  disabled={isAddingAnnotation}
                   onClick={() => {
                     setNewAnnotation(prev => prev + '@')
                   }}
@@ -2050,12 +2173,16 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
               <Button
                 size="sm"
                 onClick={addAnnotation}
-                disabled={!newAnnotation.trim()}
-                className="h-8 w-8 p-0 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 rounded-full"
+                disabled={!newAnnotation.trim() || isAddingAnnotation}
+                className="h-8 w-8 p-0 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 rounded-full disabled:opacity-50"
               >
-                <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                </svg>
+                {isAddingAnnotation ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                ) : (
+                  <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                )}
               </Button>
             </div>
           </div>
@@ -2132,15 +2259,16 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                 </div>
               ) : (
                 <Input
-                  placeholder="Type your reply..."
+                  placeholder={isSubmittingReply ? "Sending reply..." : "Type your reply..."}
                   value={newReply}
                   onChange={(e) => setNewReply(e.target.value)}
                   onKeyPress={(e) => {
-                    if (e.key === "Enter" && newReply.trim()) {
+                    if (e.key === "Enter" && newReply.trim() && !isSubmittingReply) {
                       addReply(selectedAnnotationForReply.id);
                     }
                   }}
-                  className="border-0 focus:ring-0 text-sm dark:bg-gray-800 dark:text-gray-100"
+                  disabled={isSubmittingReply}
+                  className="border-0 focus:ring-0 text-sm dark:bg-gray-800 dark:text-gray-100 disabled:opacity-50"
                   autoFocus
                 />
               )}
@@ -2154,7 +2282,8 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50"
+                    disabled={isSubmittingReply}
                     onClick={() => {
                       setNewReply((prev) => prev + "😊");
                     }}
@@ -2166,7 +2295,8 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50"
+                    disabled={isSubmittingReply}
                     onClick={() => {
                       setNewReply((prev) => prev + "@");
                     }}
@@ -2180,7 +2310,8 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50"
+                    disabled={isSubmittingReply}
                     onClick={() => {
                       const input = document.createElement("input");
                       input.type = "file";
@@ -2208,22 +2339,26 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                 <Button
                   size="sm"
                   onClick={() => addReply(selectedAnnotationForReply.id)}
-                  disabled={!newReply.trim()}
-                  className="h-8 w-8 p-0 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 rounded-full"
+                  disabled={!newReply.trim() || isSubmittingReply}
+                  className="h-8 w-8 p-0 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 rounded-full disabled:opacity-50"
                 >
-                  <svg
-                    className="h-4 w-4 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                    />
-                  </svg>
+                  {isSubmittingReply ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  ) : (
+                    <svg
+                      className="h-4 w-4 text-white"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                      />
+                    </svg>
+                  )}
                 </Button>
               </div>
             )}
@@ -2417,6 +2552,18 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Lightbox */}
+      <Lightbox
+        isOpen={showLightbox}
+        onClose={() => setShowLightbox(false)}
+        images={lightboxImages}
+        currentIndex={lightboxIndex}
+        onIndexChange={setLightboxIndex}
+        imageAlt="Project Image"
+        showNavigation={lightboxImages.length > 1}
+        showThumbnails={lightboxImages.length > 1}
+      />
     </div>
   )
 }
