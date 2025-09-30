@@ -489,7 +489,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
       onAnnotationAdded: (data) => {
         console.log('🔔 Admin received annotationAdded event:', data)
         const newAnnotation: Annotation = {
-          id: Date.now().toString(),
+          id: data.id || Date.now().toString(), // Use database ID if available
           content: data.annotation || data.content,
           fileId: data.fileId,
           addedBy: data.addedBy || 'Unknown',
