@@ -1596,13 +1596,13 @@ console.log(reviewData,'reviewData')
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                     {notification.message}
                   </p>
-                  {notification.x !== undefined &&
+                  {/* {notification.x !== undefined &&
                     notification.y !== undefined && (
                       <p className="text-xs text-gray-500">
                         Position: {notification.x.toFixed(1)}%,{" "}
                         {notification.y.toFixed(1)}%
                       </p>
-                    )}
+                    )} */}
                   <p className="text-xs text-gray-400 mt-1">
                     {new Date(notification.timestamp).toLocaleTimeString()}
                   </p>
@@ -1838,7 +1838,7 @@ console.log(reviewData,'reviewData')
                               <div className={`w-8 h-8 rounded flex items-center justify-center ${
                                 currentFile === file.id ? "bg-primar" : "bg-muted"
                               }`}>
-                                <Icons.Image />
+                                <Icons.Image  style={{MarginLeft: '10px'}}/>
                                 </div>
                               <div className="text-left flex-1">
                                 <p className="font-medium">
@@ -2948,9 +2948,9 @@ console.log(reviewData,'reviewData')
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   Annotation Conversation
                 </h3>
-                <Badge variant="outline" className="text-xs">
+                {/* <Badge variant="outline" className="text-xs">
                   Position: {selectedAnnotationChat.x?.toFixed(0) || 0}%, {selectedAnnotationChat.y?.toFixed(0) || 0}%
-                </Badge>
+                </Badge> */}
                 <Button
                   variant="outline"
                   size="sm"

@@ -1350,11 +1350,6 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
           <Badge variant="outline">
             Admin Access
           </Badge>
-           
-          
-          <Badge variant={isConnected ? "default" : "destructive"}>
-            {isConnected ? "🟢 Live" : "🔴 Offline"}
-          </Badge>
           {lastUpdate && (
             <Badge variant="outline" className="text-xs">
               Last update: {new Date(lastUpdate).toLocaleTimeString()}
@@ -1400,11 +1395,11 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                     {notification.message}
                   </p>
-                  {notification.x !== undefined && notification.y !== undefined && (
+                  {/* {notification.x !== undefined && notification.y !== undefined && (
                     <p className="text-xs text-gray-500">
                       Position: {notification.x.toFixed(1)}%, {notification.y.toFixed(1)}%
                     </p>
-                  )}
+                  )} */}
                   {notification.annotationId && (
                     <p className="text-xs text-gray-500">
                       Click to view conversation
@@ -1799,11 +1794,11 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
                             )}
                           </div>
                               <p className="text-sm">{annotation.content}</p>
-                              {annotation.x !== undefined && annotation.y !== undefined && (
+                              {/* {annotation.x !== undefined && annotation.y !== undefined && (
                                 <p className="text-xs text-muted-foreground mt-1">
                                   Position: {annotation.x.toFixed(1)}%, {annotation.y.toFixed(1)}%
                                 </p>
-                              )}
+                              )} */}
                             </div>
                           </div>
                           
