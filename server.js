@@ -4,8 +4,8 @@ const next = require('next');
 const { Server } = require('socket.io');
 
 const dev = process.env.NODE_ENV !== 'production';
-const hostname = process.env.HOSTNAME || (dev ? 'localhost' : 'localhost:3000');
-const port = process.env.PORT || 3000;
+const hostname = process.env.HOSTNAME || (dev ? 'localhost' : 'localhost:3001');
+const port = process.env.PORT || 3001;
 
 // Create Next.js app
 const app = next({ dev, hostname, port });
@@ -36,6 +36,7 @@ app.prepare().then(() => {
   // Create Socket.IO server
   const allowedOrigins = [
     'http://localhost:3000',
+    'http://localhost:3001',
   ];
 
   // Add environment-specific origins
