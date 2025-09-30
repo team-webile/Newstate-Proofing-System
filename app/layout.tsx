@@ -16,6 +16,11 @@ export const metadata: Metadata = {
   title: "NewState Proofing System",
   description: "Professional client proofing and approval system",
   generator: "v0.app",
+  icons: {
+    icon: "/images/logo.png",
+    shortcut: "/images/logo.png",
+    apple: "/images/logo.png",
+  },
 };
 
 export default function RootLayout({
@@ -26,10 +31,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} font-sans antialiased`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="dark"
-        >
+        <ThemeProvider attribute="class" defaultTheme="dark">
           <Providers>
             <Suspense fallback={null}>{children}</Suspense>
             <Toaster />

@@ -74,8 +74,11 @@ export async function GET(req: NextRequest) {
       `"${project.title || ""}"`,
       `"${project.description || ""}"`,
       `"${project.status || ""}"`,
-      `"${project.clientFirstName || ""}"`,
-      `"${project.clientLastName || ""}"`,
+      `"${
+        project.clientFirstName && project.clientLastName
+          ? `${project.clientFirstName} ${project.clientLastName}`
+          : ""
+      }"`,
       `"${project.clientEmail || ""}"`,
       `"${project.clientCompany || ""}"`,
       project.downloadEnabled ? "Yes" : "No",
