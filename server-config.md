@@ -35,8 +35,8 @@ chmod -R 755 public/uploads/
 
 ### 3. Test File Access
 After deployment, test these URLs:
-- `https://preview.devnstage.xyz/uploads/projects/254d39bf-4d1a-4d68-b598-a13df874769e/versions/V1/dc11bade-d2cb-4ca9-be0b-fb26c4b1688d.jpg`
-- `https://preview.devnstage.xyz/uploads/projects/254d39bf-4d1a-4d68-b598-a13df874769e/versions/V1/cda8296b-83ab-4e98-b373-a6c2a881112b.jpeg`
+- `https://localhost:3000/uploads/projects/254d39bf-4d1a-4d68-b598-a13df874769e/versions/V1/dc11bade-d2cb-4ca9-be0b-fb26c4b1688d.jpg`
+- `https://localhost:3000/uploads/projects/254d39bf-4d1a-4d68-b598-a13df874769e/versions/V1/cda8296b-83ab-4e98-b373-a6c2a881112b.jpeg`
 
 ### 4. Nginx Configuration (if using Nginx)
 If you're using Nginx as a reverse proxy, add this to your nginx config:
@@ -44,7 +44,7 @@ If you're using Nginx as a reverse proxy, add this to your nginx config:
 ```nginx
 server {
     listen 80;
-    server_name preview.devnstage.xyz;
+    server_name localhost:3000;
     
     # Serve static files directly
     location /uploads/ {
