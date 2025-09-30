@@ -16,6 +16,15 @@ app.prepare().then(() => {
   const server = createServer(async (req, res) => {
     try {
       const parsedUrl = parse(req.url, true);
+
+      // Custom GET route for "/"
+      if (req.method === 'GET' && parsedUrl.pathname === '/') {
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'text/plain');
+        res.end('Client Proofing System Server is running');
+        return;
+      }
+
       await handle(req, res, parsedUrl);
     } catch (err) {
       console.error('Error occurred handling', req.url, err);
@@ -23,18 +32,18 @@ app.prepare().then(() => {
       res.end('internal server error');
     }
   });
- 
+
   // Create Socket.IO server
   const allowedOrigins = [
     'http://localhost:3000',
   ];
-  
+
   // Add environment-specific origins
   if (process.env.NEXT_PUBLIC_APP_URL) {
     allowedOrigins.push(process.env.NEXT_PUBLIC_APP_URL);
   }
   if (process.env.NEXT_PUBLIC_API_URL) {
-    allowedOrigins.push(process.env.NEXT_PUBLIC_API_URL); 
+    allowedOrigins.push(process.env.NEXT_PUBLIC_API_URL);
   }
   if (process.env.NEXT_PUBLIC_SOCKET_URL) {
     allowedOrigins.push(process.env.NEXT_PUBLIC_SOCKET_URL);
@@ -42,7 +51,7 @@ app.prepare().then(() => {
   if (process.env.NEXT_PUBLIC_BASE_URL) {
     allowedOrigins.push(process.env.NEXT_PUBLIC_BASE_URL);
   }
-    
+
   const io = new Server(server, {
     cors: {
       origin: allowedOrigins,
@@ -109,19 +118,19 @@ app.prepare().then(() => {
     socket.on('addAnnotationReply', (data) => {
       console.log('💬 Received addAnnotationReply event:', data);
       console.log('Broadcasting to project room:', `project-${data.projectId}`);
-      
+
       // Handle both old and new data structures
       const replyContent = typeof data.reply === 'string' ? data.reply : data.reply.content;
       const replyId = typeof data.reply === 'object' && data.reply.id ? data.reply.id : Date.now().toString();
       const replyCreatedAt = typeof data.reply === 'object' && data.reply.createdAt ? data.reply.createdAt : data.timestamp;
-      
+
       console.log('🔍 Processing reply data:', {
         replyType: typeof data.reply,
         replyContent,
         replyId,
         replyCreatedAt
       });
-      
+
       // Broadcast to all clients in the project room
       const broadcastData = {
         projectId: data.projectId,
@@ -135,7 +144,7 @@ app.prepare().then(() => {
         },
         timestamp: data.timestamp
       };
-      
+
       console.log('📡 Broadcasting annotationReplyAdded:', broadcastData);
       socket.to(`project-${data.projectId}`).emit('annotationReplyAdded', broadcastData);
       console.log('✅ Broadcasted annotationReplyAdded event');
@@ -231,3 +240,4 @@ app.prepare().then(() => {
     console.log(`🌐 App URL: ${process.env.NEXT_PUBLIC_APP_URL || 'Not configured'}`);
   });
 });
+ 
