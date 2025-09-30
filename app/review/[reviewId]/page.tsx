@@ -1836,10 +1836,10 @@ console.log(reviewData,'reviewData')
                           >
                             <div className="flex items-center gap-3 w-full">
                               <div className={`w-8 h-8 rounded flex items-center justify-center ${
-                                currentFile === file.id ? "bg-primary text-white" : "bg-muted"
+                                currentFile === file.id ? "bg-primar" : "bg-muted"
                               }`}>
-                                <Icons.FolderOpen />
-                              </div>
+                                <Icons.Image />
+                                </div>
                               <div className="text-left flex-1">
                                 <p className="font-medium">
                                   {file.name.length > 5
