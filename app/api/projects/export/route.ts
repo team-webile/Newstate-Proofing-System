@@ -44,7 +44,8 @@ export async function GET(req: NextRequest) {
         updatedAt: projects.updatedAt,
         lastActivity: projects.lastActivity,
         clientId: projects.clientId,
-        clientName: clients.name,
+        clientFirstName: clients.firstName,
+        clientLastName: clients.lastName,
         clientEmail: clients.email,
         clientCompany: clients.company,
       })
@@ -72,7 +73,11 @@ export async function GET(req: NextRequest) {
       `"${project.title || ""}"`,
       `"${project.description || ""}"`,
       `"${project.status || ""}"`,
-      `"${project.clientName || ""}"`,
+      `"${
+        project.clientFirstName && project.clientLastName
+          ? `${project.clientFirstName} ${project.clientLastName}`
+          : ""
+      }"`,
       `"${project.clientEmail || ""}"`,
       `"${project.clientCompany || ""}"`,
       project.downloadEnabled ? "Yes" : "No",

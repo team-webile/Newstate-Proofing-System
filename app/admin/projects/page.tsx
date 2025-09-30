@@ -20,7 +20,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-;
 import { LogoutButton } from "@/components/logout-button";
 import { useProjects } from "@/lib/use-projects";
 import { ProjectsSkeleton } from "@/components/projects-skeleton";
@@ -332,7 +331,7 @@ export default function ProjectsPage() {
                   key={project.id}
                   className="border-border bg-card hover:shadow-lg transition-shadow"
                 >
-                  <CardHeader className="pb-3">
+                  <CardHeader className="pb-4">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2">
                         {getStatusIcon(project.status)}
@@ -391,23 +390,27 @@ export default function ProjectsPage() {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="space-y-6">
                     {/* Project Info */}
-                    <div>
-                      <CardTitle className="text-lg text-card-foreground mb-1">
-                        {project.title}
-                      </CardTitle>
-                      <CardDescription className="text-muted-foreground mb-2">
-                        {project.description ? (
-                          project.description.length > 100 ? 
-                            `${project.description.slice(0, 100)}...` : 
-                            project.description
-                        ) : 'N/A'}
-                      </CardDescription>
+                    <div className="space-y-3">
+                      <div>
+                        <CardTitle className="text-lg text-card-foreground mb-2">
+                          {project.title}
+                        </CardTitle>
+                        <CardDescription className="text-muted-foreground">
+                          {project.description
+                            ? project.description.length > 100
+                              ? `${project.description.slice(0, 100)}...`
+                              : project.description
+                            : "No description provided"}
+                        </CardDescription>
+                      </div>
+
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Icons.User />
-                        <span>{project.clientFirstName} {project.clientLastName}</span>
-
+                        <span>
+                          {project.clientFirstName} {project.clientLastName}
+                        </span>
                         <span>•</span>
                         <span>
                           {project.lastActivity
@@ -420,34 +423,36 @@ export default function ProjectsPage() {
                       </div>
                     </div>
 
-                    {/* Project Stats */}
-
                     {/* Project Settings */}
-                    <div className="flex items-center gap-4 text-sm">
-                      <div className="flex items-center gap-1">
-                        <div
-                          className={`h-4 w-4 ${
-                            project.downloadEnabled
-                              ? "text-green-500"
-                              : "text-muted-foreground"
-                          }`}
-                        >
-                          <Icons.Download />
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4 text-sm">
+                        <div className="flex items-center gap-1">
+                          <div
+                            className={`h-4 w-4 ${
+                              project.downloadEnabled
+                                ? "text-green-500"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            <Icons.Download />
+                          </div>
+                          <span className="text-muted-foreground">
+                            Downloads
+                          </span>
                         </div>
-                        <span className="text-muted-foreground">Downloads</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <div className="h-4 w-4 text-muted-foreground">
-                          <Icons.Mail />
+                        <div className="flex items-center gap-1">
+                          <div className="h-4 w-4 text-muted-foreground">
+                            <Icons.Mail />
+                          </div>
+                          <span className="text-muted-foreground">
+                            Notifications
+                          </span>
                         </div>
-                        <span className="text-muted-foreground">
-                          Notifications
-                        </span>
                       </div>
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex gap-2 pt-2">
+                    <div className="flex gap-2">
                       <Button
                         variant="outline"
                         size="sm"
@@ -462,17 +467,6 @@ export default function ProjectsPage() {
                         </div>
                         Manage Files
                       </Button>
-                      {/* <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const publicLink = `${window.location.origin}/client/${project.clientId}?project=${project.id}`;
-                          window.open(publicLink, "_blank");
-                        }}
-                        title="Open Public Link"
-                      >
-                        <Icons.ExternalLink />
-                      </Button> */}
                       <Button
                         variant="outline"
                         size="sm"

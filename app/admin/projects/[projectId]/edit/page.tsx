@@ -34,10 +34,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Combobox } from "@/components/ui/combobox";
 
 interface Client {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   company?: string;
 }
@@ -111,6 +113,14 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
       setClientsLoading(false);
     }
   };
+
+  // Transform clients data for combobox - fix the name display
+  const clientOptions = clients.map((client) => ({
+    value: client.id,
+    label: `${client.firstName} ${client.lastName}${
+      client.company ? ` (${client.company})` : ""
+    }`,
+  }));
 
   useEffect(() => {
     const fetchData = async () => {
@@ -518,7 +528,7 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div>
+                  <div className="space-y-2">
                     <Label htmlFor="projectName">Project Name</Label>
                     <Input
                       id="projectName"
@@ -531,7 +541,7 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
                     />
                   </div>
 
-                  <div>
+                  <div className="space-y-2">
                     <Label htmlFor="client">Client</Label>
                     {clientsLoading ? (
                       <div className="flex items-center gap-2">
@@ -553,30 +563,22 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
                         </Button>
                       </div>
                     ) : (
-                      <Select
+                      <Combobox
+                        options={clientOptions}
                         value={project.clientId}
                         onValueChange={(value) =>
                           setProject((prev) =>
                             prev ? { ...prev, clientId: value } : null
                           )
                         }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a client" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {clients.map((client) => (
-                            <SelectItem key={client.id} value={client.id}>
-                              {client.name}{" "}
-                              {client.company && `(${client.company})`}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        placeholder="Select a client"
+                        searchPlaceholder="Search clients..."
+                        emptyText="No clients found."
+                      />
                     )}
                   </div>
 
-                  <div>
+                  <div className="space-y-2">
                     <Label htmlFor="description">Description</Label>
                     <Textarea
                       id="description"
@@ -590,7 +592,7 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
                     />
                   </div>
 
-                  <div>
+                  <div className="space-y-2">
                     <Label htmlFor="status">Project Status</Label>
                     <Select
                       value={project.status}
@@ -789,7 +791,14 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
                   <div>
                     <Label className="text-sm font-medium">Client</Label>
                     <p className="text-sm text-muted-foreground">
-                      {clients.find((c) => c.id === project.clientId)?.name}
+                      {(() => {
+                        const selectedClient = clients.find(
+                          (c) => c.id === project.clientId
+                        );
+                        return selectedClient
+                          ? `${selectedClient.firstName} ${selectedClient.lastName}`
+                          : "No client selected";
+                      })()}
                     </p>
                   </div>
 
