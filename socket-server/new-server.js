@@ -5,7 +5,7 @@ const cors = require('cors');
 
 const app = express();
 const server = createServer(app);
-const port = process.env.PORT || 3001;
+const port = 3003;
 
 // Middleware
 app.use(cors());
@@ -31,24 +31,9 @@ app.get('/health', (req, res) => {
 
 // Socket.IO CORS configuration
 const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'http://localhost:3002',
+  '*',
 ];
 
-// Add environment-specific origins
-if (process.env.NEXT_PUBLIC_APP_URL) {
-  allowedOrigins.push(process.env.NEXT_PUBLIC_APP_URL);
-}
-if (process.env.NEXT_PUBLIC_API_URL) {
-  allowedOrigins.push(process.env.NEXT_PUBLIC_API_URL);
-}
-if (process.env.NEXT_PUBLIC_SOCKET_URL) {
-  allowedOrigins.push(process.env.NEXT_PUBLIC_SOCKET_URL);
-}
-if (process.env.NEXT_PUBLIC_BASE_URL) {
-  allowedOrigins.push(process.env.NEXT_PUBLIC_BASE_URL);
-}
 
 // Create Socket.IO server
 const io = new Server(server, {
