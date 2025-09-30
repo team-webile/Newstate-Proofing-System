@@ -1,50 +1,58 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Logo } from "@/components/logo"
-import { Icons } from "@/components/icons"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Switch } from "@/components/ui/switch"
-import { LogoutButton } from "@/components/logout-button"
-import { useToast } from "@/hooks/use-toast"
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Logo } from "@/components/logo";
+import { Icons } from "@/components/icons";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { LogoutButton } from "@/components/logout-button";
+import { useToast } from "@/hooks/use-toast";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 
 interface Client {
-  id: string
-  name: string
-  email: string
-  company?: string
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  company?: string;
 }
 
 interface Project {
-  title: string
-  description?: string
-  clientId: string
-  downloadEnabled: boolean
-  status?: string
-  emailNotifications?: boolean
+  title: string;
+  description?: string;
+  clientId: string;
+  downloadEnabled: boolean;
+  status?: string;
+  emailNotifications?: boolean;
 }
 
 export default function NewProjectPage() {
-  const router = useRouter()
-  const { toast } = useToast()
-  const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [clients, setClients] = useState<Client[]>([])
-  const [error, setError] = useState<string | null>(null)
-  
+  const router = useRouter();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
   const [project, setProject] = useState<Project>({
     title: "",
     description: "",
@@ -52,98 +60,111 @@ export default function NewProjectPage() {
     downloadEnabled: true,
     status: "active",
     emailNotifications: true,
-  })
+  });
 
   useEffect(() => {
-    fetchClients()
-  }, [])
+    fetchClients();
+  }, []);
 
   const fetchClients = async () => {
     try {
-      setLoading(true)
-      setError(null)
-      
-      const response = await fetch('/api/clients')
-      const data = await response.json()
-      
-      if (data.status === 'success') {
-        setClients(data.data.clients || [])
+      setLoading(true);
+      setError(null);
+
+      const response = await fetch("/api/clients");
+      const data = await response.json();
+
+      if (data.status === "success") {
+        setClients(data.data.clients || []);
       } else {
-        setError(data.message || 'Failed to fetch clients')
+        setError(data.message || "Failed to fetch clients");
       }
     } catch (err) {
-      setError('Failed to fetch clients')
+      setError("Failed to fetch clients");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    console.log('Form submitted with project data:', project)
-    
+    e.preventDefault();
+
+    console.log("Form submitted with project data:", project);
+
     if (!project.title || !project.clientId) {
-      console.log('Validation failed:', { title: project.title, clientId: project.clientId })
+      console.log("Validation failed:", {
+        title: project.title,
+        clientId: project.clientId,
+      });
       toast({
         title: "Validation Error",
         description: "Project title and client are required fields",
-        variant: "destructive"
-      })
-      return
+        variant: "destructive",
+      });
+      return;
     }
 
     try {
-      setSaving(true)
-      
-      console.log('Sending request to /api/projects with data:', project)
-      
-      const response = await fetch('/api/projects', {
-        method: 'POST',
+      setSaving(true);
+
+      console.log("Sending request to /api/projects with data:", project);
+
+      const response = await fetch("/api/projects", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(project),
-      })
-      
-      console.log('Response status:', response.status)
-      console.log('Response headers:', response.headers)
-      
-      const data = await response.json()
-      console.log('Response data:', data)
-      
-      if (data.status === 'success') {
+      });
+
+      console.log("Response status:", response.status);
+      console.log("Response headers:", response.headers);
+
+      const data = await response.json();
+      console.log("Response data:", data);
+
+      if (data.status === "success") {
         toast({
           title: "Project Created",
           description: "Project has been created successfully.",
-        })
-        router.push('/admin/projects')
+        });
+        router.push("/admin/projects");
       } else {
         toast({
           title: "Error",
           description: data.message || "Failed to create project",
-          variant: "destructive"
-        })
+          variant: "destructive",
+        });
       }
     } catch (error) {
-      console.error('Request error:', error)
+      console.error("Request error:", error);
       toast({
         title: "Error",
         description: "Failed to create project",
-        variant: "destructive"
-      })
+        variant: "destructive",
+      });
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }
+  };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
-    setProject(prev => ({
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setProject((prev) => ({
       ...prev,
-      [name]: value
-    }))
-  }
+      [name]: value,
+    }));
+  };
+
+  // Transform clients data for combobox - fix the name display
+  const clientOptions = clients.map((client) => ({
+    value: client.id,
+    label: `${client.firstName} ${client.lastName}${
+      client.company ? ` (${client.company})` : ""
+    }`,
+  }));
 
   return (
     <div className="min-h-screen bg-background">
@@ -173,8 +194,13 @@ export default function NewProjectPage() {
         <div className="max-w-6xl mx-auto">
           <div className="mb-8 flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-foreground mb-2">Create New Project</h1>
-              <p className="text-muted-foreground">Create a new project. You'll be able to add files after creation.</p>
+              <h1 className="text-3xl font-bold text-foreground mb-2">
+                Create New Project
+              </h1>
+              <p className="text-muted-foreground">
+                Create a new project. You'll be able to add files after
+                creation.
+              </p>
             </div>
             <Button
               type="submit"
@@ -204,11 +230,11 @@ export default function NewProjectPage() {
           ) : error ? (
             <div className="text-center py-12">
               <Icons.AlertCircle />
-              <h3 className="text-lg font-medium text-foreground mb-2">Error</h3>
+              <h3 className="text-lg font-medium text-foreground mb-2">
+                Error
+              </h3>
               <p className="text-muted-foreground mb-4">{error}</p>
-              <Button onClick={fetchClients}>
-                Try Again
-              </Button>
+              <Button onClick={fetchClients}>Try Again</Button>
             </div>
           ) : (
             <form id="project-form" onSubmit={handleSubmit}>
@@ -220,12 +246,13 @@ export default function NewProjectPage() {
                     <CardHeader className="flex flex-row items-center justify-between">
                       <div>
                         <CardTitle>Project Information</CardTitle>
-                        <CardDescription>Basic details about the project</CardDescription>
+                        <CardDescription>
+                          Basic details about the project
+                        </CardDescription>
                       </div>
-                     
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div>
+                    <CardContent className="space-y-6">
+                      <div className="space-y-2">
                         <Label htmlFor="title">Project Title *</Label>
                         <Input
                           id="title"
@@ -236,27 +263,22 @@ export default function NewProjectPage() {
                           required
                         />
                       </div>
-                      
-                      <div>
+
+                      <div className="space-y-2">
                         <Label htmlFor="clientId">Client *</Label>
-                        <Select 
-                          value={project.clientId} 
-                          onValueChange={(value) => setProject(prev => ({ ...prev, clientId: value }))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a client" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {clients.map((client) => (
-                              <SelectItem key={client.id} value={client.id}>
-                                {client.name} {client.company && `(${client.company})`}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Combobox
+                          options={clientOptions}
+                          value={project.clientId}
+                          onValueChange={(value) =>
+                            setProject((prev) => ({ ...prev, clientId: value }))
+                          }
+                          placeholder="Select a client"
+                          searchPlaceholder="Search clients..."
+                          emptyText="No clients found."
+                        />
                       </div>
 
-                      <div>
+                      <div className="space-y-2">
                         <Label htmlFor="description">Description</Label>
                         <Textarea
                           id="description"
@@ -268,11 +290,13 @@ export default function NewProjectPage() {
                         />
                       </div>
 
-                      <div>
+                      <div className="space-y-2">
                         <Label htmlFor="status">Project Status</Label>
-                        <Select 
-                          value={project.status || "active"} 
-                          onValueChange={(value) => setProject(prev => ({ ...prev, status: value }))}
+                        <Select
+                          value={project.status || "active"}
+                          onValueChange={(value) =>
+                            setProject((prev) => ({ ...prev, status: value }))
+                          }
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Select status" />
@@ -294,30 +318,50 @@ export default function NewProjectPage() {
                   <Card>
                     <CardHeader>
                       <CardTitle>Project Settings</CardTitle>
-                      <CardDescription>Configure project options</CardDescription>
+                      <CardDescription>
+                        Configure project options
+                      </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="flex items-center justify-between">
                         <div>
-                          <Label htmlFor="downloadEnabled">Allow Downloads</Label>
-                          <p className="text-sm text-muted-foreground">Clients can download files</p>
+                          <Label htmlFor="downloadEnabled">
+                            Allow Downloads
+                          </Label>
+                          <p className="text-sm text-muted-foreground">
+                            Clients can download files
+                          </p>
                         </div>
                         <Switch
                           id="downloadEnabled"
                           checked={project.downloadEnabled}
-                          onCheckedChange={(checked) => setProject(prev => ({ ...prev, downloadEnabled: checked }))}
+                          onCheckedChange={(checked) =>
+                            setProject((prev) => ({
+                              ...prev,
+                              downloadEnabled: checked,
+                            }))
+                          }
                         />
                       </div>
-                      
+
                       <div className="flex items-center justify-between">
                         <div>
-                          <Label htmlFor="emailNotifications">Email Notifications</Label>
-                          <p className="text-sm text-muted-foreground">Send email updates to client</p>
+                          <Label htmlFor="emailNotifications">
+                            Email Notifications
+                          </Label>
+                          <p className="text-sm text-muted-foreground">
+                            Send email updates to client
+                          </p>
                         </div>
                         <Switch
                           id="emailNotifications"
                           checked={project.emailNotifications}
-                          onCheckedChange={(checked) => setProject(prev => ({ ...prev, emailNotifications: checked }))}
+                          onCheckedChange={(checked) =>
+                            setProject((prev) => ({
+                              ...prev,
+                              emailNotifications: checked,
+                            }))
+                          }
                         />
                       </div>
                     </CardContent>
@@ -331,19 +375,28 @@ export default function NewProjectPage() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div>
-                        <Label className="text-sm font-medium">Project Title</Label>
+                        <Label className="text-sm font-medium">
+                          Project Title
+                        </Label>
                         <p className="text-sm text-muted-foreground">
                           {project.title || "Enter project title"}
                         </p>
                       </div>
-                      
+
                       <div>
                         <Label className="text-sm font-medium">Client</Label>
                         <p className="text-sm text-muted-foreground">
-                          {clients.find(c => c.id === project.clientId)?.name || "Select client"}
+                          {(() => {
+                            const selectedClient = clients.find(
+                              (c) => c.id === project.clientId
+                            );
+                            return selectedClient
+                              ? `${selectedClient.firstName} ${selectedClient.lastName}`
+                              : "Select client";
+                          })()}
                         </p>
                       </div>
-                      
+
                       <div>
                         <Label className="text-sm font-medium">Status</Label>
                         <Badge variant="secondary">Draft</Badge>
@@ -373,5 +426,5 @@ export default function NewProjectPage() {
         </div>
       </main>
     </div>
-  )
+  );
 }
