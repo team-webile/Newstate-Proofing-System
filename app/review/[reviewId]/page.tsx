@@ -25,6 +25,8 @@ import {
   Eye,
   MessageSquare,
   ZoomIn,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 // import ImageAnnotation from "@/components/ImageAnnotation"
 import { useRealtimeComments } from "@/hooks/use-realtime-comments";
@@ -200,6 +202,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
   const [reviewData, setReviewData] = useState<any>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
+  const [isProjectDetailsOpen, setIsProjectDetailsOpen] = useState(true);
   const imageRef = useRef<HTMLDivElement>(null);
 
   const currentVersionData = versions.find((v) => v.version === currentVersion);
@@ -2431,10 +2434,21 @@ console.log(reviewData,'reviewData')
             <div className="space-y-6">
               {/* Project Info */}
               <Card>
-                <CardHeader>
-                  <CardTitle>Project Details</CardTitle>
+                <CardHeader 
+                  className="cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => setIsProjectDetailsOpen(!isProjectDetailsOpen)}
+                >
+                  <CardTitle className="flex items-center justify-between">
+                    Project Details
+                    {isProjectDetailsOpen ? (
+                      <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                {isProjectDetailsOpen && (
+                  <CardContent className="space-y-4">
                   <div>
                     <Label className="text-sm font-medium">Project Name</Label>
                     <p className="text-sm text-muted-foreground">
@@ -2506,7 +2520,8 @@ console.log(reviewData,'reviewData')
                       }
                     </p>
                   </div>
-                </CardContent>
+                  </CardContent>
+                )}
               </Card>
 
               {/* Review Actions */}
