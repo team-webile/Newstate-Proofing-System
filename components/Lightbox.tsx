@@ -155,7 +155,7 @@ export default function Lightbox({
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 mt-8">
               <Button
                 variant="ghost"
                 size="sm"
@@ -163,14 +163,6 @@ export default function Lightbox({
                 className="text-white hover:bg-white/20"
               >
                 Reset
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onClose}
-                className="text-white hover:bg-white/20"
-              >
-                <Icons.X className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -218,7 +210,7 @@ export default function Lightbox({
                   onClick={goToPrevious}
                   className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 text-white hover:bg-black/70"
                 >
-                  <Icons.ChevronLeft className="h-6 w-6" />
+                  <Icons.ChevronLeft />
                 </Button>
                 <Button
                   variant="ghost"
@@ -226,7 +218,7 @@ export default function Lightbox({
                   onClick={goToNext}
                   className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 text-white hover:bg-black/70"
                 >
-                  <Icons.ChevronRight className="h-6 w-6" />
+                  <Icons.ChevronRight />
                 </Button>
               </>
             )}
@@ -267,7 +259,7 @@ export default function Lightbox({
               onClick={() => setZoom(prev => Math.max(prev / 1.2, 0.1))}
               className="text-white hover:bg-white/20"
             >
-              <Icons.Minus className="h-4 w-4" />
+              <Icons.Minus />
             </Button>
             <span className="text-white text-sm min-w-[3rem] text-center">
               {Math.round(zoom * 100)}%
@@ -278,7 +270,7 @@ export default function Lightbox({
               onClick={() => setZoom(prev => Math.min(prev * 1.2, 5))}
               className="text-white hover:bg-white/20"
             >
-              <Icons.Plus className="h-4 w-4" />
+              <Icons.Plus />
             </Button>
           </div>
         </div>

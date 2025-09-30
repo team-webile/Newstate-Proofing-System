@@ -35,6 +35,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Combobox } from "@/components/ui/combobox";
+import Lightbox from "@/components/Lightbox";
 
 interface Client {
   id: string;
@@ -93,6 +94,9 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
   const [clients, setClients] = useState<Client[]>([]);
   const [clientsLoading, setClientsLoading] = useState(true);
   const [clientsError, setClientsError] = useState<string | null>(null);
+  const [showLightbox, setShowLightbox] = useState(false);
+  const [lightboxImages, setLightboxImages] = useState<string[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
 
   const fetchClients = async () => {
     try {
@@ -380,12 +384,27 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
     }
   };
 
+  const handleLightboxOpen = (imageUrl: string, allImages?: string[]) => {
+    if (allImages && allImages.length > 0) {
+      setLightboxImages(allImages);
+      setLightboxIndex(allImages.indexOf(imageUrl));
+    } else {
+      setLightboxImages([imageUrl]);
+      setLightboxIndex(0);
+    }
+    setShowLightbox(true);
+  };
+
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return "0 Bytes";
     const k = 1024;
     const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  };
+
+  const isImageFile = (file: ProjectFile) => {
+    return file.type.startsWith("image/");
   };
 
   const getStatusColor = (status: string) => {
@@ -690,8 +709,22 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
                         className="flex items-center justify-between p-3 border rounded-lg"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-muted rounded flex items-center justify-center">
-                            <Icons.FolderOpen />
+                          <div className="w-10 h-10 bg-muted rounded flex items-center justify-center overflow-hidden">
+                            {isImageFile(file) ? (
+                              <img
+                                src={file.url}
+                                alt={file.name}
+                                className="w-full h-full object-cover cursor-zoom-in"
+                                onClick={() => {
+                                  const allImages = project.files
+                                    ?.filter((f) => isImageFile(f))
+                                    ?.map((f) => f.url) || [];
+                                  handleLightboxOpen(file.url, allImages);
+                                }}
+                              />
+                            ) : (
+                              <Icons.FolderOpen />
+                            )}
                           </div>
                           <div>
                             <p className="font-medium">{file.name}</p>
@@ -901,6 +934,18 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
           </div>
         </div>
       </main>
+
+      {/* Lightbox */}
+      <Lightbox
+        isOpen={showLightbox}
+        onClose={() => setShowLightbox(false)}
+        images={lightboxImages}
+        currentIndex={lightboxIndex}
+        onIndexChange={setLightboxIndex}
+        imageAlt="Project Image"
+        showNavigation={lightboxImages.length > 1}
+        showThumbnails={lightboxImages.length > 1}
+      />
     </div>
   );
 }
