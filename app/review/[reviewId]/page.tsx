@@ -14,7 +14,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Icons } from "@/components/icons";
-;
 import {
   PenTool,
   X,
@@ -24,10 +23,11 @@ import {
   MapPin,
   Eye,
   MessageSquare,
+  ChevronDown,
 } from "lucide-react";
 // import ImageAnnotation from "@/components/ImageAnnotation"
 import { useRealtimeComments } from "@/hooks/use-realtime-comments";
-import { useUnifiedSocket } from '@/hooks/use-unified-socket';
+import { useUnifiedSocket } from "@/hooks/use-unified-socket";
 // import { RealtimeImageAnnotation } from '@/components/RealtimeImageAnnotation';
 import {
   Dialog,
@@ -141,7 +141,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
       addedBy?: string;
       senderName?: string;
       isFromClient?: boolean;
-    }>
+    }>;
   }>({});
 
   // Helper function to get current file's chat messages
@@ -153,9 +153,9 @@ export default function ReviewPage({ params }: ReviewPageProps) {
   // Helper function to add message to current file
   const addMessageToCurrentFile = (message: any) => {
     if (!selectedImage?.id) return;
-    setChatMessages(prev => ({
+    setChatMessages((prev) => ({
       ...prev,
-      [selectedImage.id]: [...(prev[selectedImage.id] || []), message]
+      [selectedImage.id]: [...(prev[selectedImage.id] || []), message],
     }));
   };
 
@@ -175,10 +175,12 @@ export default function ReviewPage({ params }: ReviewPageProps) {
     y: number;
   } | null>(null);
   const [showReplyPopup, setShowReplyPopup] = useState(false);
-  const [selectedAnnotationForReply, setSelectedAnnotationForReply] = useState<ProjectAnnotation | null>(null);
+  const [selectedAnnotationForReply, setSelectedAnnotationForReply] =
+    useState<ProjectAnnotation | null>(null);
   const [replyText, setReplyText] = useState("");
   const [showAnnotationChat, setShowAnnotationChat] = useState(false);
-  const [selectedAnnotationChat, setSelectedAnnotationChat] = useState<ProjectAnnotation | null>(null);
+  const [selectedAnnotationChat, setSelectedAnnotationChat] =
+    useState<ProjectAnnotation | null>(null);
   const [digitalSignature, setDigitalSignature] = useState({
     firstName: "",
     lastName: "",
@@ -195,6 +197,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
   const imageRef = useRef<HTMLDivElement>(null);
+  const [isProjectDetailsCollapsed, setIsProjectDetailsCollapsed] = useState(false);
 
   const currentVersionData = versions.find((v) => v.version === currentVersion);
   const currentFileData =
@@ -252,7 +255,10 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         );
         const filesData = await filesResponse.json();
 
-        if (filesData.status === "success" && versionsData.status === "success") {
+        if (
+          filesData.status === "success" &&
+          versionsData.status === "success"
+        ) {
           // Transform project data to review format
           const transformedReviewData = {
             id: projectData.data.id,
@@ -454,83 +460,94 @@ export default function ReviewPage({ params }: ReviewPageProps) {
   const performFetchAnnotations = async () => {
     // Prevent multiple simultaneous requests
     if (isFetchingAnnotations) {
-      console.log('🔄 Already fetching annotations, skipping...');
+      console.log("🔄 Already fetching annotations, skipping...");
       return;
     }
 
     try {
       setIsFetchingAnnotations(true);
-      console.log('🔄 Fetching annotations for project:', params.reviewId);
+      console.log("🔄 Fetching annotations for project:", params.reviewId);
       const response = await fetch(
         `/api/annotations?projectId=${params.reviewId}`
       );
       const data = await response.json();
 
       if (data.status === "success") {
-        console.log('🔍 Raw API data:', data.data);
-        console.log('🔍 First annotation raw data:', data.data[0]);
-        console.log('🔍 First annotation replies:', data.data[0]?.replies);
+        console.log("🔍 Raw API data:", data.data);
+        console.log("🔍 First annotation raw data:", data.data[0]);
+        console.log("🔍 First annotation replies:", data.data[0]?.replies);
 
         // Transform annotations to ensure x, y coordinates are properly set
-        const transformedAnnotations = data.data.map((annotation: any): ProjectAnnotation => {
-          // Parse coordinates if they exist
-          let x = annotation.x;
-          let y = annotation.y;
-          if (!x && !y && annotation.coordinates) {
-            try {
-              const coords = JSON.parse(annotation.coordinates);
-              x = coords.x;
-              y = coords.y;
-            } catch (e) {
-              console.error("Error parsing coordinates:", e);
+        const transformedAnnotations = data.data.map(
+          (annotation: any): ProjectAnnotation => {
+            // Parse coordinates if they exist
+            let x = annotation.x;
+            let y = annotation.y;
+            if (!x && !y && annotation.coordinates) {
+              try {
+                const coords = JSON.parse(annotation.coordinates);
+                x = coords.x;
+                y = coords.y;
+              } catch (e) {
+                console.error("Error parsing coordinates:", e);
+              }
             }
-          }
 
-          return {
-            id: annotation.id,
-            content: annotation.content,
-            fileId: annotation.fileId,
-            projectId: annotation.projectId,
-            addedBy: annotation.addedBy,
-            addedByName: annotation.addedByName,
-            isResolved: annotation.isResolved,
-            status: annotation.status,
-            createdAt: annotation.createdAt,
-            updatedAt: annotation.updatedAt,
-            x: x,
-            y: y,
-            replies: (() => {
-              console.log(`🔍 Processing replies for annotation ${annotation.id}:`, annotation.replies);
-              const processedReplies = annotation.replies?.map((reply: any) => ({
-                id: reply.id,
-                content: reply.content,
-                annotationId: reply.annotationId,
-                projectId: reply.projectId,
-                addedBy: reply.addedBy,
-                addedByName: reply.addedByName,
-                createdAt: reply.createdAt,
-                updatedAt: reply.updatedAt
-              })) || [];
-              console.log(`🔍 Processed replies for annotation ${annotation.id}:`, processedReplies);
-              return processedReplies;
-            })()
-          };
-        });
+            return {
+              id: annotation.id,
+              content: annotation.content,
+              fileId: annotation.fileId,
+              projectId: annotation.projectId,
+              addedBy: annotation.addedBy,
+              addedByName: annotation.addedByName,
+              isResolved: annotation.isResolved,
+              status: annotation.status,
+              createdAt: annotation.createdAt,
+              updatedAt: annotation.updatedAt,
+              x: x,
+              y: y,
+              replies: (() => {
+                console.log(
+                  `🔍 Processing replies for annotation ${annotation.id}:`,
+                  annotation.replies
+                );
+                const processedReplies =
+                  annotation.replies?.map((reply: any) => ({
+                    id: reply.id,
+                    content: reply.content,
+                    annotationId: reply.annotationId,
+                    projectId: reply.projectId,
+                    addedBy: reply.addedBy,
+                    addedByName: reply.addedByName,
+                    createdAt: reply.createdAt,
+                    updatedAt: reply.updatedAt,
+                  })) || [];
+                console.log(
+                  `🔍 Processed replies for annotation ${annotation.id}:`,
+                  processedReplies
+                );
+                return processedReplies;
+              })(),
+            };
+          }
+        );
 
         // Update the main annotations state
         setAnnotations(transformedAnnotations);
 
         // Group annotations by fileId
-        const annotationsByFile = transformedAnnotations.reduce((acc: { [key: string]: any[] }, annotation: ProjectAnnotation) => {
-          if (!acc[annotation.fileId]) {
-            acc[annotation.fileId] = [];
-          }
-          acc[annotation.fileId].push(annotation);
-          return acc;
-        }, {});
+        const annotationsByFile = transformedAnnotations.reduce(
+          (acc: { [key: string]: any[] }, annotation: ProjectAnnotation) => {
+            if (!acc[annotation.fileId]) {
+              acc[annotation.fileId] = [];
+            }
+            acc[annotation.fileId].push(annotation);
+            return acc;
+          },
+          {}
+        );
 
         setFileAnnotations(annotationsByFile);
-
       } else {
         console.error("Failed to fetch annotations:", data.message);
       }
@@ -595,8 +612,9 @@ export default function ReviewPage({ params }: ReviewPageProps) {
 
   // Check if all annotations are completed or rejected
   const areAllAnnotationsResolved = () => {
-    return currentFileAnnotations.every(annotation =>
-      annotation.status === "COMPLETED" || annotation.status === "REJECTED"
+    return currentFileAnnotations.every(
+      (annotation) =>
+        annotation.status === "COMPLETED" || annotation.status === "REJECTED"
     );
   };
 
@@ -612,41 +630,51 @@ export default function ReviewPage({ params }: ReviewPageProps) {
   };
 
   const handleAnnotationChatClick = async (annotation: ProjectAnnotation) => {
-    console.log('🔍 Opening annotation chat with data:', annotation);
-    console.log('🔍 Replies data:', annotation.replies);
-    console.log('🔍 Replies length:', annotation.replies?.length || 0);
-    console.log('🔍 Replies type:', typeof annotation.replies);
-    console.log('🔍 Full annotation object:', JSON.stringify(annotation, null, 2));
+    console.log("🔍 Opening annotation chat with data:", annotation);
+    console.log("🔍 Replies data:", annotation.replies);
+    console.log("🔍 Replies length:", annotation.replies?.length || 0);
+    console.log("🔍 Replies type:", typeof annotation.replies);
+    console.log(
+      "🔍 Full annotation object:",
+      JSON.stringify(annotation, null, 2)
+    );
 
     // Only refresh if we don't have replies or if the annotation is very old
-    const shouldRefresh = !annotation.replies || annotation.replies.length === 0 ||
-      (annotation.createdAt && new Date(annotation.createdAt) < new Date(Date.now() - 5 * 60 * 1000)); // 5 minutes old
+    const shouldRefresh =
+      !annotation.replies ||
+      annotation.replies.length === 0 ||
+      (annotation.createdAt &&
+        new Date(annotation.createdAt) < new Date(Date.now() - 5 * 60 * 1000)); // 5 minutes old
 
     if (shouldRefresh) {
       try {
-        console.log('🔄 Refreshing annotations for chat...');
+        console.log("🔄 Refreshing annotations for chat...");
         await fetchAnnotations();
       } catch (error) {
-        console.error('Error refreshing annotations:', error);
+        console.error("Error refreshing annotations:", error);
       }
     }
 
     // Find the updated annotation with latest replies
-    const updatedAnnotation = annotations.find(a => a.id === annotation.id) || annotation;
+    const updatedAnnotation =
+      annotations.find((a) => a.id === annotation.id) || annotation;
 
     // Ensure we have the required fields and properly handle replies
     const chatAnnotation = {
       ...updatedAnnotation,
-      content: updatedAnnotation.content || 'No content',
-      addedBy: updatedAnnotation.addedBy || 'Unknown',
-      addedByName: updatedAnnotation.addedByName || updatedAnnotation.addedBy || 'Unknown',
+      content: updatedAnnotation.content || "No content",
+      addedBy: updatedAnnotation.addedBy || "Unknown",
+      addedByName:
+        updatedAnnotation.addedByName || updatedAnnotation.addedBy || "Unknown",
       createdAt: updatedAnnotation.createdAt || new Date().toISOString(),
-      replies: Array.isArray(updatedAnnotation.replies) ? updatedAnnotation.replies : []
+      replies: Array.isArray(updatedAnnotation.replies)
+        ? updatedAnnotation.replies
+        : [],
     };
 
-    console.log('🔍 Processed chat annotation:', chatAnnotation);
-    console.log('🔍 Processed replies:', chatAnnotation.replies);
-    console.log('🔍 Processed replies length:', chatAnnotation.replies.length);
+    console.log("🔍 Processed chat annotation:", chatAnnotation);
+    console.log("🔍 Processed replies:", chatAnnotation.replies);
+    console.log("🔍 Processed replies length:", chatAnnotation.replies.length);
     setSelectedAnnotationChat(chatAnnotation);
     setShowAnnotationChat(true);
 
@@ -663,7 +691,8 @@ export default function ReviewPage({ params }: ReviewPageProps) {
 
   const handleReplySubmit = async () => {
     // Use selectedAnnotationChat for the new chat popup, fallback to selectedAnnotationForReply for legacy popup
-    const targetAnnotation = selectedAnnotationChat || selectedAnnotationForReply;
+    const targetAnnotation =
+      selectedAnnotationChat || selectedAnnotationForReply;
 
     if (!targetAnnotation || !replyText.trim() || isSubmittingReply) return;
 
@@ -688,25 +717,28 @@ export default function ReviewPage({ params }: ReviewPageProps) {
           prev.map((annotation) =>
             annotation.id === targetAnnotation.id
               ? {
-                ...annotation,
-                replies: [
-                  ...(annotation.replies || []),
-                  {
-                    id: data.data.id,
-                    content: replyText,
-                    addedBy: "Client",
-                    addedByName: currentUser?.name || "Client",
-                    createdAt: new Date().toISOString(),
-                  },
-                ],
-              }
+                  ...annotation,
+                  replies: [
+                    ...(annotation.replies || []),
+                    {
+                      id: data.data.id,
+                      content: replyText,
+                      addedBy: "Client",
+                      addedByName: currentUser?.name || "Client",
+                      createdAt: new Date().toISOString(),
+                    },
+                  ],
+                }
               : annotation
           )
         );
 
         // Update selectedAnnotationChat if it exists
         if (selectedAnnotationChat) {
-          console.log('🔄 Updating selectedAnnotationChat with new reply:', replyText);
+          console.log(
+            "🔄 Updating selectedAnnotationChat with new reply:",
+            replyText
+          );
           setSelectedAnnotationChat((prev) => {
             if (!prev) return prev;
             const updatedChat = {
@@ -722,7 +754,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                 },
               ],
             };
-            console.log('🔄 Updated selectedAnnotationChat:', updatedChat);
+            console.log("🔄 Updated selectedAnnotationChat:", updatedChat);
             return updatedChat;
           });
 
@@ -736,7 +768,9 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         if (selectedImage?.id) {
           const messageId = `reply-${data.data.id}`;
           const currentMessages = getCurrentFileChatMessages();
-          const existingMessage = currentMessages.find(msg => msg.id === messageId);
+          const existingMessage = currentMessages.find(
+            (msg) => msg.id === messageId
+          );
           if (!existingMessage) {
             addMessageToCurrentFile({
               id: messageId,
@@ -774,12 +808,12 @@ export default function ReviewPage({ params }: ReviewPageProps) {
     const updatedAnnotations = annotations.map((annotation) =>
       annotation.id === annotationId
         ? {
-          ...annotation,
-          isResolved: !annotation.isResolved,
-          status: annotation.isResolved
-            ? ("PENDING" as const)
-            : ("COMPLETED" as const),
-        }
+            ...annotation,
+            isResolved: !annotation.isResolved,
+            status: annotation.isResolved
+              ? ("PENDING" as const)
+              : ("COMPLETED" as const),
+          }
         : annotation
     );
     setAnnotations(updatedAnnotations);
@@ -809,11 +843,11 @@ export default function ReviewPage({ params }: ReviewPageProps) {
     const updatedRevisions = revisions.map((r) =>
       r.version === currentVersion
         ? {
-          ...r,
-          status: "COMPLETED" as const,
-          digitalSignature: digitalSignature,
-          completedAt: new Date().toISOString(),
-        }
+            ...r,
+            status: "COMPLETED" as const,
+            digitalSignature: digitalSignature,
+            completedAt: new Date().toISOString(),
+          }
         : r
     );
     setRevisions(updatedRevisions);
@@ -902,32 +936,33 @@ export default function ReviewPage({ params }: ReviewPageProps) {
     emitAnnotationReply,
     emitAnnotationStatusChange,
     emitReviewStatusChange,
-    emitProjectStatusChange
+    emitProjectStatusChange,
   } = useUnifiedSocket({
     projectId: params.reviewId,
     events: {
       onAnnotationAdded: (data) => {
-        console.log('🔔 Client received annotationAdded event:', data);
+        console.log("🔔 Client received annotationAdded event:", data);
         const newAnnotation: ProjectAnnotation = {
           id: data.id || Date.now().toString(), // Use database ID if available
           content: data.annotation || data.content,
           fileId: data.fileId,
-          addedBy: data.addedBy || 'Unknown',
-          addedByName: data.addedByName || 'Unknown',
+          addedBy: data.addedBy || "Unknown",
+          addedByName: data.addedByName || "Unknown",
           createdAt: data.timestamp,
-          status: 'PENDING',
+          status: "PENDING",
           isResolved: false,
           x: data.x,
           y: data.y,
-          replies: []
+          replies: [],
         };
 
-        setAnnotations(prev => [...prev, newAnnotation]);
+        setAnnotations((prev) => [...prev, newAnnotation]);
         setLastUpdate(data.timestamp);
 
         // Add to chat messages
-        const senderName = data.addedByName || data.addedBy || 'Unknown';
-        const isFromClient = senderName.includes('Client') || senderName === 'Client';
+        const senderName = data.addedByName || data.addedBy || "Unknown";
+        const isFromClient =
+          senderName.includes("Client") || senderName === "Client";
         const messageText = isFromClient
           ? `You sent: "${data.annotation || data.content}"`
           : `Received from ${senderName}: "${data.annotation || data.content}"`;
@@ -936,12 +971,12 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         if (data.fileId === selectedImage?.id) {
           addMessageToCurrentFile({
             id: Date.now().toString(),
-            type: 'annotation',
+            type: "annotation",
             message: messageText,
             timestamp: data.timestamp,
             addedBy: senderName,
             senderName: senderName,
-            isFromClient: isFromClient
+            isFromClient: isFromClient,
           });
         }
 
@@ -949,58 +984,67 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         if (!isFromClient) {
           const notification = {
             id: Date.now().toString(),
-            type: 'annotation',
-            title: 'New Annotation Added',
-            message: `${senderName} added a new annotation: "${data.annotation || data.content}"`,
+            type: "annotation",
+            title: "New Annotation Added",
+            message: `${senderName} added a new annotation: "${
+              data.annotation || data.content
+            }"`,
             timestamp: data.timestamp,
             fileId: data.fileId,
             x: data.x,
-            y: data.y
+            y: data.y,
           };
-          setNotifications(prev => [notification, ...prev.slice(0, 9)]);
+          setNotifications((prev) => [notification, ...prev.slice(0, 9)]);
         }
       },
       onAnnotationReplyAdded: (data) => {
-        console.log('🔔 Client received annotation reply via socket:', data);
+        console.log("🔔 Client received annotation reply via socket:", data);
 
         // Handle different data structures
         let newReply;
-        if (data.reply && typeof data.reply === 'object') {
+        if (data.reply && typeof data.reply === "object") {
           newReply = {
             id: data.reply.id || Date.now().toString(),
-            content: data.reply.content || 'Reply content',
-            addedBy: data.reply.addedBy || 'Unknown',
-            addedByName: data.reply.addedByName || 'Unknown',
-            createdAt: data.reply.createdAt || new Date().toISOString()
+            content: data.reply.content || "Reply content",
+            addedBy: data.reply.addedBy || "Unknown",
+            addedByName: data.reply.addedByName || "Unknown",
+            createdAt: data.reply.createdAt || new Date().toISOString(),
           };
         } else {
           newReply = {
             id: Date.now().toString(),
-            content: data.reply || 'Reply content',
-            addedBy: data.addedBy || 'Unknown',
-            addedByName: data.addedByName || 'Unknown',
-            createdAt: data.timestamp || new Date().toISOString()
+            content: data.reply || "Reply content",
+            addedBy: data.addedBy || "Unknown",
+            addedByName: data.addedByName || "Unknown",
+            createdAt: data.timestamp || new Date().toISOString(),
           };
         }
 
         // Update annotations array
-        setAnnotations(prev => prev.map(annotation =>
-          annotation.id === data.annotationId
-            ? {
-              ...annotation,
-              replies: [...(annotation.replies || []), newReply]
-            }
-            : annotation
-        ));
+        setAnnotations((prev) =>
+          prev.map((annotation) =>
+            annotation.id === data.annotationId
+              ? {
+                  ...annotation,
+                  replies: [...(annotation.replies || []), newReply],
+                }
+              : annotation
+          )
+        );
 
         // Update selectedAnnotationChat if it's the same annotation AND not from current client
-        const isFromCurrentClient = newReply.addedBy === 'Client' || newReply.addedByName === 'Client';
-        if (selectedAnnotationChat && selectedAnnotationChat.id === data.annotationId && !isFromCurrentClient) {
-          setSelectedAnnotationChat(prev => {
+        const isFromCurrentClient =
+          newReply.addedBy === "Client" || newReply.addedByName === "Client";
+        if (
+          selectedAnnotationChat &&
+          selectedAnnotationChat.id === data.annotationId &&
+          !isFromCurrentClient
+        ) {
+          setSelectedAnnotationChat((prev) => {
             if (!prev) return prev;
             return {
               ...prev,
-              replies: [...(prev.replies || []), newReply]
+              replies: [...(prev.replies || []), newReply],
             };
           });
 
@@ -1010,105 +1054,129 @@ export default function ReviewPage({ params }: ReviewPageProps) {
         }
 
         // Add to chat messages
-        const senderName = newReply.addedByName || newReply.addedBy || 'Unknown';
+        const senderName =
+          newReply.addedByName || newReply.addedBy || "Unknown";
         const messageId = `socket-reply-${newReply.id}`;
         const currentMessages = getCurrentFileChatMessages();
-        const existingMessage = currentMessages.find(msg => msg.id === messageId);
+        const existingMessage = currentMessages.find(
+          (msg) => msg.id === messageId
+        );
         if (!existingMessage) {
           addMessageToCurrentFile({
             id: messageId,
-            type: 'annotation',
+            type: "annotation",
             message: `Reply added by ${senderName}: ${newReply.content}`,
             timestamp: data.timestamp || newReply.createdAt,
             addedBy: newReply.addedBy,
             senderName: senderName,
-            isFromClient: newReply.addedBy === 'Client'
+            isFromClient: newReply.addedBy === "Client",
           });
         }
         setLastUpdate(data.timestamp);
       },
       onAnnotationStatusUpdated: (data) => {
-        setAnnotations(prev => prev.map(annotation =>
-          annotation.id === data.annotationId
-            ? {
-              ...annotation,
-              status: data.status as any,
-              isResolved: data.status === "COMPLETED"
-            }
-            : annotation
-        ));
+        setAnnotations((prev) =>
+          prev.map((annotation) =>
+            annotation.id === data.annotationId
+              ? {
+                  ...annotation,
+                  status: data.status as any,
+                  isResolved: data.status === "COMPLETED",
+                }
+              : annotation
+          )
+        );
 
-        const senderName = data.updatedByName || data.updatedBy || 'Unknown';
+        const senderName = data.updatedByName || data.updatedBy || "Unknown";
         addMessageToCurrentFile({
           id: Date.now().toString(),
-          type: 'status',
+          type: "status",
           message: `Annotation status changed to ${data.status} by ${senderName}`,
           timestamp: data.timestamp,
           addedBy: data.updatedBy,
           senderName: senderName,
-          isFromClient: data.updatedBy === 'Client'
+          isFromClient: data.updatedBy === "Client",
         });
         setLastUpdate(data.timestamp);
       },
       onReviewStatusUpdated: (data) => {
-        console.log('🔔 Client received reviewStatusUpdated event:', data);
-        
+        console.log("🔔 Client received reviewStatusUpdated event:", data);
+
         // Update project status if review status affects it
-        if (data.status === 'APPROVED' || data.status === 'REJECTED') {
+        if (data.status === "APPROVED" || data.status === "REJECTED") {
           // Update review data status
-          setReviewData((prev: any) => prev ? { 
-            ...prev, 
-            status: data.status === 'APPROVED' ? 'COMPLETED' : 'REJECTED' as any 
-          } : prev);
+          setReviewData((prev: any) =>
+            prev
+              ? {
+                  ...prev,
+                  status:
+                    data.status === "APPROVED"
+                      ? "COMPLETED"
+                      : ("REJECTED" as any),
+                }
+              : prev
+          );
         }
-        
-        const senderName = data.updatedByName || data.updatedBy || 'Unknown';
+
+        const senderName = data.updatedByName || data.updatedBy || "Unknown";
         addMessageToCurrentFile({
           id: Date.now().toString(),
-          type: 'status',
+          type: "status",
           message: `Review status changed to ${data.status} by ${senderName}`,
           timestamp: data.timestamp,
           addedBy: data.updatedBy,
           senderName: senderName,
-          isFromClient: data.updatedBy === 'Client'
+          isFromClient: data.updatedBy === "Client",
         });
         setLastUpdate(data.timestamp);
       },
       onProjectStatusChanged: (data) => {
-        setReviewData((prev: any) => prev ? { ...prev, status: data.status as any } : prev);
-        
-        const senderName = data.changedByName || data.changedBy || 'Unknown';
+        setReviewData((prev: any) =>
+          prev ? { ...prev, status: data.status as any } : prev
+        );
+
+        const senderName = data.changedByName || data.changedBy || "Unknown";
         addMessageToCurrentFile({
           id: Date.now().toString(),
-          type: 'status',
+          type: "status",
           message: `Project status changed to ${data.status} by ${senderName}`,
           timestamp: data.timestamp,
           addedBy: data.changedBy,
           senderName: senderName,
-          isFromClient: data.changedBy === 'Client'
+          isFromClient: data.changedBy === "Client",
         });
         setLastUpdate(data.timestamp);
-      }
-    }
+      },
+    },
   });
 
   // Update selectedAnnotationChat when annotations are updated (only for non-client messages)
   useEffect(() => {
     if (selectedAnnotationChat && annotations.length > 0) {
-      const updatedAnnotation = annotations.find(a => a.id === selectedAnnotationChat.id);
+      const updatedAnnotation = annotations.find(
+        (a) => a.id === selectedAnnotationChat.id
+      );
       if (updatedAnnotation && updatedAnnotation.replies) {
         // Check if the latest reply is from current client - if so, don't update to prevent duplicates
-        const latestReply = updatedAnnotation.replies[updatedAnnotation.replies.length - 1];
-        const isLatestFromCurrentClient = latestReply?.addedBy === 'Client' || latestReply?.addedByName === 'Client';
+        const latestReply =
+          updatedAnnotation.replies[updatedAnnotation.replies.length - 1];
+        const isLatestFromCurrentClient =
+          latestReply?.addedBy === "Client" ||
+          latestReply?.addedByName === "Client";
 
         if (!isLatestFromCurrentClient) {
-          console.log('🔄 Updating selectedAnnotationChat with new replies from other users:', updatedAnnotation.replies);
-          setSelectedAnnotationChat(prev => ({
+          console.log(
+            "🔄 Updating selectedAnnotationChat with new replies from other users:",
+            updatedAnnotation.replies
+          );
+          setSelectedAnnotationChat((prev) => ({
             ...prev!,
-            replies: updatedAnnotation.replies || []
+            replies: updatedAnnotation.replies || [],
           }));
         } else {
-          console.log('🔄 Skipping selectedAnnotationChat update - latest reply is from current client');
+          console.log(
+            "🔄 Skipping selectedAnnotationChat update - latest reply is from current client"
+          );
         }
       }
     }
@@ -1238,18 +1306,18 @@ export default function ReviewPage({ params }: ReviewPageProps) {
           prev.map((annotation) =>
             annotation.id === selectedAnnotation.id
               ? {
-                ...annotation,
-                replies: [
-                  ...(annotation.replies || []),
-                  {
-                    id: data.data.id,
-                    content: newComment,
-                    addedBy: "Client",
-                    addedByName: currentUser?.name || "Client",
-                    createdAt: new Date().toISOString(),
-                  },
-                ],
-              }
+                  ...annotation,
+                  replies: [
+                    ...(annotation.replies || []),
+                    {
+                      id: data.data.id,
+                      content: newComment,
+                      addedBy: "Client",
+                      addedByName: currentUser?.name || "Client",
+                      createdAt: new Date().toISOString(),
+                    },
+                  ],
+                }
               : annotation
           )
         );
@@ -1598,88 +1666,135 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="border rounded-lg p-4">
                             <h4 className="font-medium mb-3 flex items-center gap-2">
-                              <div className={`w-2 h-2 rounded-full ${getStatusColor(reviewData.status || 'pending_review')}`} />
+                              <div
+                                className={`w-2 h-2 rounded-full ${getStatusColor(
+                                  reviewData.status || "pending_review"
+                                )}`}
+                              />
                               Current: {currentVersion}
                             </h4>
                             <div className="space-y-3">
                               {currentVersionData?.files.map((file: any) => (
-                                <div key={file.id} className="border rounded-lg p-2">
-                                  {file.type?.startsWith('image/') ? (
+                                <div
+                                  key={file.id}
+                                  className="border rounded-lg p-2"
+                                >
+                                  {file.type?.startsWith("image/") ? (
                                     <div className="space-y-2">
                                       <img
                                         src={file.url}
                                         alt={file.name}
                                         className="w-full h-32 object-cover rounded border"
                                         onError={(e) => {
-                                          e.currentTarget.style.display = 'none';
-                                          const nextElement = e.currentTarget.nextElementSibling as HTMLElement;
+                                          e.currentTarget.style.display =
+                                            "none";
+                                          const nextElement = e.currentTarget
+                                            .nextElementSibling as HTMLElement;
                                           if (nextElement) {
-                                            nextElement.style.display = 'flex';
+                                            nextElement.style.display = "flex";
                                           }
                                         }}
                                       />
-                                      <div className="flex items-center gap-2 text-sm bg-muted p-2 rounded" style={{ display: 'none' }}>
+                                      <div
+                                        className="flex items-center gap-2 text-sm bg-muted p-2 rounded"
+                                        style={{ display: "none" }}
+                                      >
                                         <Icons.File />
-                                        <span className="truncate">{file.name}</span>
+                                        <span className="truncate">
+                                          {file.name}
+                                        </span>
                                       </div>
-                                      <p className="text-xs text-muted-foreground truncate">{file.name}</p>
+                                      <p className="text-xs text-muted-foreground truncate">
+                                        {file.name}
+                                      </p>
                                     </div>
                                   ) : (
                                     <div className="flex items-center gap-2 text-sm">
                                       <div className="w-8 h-8 bg-muted rounded flex items-center justify-center">
                                         <Icons.File />
                                       </div>
-                                      <span className="truncate">{file.name}</span>
+                                      <span className="truncate">
+                                        {file.name}
+                                      </span>
                                     </div>
                                   )}
                                 </div>
                               ))}
                               {currentVersionData?.files.length === 0 && (
-                                <p className="text-sm text-muted-foreground">No files in this version</p>
+                                <p className="text-sm text-muted-foreground">
+                                  No files in this version
+                                </p>
                               )}
                             </div>
                           </div>
 
                           <div className="border rounded-lg p-4">
                             <h4 className="font-medium mb-3 flex items-center gap-2">
-                              <div className={`w-2 h-2 rounded-full ${getStatusColor(versions.find(v => v.version === compareVersion)?.status || 'pending_review')}`} />
+                              <div
+                                className={`w-2 h-2 rounded-full ${getStatusColor(
+                                  versions.find(
+                                    (v) => v.version === compareVersion
+                                  )?.status || "pending_review"
+                                )}`}
+                              />
                               Comparing: {compareVersion}
                             </h4>
                             <div className="space-y-3">
-                              {versions.find(v => v.version === compareVersion)?.files.map((file: any) => (
-                                <div key={file.id} className="border rounded-lg p-2">
-                                  {file.type?.startsWith('image/') ? (
-                                    <div className="space-y-2">
-                                      <img
-                                        src={file.url}
-                                        alt={file.name}
-                                        className="w-full h-32 object-cover rounded border"
-                                        onError={(e) => {
-                                          e.currentTarget.style.display = 'none';
-                                          const nextElement = e.currentTarget.nextElementSibling as HTMLElement;
-                                          if (nextElement) {
-                                            nextElement.style.display = 'flex';
-                                          }
-                                        }}
-                                      />
-                                      <div className="flex items-center gap-2 text-sm bg-muted p-2 rounded" style={{ display: 'none' }}>
-                                        <Icons.File />
-                                        <span className="truncate">{file.name}</span>
+                              {versions
+                                .find((v) => v.version === compareVersion)
+                                ?.files.map((file: any) => (
+                                  <div
+                                    key={file.id}
+                                    className="border rounded-lg p-2"
+                                  >
+                                    {file.type?.startsWith("image/") ? (
+                                      <div className="space-y-2">
+                                        <img
+                                          src={file.url}
+                                          alt={file.name}
+                                          className="w-full h-32 object-cover rounded border"
+                                          onError={(e) => {
+                                            e.currentTarget.style.display =
+                                              "none";
+                                            const nextElement = e.currentTarget
+                                              .nextElementSibling as HTMLElement;
+                                            if (nextElement) {
+                                              nextElement.style.display =
+                                                "flex";
+                                            }
+                                          }}
+                                        />
+                                        <div
+                                          className="flex items-center gap-2 text-sm bg-muted p-2 rounded"
+                                          style={{ display: "none" }}
+                                        >
+                                          <Icons.File />
+                                          <span className="truncate">
+                                            {file.name}
+                                          </span>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground truncate">
+                                          {file.name}
+                                        </p>
                                       </div>
-                                      <p className="text-xs text-muted-foreground truncate">{file.name}</p>
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-center gap-2 text-sm">
-                                      <div className="w-8 h-8 bg-muted rounded flex items-center justify-center">
-                                        <Icons.File />
+                                    ) : (
+                                      <div className="flex items-center gap-2 text-sm">
+                                        <div className="w-8 h-8 bg-muted rounded flex items-center justify-center">
+                                          <Icons.File />
+                                        </div>
+                                        <span className="truncate">
+                                          {file.name}
+                                        </span>
                                       </div>
-                                      <span className="truncate">{file.name}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                              {versions.find(v => v.version === compareVersion)?.files.length === 0 && (
-                                <p className="text-sm text-muted-foreground">No files in this version</p>
+                                    )}
+                                  </div>
+                                ))}
+                              {versions.find(
+                                (v) => v.version === compareVersion
+                              )?.files.length === 0 && (
+                                <p className="text-sm text-muted-foreground">
+                                  No files in this version
+                                </p>
                               )}
                             </div>
                           </div>
@@ -1753,7 +1868,9 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                     Design Review -{" "}
                     {currentFileData?.name || "No file selected"}
                     <div className="flex gap-2">
-                      <Badge variant={socketConnected ? "default" : "secondary"}>
+                      <Badge
+                        variant={socketConnected ? "default" : "secondary"}
+                      >
                         {socketConnected ? "Connected" : "Disconnected"}
                       </Badge>
                     </div>
@@ -1762,12 +1879,14 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                     {reviewData.status === "COMPLETED" ? (
                       <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
                         <CheckCircle className="h-4 w-4" />
-                        This version has been completed. No further annotations can be added.
+                        This version has been completed. No further annotations
+                        can be added.
                       </div>
                     ) : reviewData.status === "REJECTED" ? (
                       <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
                         <AlertCircle className="h-4 w-4" />
-                        This version has been rejected. No further annotations can be added.
+                        This version has been rejected. No further annotations
+                        can be added.
                       </div>
                     ) : (
                       "Click anywhere on the design to add annotations and feedback"
@@ -1780,10 +1899,17 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                       <img
                         src={currentFileData.url}
                         alt={currentFileData.name}
-                        className={`w-full h-auto max-h-[500px] object-contain ${(reviewData.status === "COMPLETED" || reviewData.status === "REJECTED") ? 'cursor-not-allowed' : 'cursor-crosshair'
-                          }`}
+                        className={`w-full h-auto max-h-[500px] object-contain ${
+                          reviewData.status === "COMPLETED" ||
+                          reviewData.status === "REJECTED"
+                            ? "cursor-not-allowed"
+                            : "cursor-crosshair"
+                        }`}
                         onClick={(e) => {
-                          if (reviewData.status === "COMPLETED" || reviewData.status === "REJECTED") {
+                          if (
+                            reviewData.status === "COMPLETED" ||
+                            reviewData.status === "REJECTED"
+                          ) {
                             e.preventDefault();
                             return;
                           }
@@ -1797,8 +1923,11 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                           annotation.x !== undefined &&
                           annotation.y !== undefined
                         ) {
-                          const hasReplies = annotation.replies && annotation.replies.length > 0
-                          const isOriginalMessage = !annotation.replies || annotation.replies.length === 0
+                          const hasReplies =
+                            annotation.replies && annotation.replies.length > 0;
+                          const isOriginalMessage =
+                            !annotation.replies ||
+                            annotation.replies.length === 0;
 
                           return (
                             <div
@@ -1811,11 +1940,15 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                             >
                               {/* Main annotation pin with blinking effect for original messages */}
                               <div
-                                className={`${annotation.isResolved
-                                  ? "bg-green-500"
-                                  : "bg-red-500"
-                                  } text-white text-xs px-3 py-2 rounded-full shadow-lg cursor-pointer hover:opacity-90 transition-all duration-300 group ${isOriginalMessage ? 'animate-pulse ring-2 ring-white ring-opacity-50' : ''
-                                  }`}
+                                className={`${
+                                  annotation.isResolved
+                                    ? "bg-green-500"
+                                    : "bg-red-500"
+                                } text-white text-xs px-3 py-2 rounded-full shadow-lg cursor-pointer hover:opacity-90 transition-all duration-300 group ${
+                                  isOriginalMessage
+                                    ? "animate-pulse ring-2 ring-white ring-opacity-50"
+                                    : ""
+                                }`}
                                 onClick={() =>
                                   handleAnnotationChatClick(annotation)
                                 }
@@ -1831,7 +1964,13 @@ export default function ReviewPage({ params }: ReviewPageProps) {
 
                                 {/* Message content */}
                                 <span className="font-medium">
-                                  {typeof annotation.content === 'string' && annotation.content.length > 12 ? annotation.content.substring(0, 12) + '...' : (typeof annotation.content === 'string' ? annotation.content : 'Annotation')}
+                                  {typeof annotation.content === "string" &&
+                                  annotation.content.length > 12
+                                    ? annotation.content.substring(0, 12) +
+                                      "..."
+                                    : typeof annotation.content === "string"
+                                    ? annotation.content
+                                    : "Annotation"}
                                 </span>
 
                                 {/* Reply count badge */}
@@ -1843,18 +1982,24 @@ export default function ReviewPage({ params }: ReviewPageProps) {
 
                                 {/* Status indicator */}
                                 <div
-                                  className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full ${annotation.isResolved
-                                    ? "bg-green-500"
-                                    : "bg-red-500"
-                                    } border-2 border-white`}
+                                  className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full ${
+                                    annotation.isResolved
+                                      ? "bg-green-500"
+                                      : "bg-red-500"
+                                  } border-2 border-white`}
                                 ></div>
                               </div>
 
                               {/* Quick action tooltip */}
                               <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none">
                                 <div className="bg-black text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
-                                  {isOriginalMessage ? 'Original Message' : 'View Conversation'}
-                                  {hasReplies && ` (${(annotation.replies?.length || 0)} replies)`}
+                                  {isOriginalMessage
+                                    ? "Original Message"
+                                    : "View Conversation"}
+                                  {hasReplies &&
+                                    ` (${
+                                      annotation.replies?.length || 0
+                                    } replies)`}
                                 </div>
                               </div>
                             </div>
@@ -1869,8 +2014,11 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                           annotation.x !== undefined &&
                           annotation.y !== undefined
                         ) {
-                          const hasReplies = annotation.replies && annotation.replies.length > 0
-                          const isOriginalMessage = !annotation.replies || annotation.replies.length === 0
+                          const hasReplies =
+                            annotation.replies && annotation.replies.length > 0;
+                          const isOriginalMessage =
+                            !annotation.replies ||
+                            annotation.replies.length === 0;
 
                           return (
                             <div
@@ -1883,28 +2031,52 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                             >
                               {/* Main annotation pin with blinking effect for original messages */}
                               <div
-                                className={`${annotation.resolved
-                                  ? "bg-green-500"
-                                  : "bg-red-500"
-                                  } text-white text-xs px-3 py-2 rounded-full shadow-lg cursor-pointer hover:opacity-90 transition-all duration-300 group ${isOriginalMessage ? 'animate-pulse ring-2 ring-white ring-opacity-50' : ''
-                                  }`}
+                                className={`${
+                                  annotation.resolved
+                                    ? "bg-green-500"
+                                    : "bg-red-500"
+                                } text-white text-xs px-3 py-2 rounded-full shadow-lg cursor-pointer hover:opacity-90 transition-all duration-300 group ${
+                                  isOriginalMessage
+                                    ? "animate-pulse ring-2 ring-white ring-opacity-50"
+                                    : ""
+                                }`}
                                 onClick={() => {
-                                  console.log('🔍 Real-time annotation clicked:', annotation);
+                                  console.log(
+                                    "🔍 Real-time annotation clicked:",
+                                    annotation
+                                  );
                                   const chatData = {
                                     id: annotation.id,
-                                    content: annotation.content || (typeof annotation.comment === 'string' ? annotation.comment : 'Annotation'),
-                                    fileId: annotation.fileId || '',
-                                    addedBy: annotation.addedBy || 'Unknown',
-                                    addedByName: annotation.addedByName || 'Unknown',
-                                    createdAt: annotation.createdAt || (typeof annotation.timestamp === 'string' ? annotation.timestamp : new Date().toISOString()),
+                                    content:
+                                      annotation.content ||
+                                      (typeof annotation.comment === "string"
+                                        ? annotation.comment
+                                        : "Annotation"),
+                                    fileId: annotation.fileId || "",
+                                    addedBy: annotation.addedBy || "Unknown",
+                                    addedByName:
+                                      annotation.addedByName || "Unknown",
+                                    createdAt:
+                                      annotation.createdAt ||
+                                      (typeof annotation.timestamp === "string"
+                                        ? annotation.timestamp
+                                        : new Date().toISOString()),
                                     x: annotation.x,
                                     y: annotation.y,
-                                    status: annotation.status || (annotation.resolved ? "COMPLETED" : 'PENDING'),
-                                    isResolved: annotation.isResolved || annotation.resolved,
-                                    replies: annotation.replies || []
+                                    status:
+                                      annotation.status ||
+                                      (annotation.resolved
+                                        ? "COMPLETED"
+                                        : "PENDING"),
+                                    isResolved:
+                                      annotation.isResolved ||
+                                      annotation.resolved,
+                                    replies: annotation.replies || [],
                                   };
-                                  console.log('🔍 Chat data:', chatData);
-                                  handleAnnotationChatClick(chatData as ProjectAnnotation);
+                                  console.log("🔍 Chat data:", chatData);
+                                  handleAnnotationChatClick(
+                                    chatData as ProjectAnnotation
+                                  );
                                 }}
                               >
                                 {/* Original message indicator */}
@@ -1918,7 +2090,13 @@ export default function ReviewPage({ params }: ReviewPageProps) {
 
                                 {/* Message content */}
                                 <span className="font-medium">
-                                  {typeof annotation.comment === 'string' && annotation.comment.length > 12 ? annotation.comment.substring(0, 12) + '...' : (typeof annotation.comment === 'string' ? annotation.comment : 'Annotation')}
+                                  {typeof annotation.comment === "string" &&
+                                  annotation.comment.length > 12
+                                    ? annotation.comment.substring(0, 12) +
+                                      "..."
+                                    : typeof annotation.comment === "string"
+                                    ? annotation.comment
+                                    : "Annotation"}
                                 </span>
 
                                 {/* Reply count badge */}
@@ -1930,18 +2108,24 @@ export default function ReviewPage({ params }: ReviewPageProps) {
 
                                 {/* Status indicator */}
                                 <div
-                                  className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full ${annotation.resolved
-                                    ? "bg-green-500"
-                                    : "bg-red-500"
-                                    } border-2 border-white`}
+                                  className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full ${
+                                    annotation.resolved
+                                      ? "bg-green-500"
+                                      : "bg-red-500"
+                                  } border-2 border-white`}
                                 ></div>
                               </div>
 
                               {/* Quick action tooltip */}
                               <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none">
                                 <div className="bg-black text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
-                                  {isOriginalMessage ? 'Original Message' : 'View Conversation'}
-                                  {hasReplies && ` (${(annotation.replies?.length || 0)} replies)`}
+                                  {isOriginalMessage
+                                    ? "Original Message"
+                                    : "View Conversation"}
+                                  {hasReplies &&
+                                    ` (${
+                                      annotation.replies?.length || 0
+                                    } replies)`}
                                 </div>
                               </div>
                             </div>
@@ -1951,19 +2135,31 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                       })}
 
                       {/* Click to annotate badge */}
-                      {reviewData.status !== "COMPLETED" && reviewData.status !== "REJECTED" && (
-                        <div className="absolute top-4 left-4">
-                          <Badge variant="outline" className="text-xs text-green-600 dark:text-green-400 border-green-200 dark:border-green-800">
-                            <MapPin className="h-3 w-3 mr-1" />
-                            Click to annotate
-                          </Badge>
-                        </div>
-                      )}
+                      {reviewData.status !== "COMPLETED" &&
+                        reviewData.status !== "REJECTED" && (
+                          <div className="absolute top-4 left-4">
+                            <Badge
+                              variant="outline"
+                              className="text-xs text-green-600 dark:text-green-400 border-green-200 dark:border-green-800"
+                            >
+                              <MapPin className="h-3 w-3 mr-1" />
+                              Click to annotate
+                            </Badge>
+                          </div>
+                        )}
 
                       {/* Status message badge */}
-                      {(reviewData.status === "COMPLETED" || reviewData.status === "REJECTED") && (
+                      {(reviewData.status === "COMPLETED" ||
+                        reviewData.status === "REJECTED") && (
                         <div className="absolute top-4 left-4">
-                          <Badge variant="outline" className={`text-xs ${reviewData.status === "COMPLETED" ? 'text-green-600 dark:text-green-400 border-green-200 dark:border-green-800' : 'text-red-600 dark:text-red-400 border-red-200 dark:border-red-800'}`}>
+                          <Badge
+                            variant="outline"
+                            className={`text-xs ${
+                              reviewData.status === "COMPLETED"
+                                ? "text-green-600 dark:text-green-400 border-green-200 dark:border-green-800"
+                                : "text-red-600 dark:text-red-400 border-red-200 dark:border-red-800"
+                            }`}
+                          >
                             {reviewData.status === "COMPLETED" ? (
                               <>
                                 <CheckCircle className="h-3 w-3 mr-1" />
@@ -1982,22 +2178,23 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                       {/* Annotation counter badge */}
                       {(currentFileAnnotations.length > 0 ||
                         currentFileRealtimeAnnotations.length > 0) && (
-                          <div className="absolute top-4 right-4">
-                            <Badge
-                              variant="default"
-                              className="text-xs bg-blue-500 text-white"
-                            >
-                              <MessageCircle className="h-3 w-3 mr-1" />
-                              {currentFileAnnotations.length +
-                                currentFileRealtimeAnnotations.length}{" "}
-                              annotation
-                              {currentFileAnnotations.length + currentFileRealtimeAnnotations.length !==
-                                1
-                                ? "s"
-                                : ""}
-                            </Badge>
-                          </div>
-                        )}
+                        <div className="absolute top-4 right-4">
+                          <Badge
+                            variant="default"
+                            className="text-xs bg-blue-500 text-white"
+                          >
+                            <MessageCircle className="h-3 w-3 mr-1" />
+                            {currentFileAnnotations.length +
+                              currentFileRealtimeAnnotations.length}{" "}
+                            annotation
+                            {currentFileAnnotations.length +
+                              currentFileRealtimeAnnotations.length !==
+                            1
+                              ? "s"
+                              : ""}
+                          </Badge>
+                        </div>
+                      )}
                     </div>
                   ) : currentFileData ? (
                     <div className="relative bg-muted rounded-lg overflow-hidden border-2 border-border">
@@ -2031,158 +2228,203 @@ export default function ReviewPage({ params }: ReviewPageProps) {
               {(realtimeComments.length > 0 ||
                 currentFileRealtimeAnnotations.length > 0 ||
                 currentFileAnnotations.length > 0) && (
-                  <Card className="mt-6">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <MessageCircle className="h-5 w-5" />
-                        Comments & Annotations (
-                        {realtimeComments.length +
-                          currentFileRealtimeAnnotations.length +
-                          currentFileAnnotations.length}
-                        )
-                      </CardTitle>
-                      <CardDescription>
-                        All feedback and annotations for this file
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {/* Comments */}
-                        {realtimeComments.map((comment) => (
-                          <div key={comment.id} className="p-4 border rounded-lg">
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                                  <span className="text-sm font-medium">
-                                    {comment.userName}
-                                  </span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {comment.createdAt
-                                      ? new Date(comment.createdAt).toLocaleString()
-                                      : 'Invalid Date'}
-                                  </span>
-                                </div>
-                                <p className="text-sm">{comment.commentText}</p>
-                                {comment.coordinates && (
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    Position: {comment.coordinates}
-                                  </p>
-                                )}
+                <Card className="mt-6">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <MessageCircle className="h-5 w-5" />
+                      Comments & Annotations (
+                      {realtimeComments.length +
+                        currentFileRealtimeAnnotations.length +
+                        currentFileAnnotations.length}
+                      )
+                    </CardTitle>
+                    <CardDescription>
+                      All feedback and annotations for this file
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {/* Comments */}
+                      {realtimeComments.map((comment) => (
+                        <div key={comment.id} className="p-4 border rounded-lg">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                <span className="text-sm font-medium">
+                                  {comment.userName}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  {comment.createdAt
+                                    ? new Date(
+                                        comment.createdAt
+                                      ).toLocaleString()
+                                    : "Invalid Date"}
+                                </span>
                               </div>
+                              <p className="text-sm">{comment.commentText}</p>
+                              {comment.coordinates && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Position: {comment.coordinates}
+                                </p>
+                              )}
                             </div>
                           </div>
-                        ))}
+                        </div>
+                      ))}
 
-                        {/* Real-time Annotations */}
-                        {currentFileRealtimeAnnotations.map((annotation) => (
-                          <div
-                            key={annotation.id}
-                            className="p-4 border rounded-lg"
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <div
-                                    className={`w-3 h-3 rounded-full ${annotation.resolved
+                      {/* Real-time Annotations */}
+                      {currentFileRealtimeAnnotations.map((annotation) => (
+                        <div
+                          key={annotation.id}
+                          className="p-4 border rounded-lg"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <div
+                                  className={`w-3 h-3 rounded-full ${
+                                    annotation.resolved
                                       ? "bg-green-500"
                                       : "bg-red-500"
-                                      }`}
-                                  />
-                                  <span className="text-sm font-medium">
-                                    {annotation.addedByName ||
-                                      annotation.addedBy ||
-                                      "Unknown"}
-                                  </span>
+                                  }`}
+                                />
+                                <span className="text-sm font-medium">
+                                  {annotation.addedByName ||
+                                    annotation.addedBy ||
+                                    "Unknown"}
+                                </span>
 
-                                  <span className="text-xs text-muted-foreground">
-                                    {typeof annotation.timestamp === 'string' ? new Date(annotation.timestamp).toLocaleString() : 'Date not available'}
-                                  </span>
-                                </div>
-                                <p className="text-sm">{typeof annotation.comment === 'string' ? annotation.comment : 'Annotation content'}</p>
-
+                                <span className="text-xs text-muted-foreground">
+                                  {typeof annotation.timestamp === "string"
+                                    ? new Date(
+                                        annotation.timestamp
+                                      ).toLocaleString()
+                                    : "Date not available"}
+                                </span>
                               </div>
+                              <p className="text-sm">
+                                {typeof annotation.comment === "string"
+                                  ? annotation.comment
+                                  : "Annotation content"}
+                              </p>
                             </div>
                           </div>
-                        ))}
+                        </div>
+                      ))}
 
-                        {/* Regular Annotations */}
-                        {currentFileAnnotations.map((annotation) => (
-                          <div
-                            key={annotation.id}
-                            className="p-4 border rounded-lg"
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <div
-                                    className={`w-3 h-3 rounded-full ${annotation.isResolved
+                      {/* Regular Annotations */}
+                      {currentFileAnnotations.map((annotation) => (
+                        <div
+                          key={annotation.id}
+                          className="p-4 border rounded-lg"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <div
+                                  className={`w-3 h-3 rounded-full ${
+                                    annotation.isResolved
                                       ? "bg-green-500"
                                       : "bg-red-500"
-                                      }`}
-                                  />
-                                  <span className="text-sm font-medium">
-                                    {annotation.addedByName ||
-                                      annotation.addedBy ||
-                                      "Unknown"}
-                                  </span>
+                                  }`}
+                                />
+                                <span className="text-sm font-medium">
+                                  {annotation.addedByName ||
+                                    annotation.addedBy ||
+                                    "Unknown"}
+                                </span>
 
-                                  <span className="text-xs text-muted-foreground">
-                                    {annotation.createdAt
-                                      ? new Date(annotation.createdAt).toLocaleString()
-                                      : 'Date not available'}
-                                  </span>
-                                </div>
-                                <p className="text-sm">{typeof annotation.content === 'string' ? annotation.content : 'Annotation content'}</p>
+                                <span className="text-xs text-muted-foreground">
+                                  {annotation.createdAt
+                                    ? new Date(
+                                        annotation.createdAt
+                                      ).toLocaleString()
+                                    : "Date not available"}
+                                </span>
+                              </div>
+                              <p className="text-sm">
+                                {typeof annotation.content === "string"
+                                  ? annotation.content
+                                  : "Annotation content"}
+                              </p>
 
-
-                                {/* Show replies if any */}
-                                {annotation.replies &&
-                                  annotation.replies.length > 0 && (
-                                    <div className="mt-3 ml-4 space-y-2">
-                                      <div className="text-xs font-medium text-muted-foreground mb-2">
-                                        Replies ({typeof annotation.replies === 'object' && annotation.replies ? annotation.replies.length : 0})
-                                      </div>
-                                      {annotation.replies.map((reply) => (
-                                        <div
-                                          key={typeof reply.id === 'string' ? reply.id : `reply-${Math.random()}`}
-                                          className="p-2 bg-gray-50 dark:bg-gray-800 rounded border-l-2 border-blue-500"
-                                        >
-                                          <div className="flex items-center gap-2 mb-1">
-                                            <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
-                                            <span className="text-xs font-medium">
-                                              {typeof reply.addedByName === 'string' ? reply.addedByName : (typeof reply.addedBy === 'string' ? reply.addedBy : 'Unknown')}
-                                            </span>
-                                            <span className="text-xs text-muted-foreground">
-                                              {typeof reply.createdAt === 'string' ? new Date(reply.createdAt).toLocaleString() : 'Date not available'}
-                                            </span>
-                                          </div>
-                                          <p className="text-xs">
-                                            {(() => {
-                                              try {
-                                                if (typeof reply.content === 'string') {
-                                                  return reply.content;
-                                                } else if (reply.content && typeof reply.content === 'object') {
-                                                  return (reply.content as any)?.content || 'Reply content';
-                                                }
-                                                return 'Reply content';
-                                              } catch (error) {
-                                                return 'Reply content';
-                                              }
-                                            })()}
-                                          </p>
-                                        </div>
-                                      ))}
+                              {/* Show replies if any */}
+                              {annotation.replies &&
+                                annotation.replies.length > 0 && (
+                                  <div className="mt-3 ml-4 space-y-2">
+                                    <div className="text-xs font-medium text-muted-foreground mb-2">
+                                      Replies (
+                                      {typeof annotation.replies === "object" &&
+                                      annotation.replies
+                                        ? annotation.replies.length
+                                        : 0}
+                                      )
                                     </div>
-                                  )}
-                              </div>
+                                    {annotation.replies.map((reply) => (
+                                      <div
+                                        key={
+                                          typeof reply.id === "string"
+                                            ? reply.id
+                                            : `reply-${Math.random()}`
+                                        }
+                                        className="p-2 bg-gray-50 dark:bg-gray-800 rounded border-l-2 border-blue-500"
+                                      >
+                                        <div className="flex items-center gap-2 mb-1">
+                                          <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                                          <span className="text-xs font-medium">
+                                            {typeof reply.addedByName ===
+                                            "string"
+                                              ? reply.addedByName
+                                              : typeof reply.addedBy ===
+                                                "string"
+                                              ? reply.addedBy
+                                              : "Unknown"}
+                                          </span>
+                                          <span className="text-xs text-muted-foreground">
+                                            {typeof reply.createdAt === "string"
+                                              ? new Date(
+                                                  reply.createdAt
+                                                ).toLocaleString()
+                                              : "Date not available"}
+                                          </span>
+                                        </div>
+                                        <p className="text-xs">
+                                          {(() => {
+                                            try {
+                                              if (
+                                                typeof reply.content ===
+                                                "string"
+                                              ) {
+                                                return reply.content;
+                                              } else if (
+                                                reply.content &&
+                                                typeof reply.content ===
+                                                  "object"
+                                              ) {
+                                                return (
+                                                  (reply.content as any)
+                                                    ?.content || "Reply content"
+                                                );
+                                              }
+                                              return "Reply content";
+                                            } catch (error) {
+                                              return "Reply content";
+                                            }
+                                          })()}
+                                        </p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Revision History */}
               {revisions.length > 0 && (
@@ -2195,14 +2437,15 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                       {revisions.map((revision) => (
                         <div
                           key={revision.id}
-                          className={`p-4 border rounded-lg ${revision.status === "COMPLETED"
-                            ? "bg-green-50 border-green-200"
-                            : revision.status === "rejected"
+                          className={`p-4 border rounded-lg ${
+                            revision.status === "COMPLETED"
+                              ? "bg-green-50 border-green-200"
+                              : revision.status === "rejected"
                               ? "bg-red-50 border-red-200"
                               : revision.status === "in_revision"
-                                ? "bg-yellow-50 border-yellow-200"
-                                : "bg-blue-50 border-blue-200"
-                            }`}
+                              ? "bg-yellow-50 border-yellow-200"
+                              : "bg-blue-50 border-blue-200"
+                          }`}
                         >
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
@@ -2212,10 +2455,10 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                                     revision.status === "COMPLETED"
                                       ? "default"
                                       : revision.status === "rejected"
-                                        ? "destructive"
-                                        : revision.status === "in_revision"
-                                          ? "secondary"
-                                          : "outline"
+                                      ? "destructive"
+                                      : revision.status === "in_revision"
+                                      ? "secondary"
+                                      : "outline"
                                   }
                                 >
                                   {revision.version}
@@ -2225,10 +2468,10 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                                     revision.status === "COMPLETED"
                                       ? "default"
                                       : revision.status === "rejected"
-                                        ? "destructive"
-                                        : revision.status === "in_revision"
-                                          ? "secondary"
-                                          : "outline"
+                                      ? "destructive"
+                                      : revision.status === "in_revision"
+                                      ? "secondary"
+                                      : "outline"
                                   }
                                 >
                                   {getStatusText(revision.status)}
@@ -2282,93 +2525,87 @@ export default function ReviewPage({ params }: ReviewPageProps) {
 
             {/* Review Actions Sidebar */}
             <div className="space-y-6">
-              {/* Project Info */}
+              {/* Project Info - Collapsible */}
               <Card>
-                <CardHeader>
-                  <CardTitle>Project Details</CardTitle>
+                <CardHeader 
+                  className="cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => setIsProjectDetailsCollapsed(!isProjectDetailsCollapsed)}
+                >
+                  <CardTitle className="flex items-center justify-between">
+                    Project Details
+                    <ChevronDown 
+                      className={`h-4 w-4 transition-transform duration-200 ${
+                        isProjectDetailsCollapsed ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label className="text-sm font-medium">Project Name</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {reviewData.project?.title || reviewData.reviewName}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium">Client</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {reviewData.project?.client?.name}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium">
-                      Current Version
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      {currentVersion}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium">Current File</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {currentFileData?.name || "No file selected"}
-                    </p>
-                  </div>
-                  {/* <div>
-                    <Label className="text-sm font-medium">
-                      Version Status
-                    </Label>
-                    <Badge
-                      variant={
-                        reviewData.status === "COMPLETED"
-                          ? "default"
-                          : reviewData.status === "rejected"
-                            ? "destructive"
-                            : reviewData.status === "in_revision"
-                              ? "secondary"
-                              : "outline"
-                      }
-                    >
-                      {getStatusText(reviewData.status || "unknown")}
-                    </Badge>
-                  </div> */}
-                  <div>
-                    <Label className="text-sm font-medium">Review Status</Label>
-                    <Badge
-                      variant={
-                        reviewData.status === "COMPLETED"
-                          ? "default"
-                          : reviewData.status === "REJECTED"
-                            ? "destructive"
-                            : reviewData.status === "IN_PROGRESS"
-                              ? "secondary"
-                              : "outline"
-                      }
-                    >
-                      {reviewData.status?.toLowerCase()}
-                    </Badge>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium">Created</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {reviewData.createdAt ?
-                        new Date(reviewData.createdAt).toLocaleDateString(
-                          "en-US",
-                          {
-                            year: "numeric",
-                            month: "2-digit",
-                            day: "2-digit",
-                          }
-                        ) :
-                        "Date not available"
-                      }
-                    </p>
-                  </div>
-                </CardContent>
+                {!isProjectDetailsCollapsed && (
+                  <CardContent className="space-y-4">
+                    <div>
+                      <Label className="text-sm font-medium">Project Name</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {reviewData.project?.title || reviewData.reviewName}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Client</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {reviewData.project?.client?.name}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">
+                        Current Version
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        {currentVersion}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Current File</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {currentFileData?.name || "No file selected"}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Review Status</Label>
+                      <Badge
+                        variant={
+                          reviewData.status === "COMPLETED"
+                            ? "default"
+                            : reviewData.status === "REJECTED"
+                              ? "destructive"
+                              : reviewData.status === "IN_PROGRESS"
+                                ? "secondary"
+                                : "outline"
+                        }
+                      >
+                        {reviewData.status?.toLowerCase()}
+                      </Badge>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Created</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {reviewData.createdAt ?
+                          new Date(reviewData.createdAt).toLocaleDateString(
+                            "en-US",
+                            {
+                              year: "numeric",
+                              month: "2-digit",
+                              day: "2-digit",
+                            }
+                          ) :
+                          "Date not available"
+                        }
+                      </p>
+                    </div>
+                  </CardContent>
+                )}
               </Card>
 
               {/* Review Actions */}
-              {reviewData.status === "COMPLETED"  ? (
+              {reviewData.status === "COMPLETED" ? (
                 <Card>
                   <CardHeader>
                     <CardTitle>Review Status</CardTitle>
@@ -2403,7 +2640,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                       className="w-full bg-green-600 hover:bg-green-700"
                     >
                       <Icons.CheckCircle />
-                      Approve  
+                      Approve
                     </Button>
 
                     <Button
@@ -2412,7 +2649,7 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                       className="w-full"
                     >
                       <Icons.X />
-                      Reject  
+                      Reject
                     </Button>
 
                     {reviewData.allowDownloads && (
@@ -2424,8 +2661,6 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                   </CardContent>
                 </Card>
               )}
-
-
 
               {/* Instructions */}
               <Card>
@@ -2453,66 +2688,6 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                 </CardContent>
               </Card>
             </div>
-
-            {/* Right Sidebar - Chat Messages */}
-            {/* <div className="lg:col-span-1">
-              <Card className="sticky top-6">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4" />
-                    Live Chat
-                    <Badge variant="outline" className="text-xs">
-                      {getCurrentFileChatMessages().length} messages
-                    </Badge>
-                  </CardTitle>
-                  <CardDescription>
-                    Real-time communication with admin
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4 max-h-96 overflow-y-auto">
-                    {getCurrentFileChatMessages().length > 0 ? (
-                      getCurrentFileChatMessages().map((message) => (
-                        <div
-                          key={message.id}
-                          className={`p-3 rounded-lg ${message.isFromClient
-                              ? "bg-blue-50 dark:bg-blue-900/20 ml-4"
-                              : "bg-gray-50 dark:bg-gray-800 mr-4"
-                            }`}
-                        >
-                          <div className="flex items-center gap-2 mb-1">
-                            <div
-                              className={`w-2 h-2 rounded-full ${message.isFromClient
-                                  ? "bg-blue-500"
-                                  : "bg-gray-500"
-                                }`}
-                            ></div>
-                            <span className="text-xs font-medium">
-                              {message.senderName || message.addedBy || "Unknown"}
-                            </span>
-                            <Badge variant="secondary" className="text-xs">
-                              {message.type}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {message.timestamp
-                                ? new Date(message.timestamp).toLocaleTimeString()
-                                : 'Invalid Date'}
-                            </span>
-                          </div>
-                          <p className="text-sm">{message.message}</p>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                        <p className="text-sm">No messages yet</p>
-                        <p className="text-xs">Start annotating to see live updates</p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div> */}
           </div>
         </div>
       </main>
@@ -2523,7 +2698,8 @@ export default function ReviewPage({ params }: ReviewPageProps) {
           <DialogHeader>
             <DialogTitle>Reject</DialogTitle>
             <DialogDescription>
-              Please provide detailed feedback about why you are rejecting this design and what changes are needed.
+              Please provide detailed feedback about why you are rejecting this
+              design and what changes are needed.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -2708,7 +2884,6 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                 </Button>
 
                 {/* Attachment Button */}
-
               </div>
 
               {/* Submit Button */}
@@ -2749,19 +2924,20 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                   Annotation Conversation
                 </h3>
                 <Badge variant="outline" className="text-xs">
-                  Position: {selectedAnnotationChat.x?.toFixed(0) || 0}%, {selectedAnnotationChat.y?.toFixed(0) || 0}%
+                  Position: {selectedAnnotationChat.x?.toFixed(0) || 0}%,{" "}
+                  {selectedAnnotationChat.y?.toFixed(0) || 0}%
                 </Badge>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={async () => {
-                    console.log('🔄 Manually refreshing annotations...');
+                    console.log("🔄 Manually refreshing annotations...");
                     await fetchAnnotations(true); // Force refresh
                   }}
                   disabled={isFetchingAnnotations}
                   className="text-xs"
                 >
-                  {isFetchingAnnotations ? '⏳ Loading...' : '🔄 Refresh'}
+                  {isFetchingAnnotations ? "⏳ Loading..." : "🔄 Refresh"}
                 </Button>
               </div>
               <Button
@@ -2775,21 +2951,27 @@ export default function ReviewPage({ params }: ReviewPageProps) {
             </div>
 
             {/* Conversation Messages */}
-            <div ref={chatScrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 min-h-[300px]">
-
+            <div
+              ref={chatScrollRef}
+              className="flex-1 overflow-y-auto p-4 space-y-4 min-h-[300px]"
+            >
               {/* Original Message */}
               <div className="flex justify-start">
                 <div className="bg-blue-100 dark:bg-blue-900/30 rounded-lg p-3 max-w-[80%] border-l-4 border-blue-500">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
                     <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">
-                      {selectedAnnotationChat.addedByName || selectedAnnotationChat.addedBy || "Unknown"}
+                      {selectedAnnotationChat.addedByName ||
+                        selectedAnnotationChat.addedBy ||
+                        "Unknown"}
                     </span>
-                   
+
                     <span className="text-xs text-gray-500">
                       {selectedAnnotationChat.createdAt
-                        ? new Date(selectedAnnotationChat.createdAt).toLocaleString()
-                        : 'Date not available'}
+                        ? new Date(
+                            selectedAnnotationChat.createdAt
+                          ).toLocaleString()
+                        : "Date not available"}
                     </span>
                   </div>
                   <p className="text-sm text-gray-800 dark:text-gray-200 font-medium">
@@ -2799,68 +2981,121 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                     <div className="text-xs text-blue-600 dark:text-blue-400 font-medium">
                       📌 Original Message
                     </div>
-                    {selectedAnnotationChat.replies && selectedAnnotationChat.replies.length > 0 && (
-                      <div className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                        💬 {selectedAnnotationChat.replies.length} replies
-                      </div>
-                    )}
+                    {selectedAnnotationChat.replies &&
+                      selectedAnnotationChat.replies.length > 0 && (
+                        <div className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                          💬 {selectedAnnotationChat.replies.length} replies
+                        </div>
+                      )}
                   </div>
                 </div>
               </div>
 
               {/* Replies */}
               {(() => {
-                console.log('🔍 Rendering replies in chat popup:');
-                console.log('🔍 selectedAnnotationChat:', selectedAnnotationChat);
-                console.log('🔍 selectedAnnotationChat.replies:', selectedAnnotationChat.replies);
-                console.log('🔍 selectedAnnotationChat.replies?.length:', selectedAnnotationChat.replies?.length);
+                console.log("🔍 Rendering replies in chat popup:");
+                console.log(
+                  "🔍 selectedAnnotationChat:",
+                  selectedAnnotationChat
+                );
+                console.log(
+                  "🔍 selectedAnnotationChat.replies:",
+                  selectedAnnotationChat.replies
+                );
+                console.log(
+                  "🔍 selectedAnnotationChat.replies?.length:",
+                  selectedAnnotationChat.replies?.length
+                );
                 return null;
               })()}
-              {selectedAnnotationChat.replies && selectedAnnotationChat.replies.length > 0 ? (
+              {selectedAnnotationChat.replies &&
+              selectedAnnotationChat.replies.length > 0 ? (
                 <>
                   <div className="text-center py-2">
                     <div className="text-xs text-gray-500 font-medium">
-                      💬 {selectedAnnotationChat.replies?.length || 0} {(selectedAnnotationChat.replies?.length || 0) === 1 ? 'Reply' : 'Replies'}
+                      💬 {selectedAnnotationChat.replies?.length || 0}{" "}
+                      {(selectedAnnotationChat.replies?.length || 0) === 1
+                        ? "Reply"
+                        : "Replies"}
                     </div>
                   </div>
                   {selectedAnnotationChat.replies?.map((reply, index) => {
-                    const isFromClient = reply.addedBy === 'Client' || reply.addedByName === 'Client';
+                    const isFromClient =
+                      reply.addedBy === "Client" ||
+                      reply.addedByName === "Client";
                     return (
-                      <div key={reply.id || `reply-${index}`} className={`flex ${isFromClient ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`rounded-lg p-3 max-w-[80%] ${isFromClient
-                            ? 'bg-green-100 dark:bg-green-900/30 border-l-4 border-green-500'
-                            : 'bg-gray-100 dark:bg-gray-800 border-l-4 border-gray-400'
-                          }`}>
+                      <div
+                        key={reply.id || `reply-${index}`}
+                        className={`flex ${
+                          isFromClient ? "justify-end" : "justify-start"
+                        }`}
+                      >
+                        <div
+                          className={`rounded-lg p-3 max-w-[80%] ${
+                            isFromClient
+                              ? "bg-green-100 dark:bg-green-900/30 border-l-4 border-green-500"
+                              : "bg-gray-100 dark:bg-gray-800 border-l-4 border-gray-400"
+                          }`}
+                        >
                           <div className="flex items-center gap-2 mb-2">
-                            <div className={`w-2 h-2 rounded-full ${isFromClient ? 'bg-green-500' : 'bg-gray-500'}`}></div>
-                            <span className={`text-sm font-semibold ${isFromClient ? 'text-green-700 dark:text-green-300' : 'text-gray-700 dark:text-gray-300'}`}>
+                            <div
+                              className={`w-2 h-2 rounded-full ${
+                                isFromClient ? "bg-green-500" : "bg-gray-500"
+                              }`}
+                            ></div>
+                            <span
+                              className={`text-sm font-semibold ${
+                                isFromClient
+                                  ? "text-green-700 dark:text-green-300"
+                                  : "text-gray-700 dark:text-gray-300"
+                              }`}
+                            >
                               {reply.addedByName || reply.addedBy || "Unknown"}
                             </span>
                             <Badge variant="outline" className="text-xs">
-                              {isFromClient ? 'Client' : 'Admin'}
+                              {isFromClient ? "Client" : "Admin"}
                             </Badge>
                             <span className="text-xs text-gray-500">
                               {reply.createdAt
                                 ? new Date(reply.createdAt).toLocaleString()
-                                : 'Date not available'}
+                                : "Date not available"}
                             </span>
                           </div>
-                          <p className={`text-sm ${isFromClient ? 'text-gray-800 dark:text-gray-200' : 'text-gray-700 dark:text-gray-300'}`}>
+                          <p
+                            className={`text-sm ${
+                              isFromClient
+                                ? "text-gray-800 dark:text-gray-200"
+                                : "text-gray-700 dark:text-gray-300"
+                            }`}
+                          >
                             {(() => {
                               try {
-                                if (typeof reply.content === 'string') {
+                                if (typeof reply.content === "string") {
                                   return reply.content;
-                                } else if (reply.content && typeof reply.content === 'object') {
-                                  return (reply.content as any)?.content || 'Reply content';
+                                } else if (
+                                  reply.content &&
+                                  typeof reply.content === "object"
+                                ) {
+                                  return (
+                                    (reply.content as any)?.content ||
+                                    "Reply content"
+                                  );
                                 }
-                                return 'Reply content';
+                                return "Reply content";
                               } catch (error) {
-                                return 'Reply content';
+                                return "Reply content";
                               }
                             })()}
                           </p>
-                          <div className={`mt-2 text-xs ${isFromClient ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'} font-medium`}>
-                            💬 Reply #{index + 1} • {isFromClient ? 'From Client' : 'From Admin'}
+                          <div
+                            className={`mt-2 text-xs ${
+                              isFromClient
+                                ? "text-green-600 dark:text-green-400"
+                                : "text-gray-600 dark:text-gray-400"
+                            } font-medium`}
+                          >
+                            💬 Reply #{index + 1} •{" "}
+                            {isFromClient ? "From Client" : "From Admin"}
                           </div>
                         </div>
                       </div>
@@ -2870,95 +3105,107 @@ export default function ReviewPage({ params }: ReviewPageProps) {
               ) : (
                 <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                   <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No replies yet. Be the first to respond!</p>
+                  <p className="text-sm">
+                    No replies yet. Be the first to respond!
+                  </p>
                   <div className="text-xs text-gray-400 mt-2">
-                    Debug: {selectedAnnotationChat.replies?.length || 0} replies found
+                    Debug: {selectedAnnotationChat.replies?.length || 0} replies
+                    found
                   </div>
                 </div>
               )}
             </div>
 
             {/* Input Area */}
-            {!selectedAnnotationChat.isResolved && reviewData.status !== "COMPLETED" && reviewData.status !== "REJECTED" && (
-              <div className="border-t border-gray-200 dark:border-gray-700 p-4">
-                <div className="flex items-center gap-3">
-                  <Input
-                    placeholder="Type your reply..."
-                    value={replyText}
-                    onChange={(e) => setReplyText(e.target.value)}
-                    onKeyPress={(e) => {
-                      if (e.key === "Enter" && replyText.trim()) {
-                        handleReplySubmit();
-                        setReplyText('');
-                      }
-                    }}
-                    className="flex-1 border-0 focus:ring-0 text-sm dark:bg-gray-800 dark:text-gray-100"
-                    autoFocus
-                  />
-                  <div className="flex items-center gap-2">
-                    {/* Emoji Button */}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
-                      onClick={() => {
-                        setReplyText((prev) => prev + "😊");
+            {!selectedAnnotationChat.isResolved &&
+              reviewData.status !== "COMPLETED" &&
+              reviewData.status !== "REJECTED" && (
+                <div className="border-t border-gray-200 dark:border-gray-700 p-4">
+                  <div className="flex items-center gap-3">
+                    <Input
+                      placeholder="Type your reply..."
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === "Enter" && replyText.trim()) {
+                          handleReplySubmit();
+                          setReplyText("");
+                        }
                       }}
-                    >
-                      <span className="text-lg">😊</span>
-                    </Button>
+                      className="flex-1 border-0 focus:ring-0 text-sm dark:bg-gray-800 dark:text-gray-100"
+                      autoFocus
+                    />
+                    <div className="flex items-center gap-2">
+                      {/* Emoji Button */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        onClick={() => {
+                          setReplyText((prev) => prev + "😊");
+                        }}
+                      >
+                        <span className="text-lg">😊</span>
+                      </Button>
 
-                    {/* Submit Button */}
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        handleReplySubmit();
-                        setReplyText('');
-                      }}
-                      disabled={!replyText.trim() || isSubmittingReply}
-                      className="h-8 w-8 p-0 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 rounded-full"
-                    >
-                      {isSubmittingReply ? (
-                        <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      ) : (
-                        <svg
-                          className="h-4 w-4 text-white"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                          />
-                        </svg>
-                      )}
-                    </Button>
+                      {/* Submit Button */}
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          handleReplySubmit();
+                          setReplyText("");
+                        }}
+                        disabled={!replyText.trim() || isSubmittingReply}
+                        className="h-8 w-8 p-0 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 rounded-full"
+                      >
+                        {isSubmittingReply ? (
+                          <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                          <svg
+                            className="h-4 w-4 text-white"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                            />
+                          </svg>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
             {/* Status message when version is completed or rejected */}
-            {!selectedAnnotationChat.isResolved && (reviewData.status === "COMPLETED" || reviewData.status === "REJECTED") && (
-              <div className="border-t border-gray-200 dark:border-gray-700 p-4 text-center">
-                <div className={`mb-2 ${reviewData.status === "COMPLETED" ? 'text-green-500' : 'text-red-500'}`}>
-                  {reviewData.status === "COMPLETED" ? (
-                    <CheckCircle className="h-8 w-8 mx-auto" />
-                  ) : (
-                    <AlertCircle className="h-8 w-8 mx-auto" />
-                  )}
+            {!selectedAnnotationChat.isResolved &&
+              (reviewData.status === "COMPLETED" ||
+                reviewData.status === "REJECTED") && (
+                <div className="border-t border-gray-200 dark:border-gray-700 p-4 text-center">
+                  <div
+                    className={`mb-2 ${
+                      reviewData.status === "COMPLETED"
+                        ? "text-green-500"
+                        : "text-red-500"
+                    }`}
+                  >
+                    {reviewData.status === "COMPLETED" ? (
+                      <CheckCircle className="h-8 w-8 mx-auto" />
+                    ) : (
+                      <AlertCircle className="h-8 w-8 mx-auto" />
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {reviewData.status === "COMPLETED"
+                      ? "This version has been completed. No further replies can be added."
+                      : "This version has been rejected. No further replies can be added."}
+                  </p>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  {reviewData.status === "COMPLETED"
-                    ? 'This version has been completed. No further replies can be added.'
-                    : 'This version has been rejected. No further replies can be added.'
-                  }
-                </p>
-              </div>
-            )}
+              )}
 
             {/* Resolved message */}
             {selectedAnnotationChat.isResolved && (
@@ -3000,37 +3247,54 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                     <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
                       <div className="flex items-center gap-2 mb-2">
                         <div
-                          className={`w-3 h-3 rounded-full ${selectedAnnotationForReply.isResolved
-                            ? "bg-green-500"
-                            : "bg-red-500"
-                            }`}
+                          className={`w-3 h-3 rounded-full ${
+                            selectedAnnotationForReply.isResolved
+                              ? "bg-green-500"
+                              : "bg-red-500"
+                          }`}
                         ></div>
                         <span className="text-sm font-medium">
-                          {selectedAnnotationForReply.addedByName || selectedAnnotationForReply.addedBy || "Unknown"}
+                          {selectedAnnotationForReply.addedByName ||
+                            selectedAnnotationForReply.addedBy ||
+                            "Unknown"}
                         </span>
-
                       </div>
                       <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">
                         {selectedAnnotationForReply.content}
                       </p>
-
                     </div>
                   </div>
 
                   {/* Input Area */}
                   <div className="p-4">
-                    {selectedAnnotationForReply.status === "COMPLETED" || selectedAnnotationForReply.status === "REJECTED" ? (
+                    {selectedAnnotationForReply.status === "COMPLETED" ||
+                    selectedAnnotationForReply.status === "REJECTED" ? (
                       <div className="text-center py-4">
-                        <div className={`mb-2 ${selectedAnnotationForReply.status === "COMPLETED" ? 'text-green-500' : 'text-red-500'}`}>
+                        <div
+                          className={`mb-2 ${
+                            selectedAnnotationForReply.status === "COMPLETED"
+                              ? "text-green-500"
+                              : "text-red-500"
+                          }`}
+                        >
                           <CheckCircle className="h-8 w-8 mx-auto" />
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          This annotation has been {selectedAnnotationForReply.status.toLowerCase()} and cannot be replied to.
+                          This annotation has been{" "}
+                          {selectedAnnotationForReply.status.toLowerCase()} and
+                          cannot be replied to.
                         </p>
                       </div>
-                    ) : (reviewData.status === "COMPLETED" || reviewData.status === "REJECTED") ? (
+                    ) : reviewData.status === "COMPLETED" ||
+                      reviewData.status === "REJECTED" ? (
                       <div className="text-center py-4">
-                        <div className={`mb-2 ${reviewData.status === "COMPLETED" ? 'text-green-500' : 'text-red-500'}`}>
+                        <div
+                          className={`mb-2 ${
+                            reviewData.status === "COMPLETED"
+                              ? "text-green-500"
+                              : "text-red-500"
+                          }`}
+                        >
                           {reviewData.status === "COMPLETED" ? (
                             <CheckCircle className="h-8 w-8 mx-auto" />
                           ) : (
@@ -3039,9 +3303,8 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                         </div>
                         <p className="text-sm text-muted-foreground">
                           {reviewData.status === "COMPLETED"
-                            ? 'This version has been completed. No further replies can be added.'
-                            : 'This version has been rejected. No further replies can be added.'
-                          }
+                            ? "This version has been completed. No further replies can be added."
+                            : "This version has been rejected. No further replies can be added."}
                         </p>
                       </div>
                     ) : (
@@ -3061,90 +3324,92 @@ export default function ReviewPage({ params }: ReviewPageProps) {
                   </div>
 
                   {/* Action Bar */}
-                  {selectedAnnotationForReply.status === 'PENDING' && reviewData.status !== "COMPLETED" && reviewData.status !== "REJECTED" && (
-                    <div className="flex items-center justify-between p-4 border-t border-gray-200 dark:border-gray-700">
-                      <div className="flex items-center gap-3">
-                        {/* Emoji Button */}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
-                          onClick={() => {
-                            setReplyText((prev) => prev + "😊");
-                          }}
-                        >
-                          <span className="text-lg">😊</span>
-                        </Button>
-
-                        {/* Mention Button */}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
-                          onClick={() => {
-                            setReplyText((prev) => prev + "@");
-                          }}
-                        >
-                          <span className="text-sm font-bold dark:text-gray-100">
-                            @
-                          </span>
-                        </Button>
-
-                        {/* Attachment Button */}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
-                          onClick={() => {
-                            const input = document.createElement("input");
-                            input.type = "file";
-                            input.accept = "image/*";
-                            input.click();
-                          }}
-                        >
-                          <svg
-                            className="h-4 w-4 dark:text-gray-100"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                  {selectedAnnotationForReply.status === "PENDING" &&
+                    reviewData.status !== "COMPLETED" &&
+                    reviewData.status !== "REJECTED" && (
+                      <div className="flex items-center justify-between p-4 border-t border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center gap-3">
+                          {/* Emoji Button */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                            onClick={() => {
+                              setReplyText((prev) => prev + "😊");
+                            }}
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                            />
-                          </svg>
+                            <span className="text-lg">😊</span>
+                          </Button>
+
+                          {/* Mention Button */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                            onClick={() => {
+                              setReplyText((prev) => prev + "@");
+                            }}
+                          >
+                            <span className="text-sm font-bold dark:text-gray-100">
+                              @
+                            </span>
+                          </Button>
+
+                          {/* Attachment Button */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                            onClick={() => {
+                              const input = document.createElement("input");
+                              input.type = "file";
+                              input.accept = "image/*";
+                              input.click();
+                            }}
+                          >
+                            <svg
+                              className="h-4 w-4 dark:text-gray-100"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                              />
+                            </svg>
+                          </Button>
+                        </div>
+
+                        {/* Submit Button */}
+                        <Button
+                          size="sm"
+                          onClick={handleReplySubmit}
+                          disabled={!replyText.trim() || isSubmittingReply}
+                          className="h-8 w-8 p-0 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 rounded-full"
+                        >
+                          {isSubmittingReply ? (
+                            <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          ) : (
+                            <svg
+                              className="h-4 w-4 text-white"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                              />
+                            </svg>
+                          )}
                         </Button>
                       </div>
-
-                      {/* Submit Button */}
-                      <Button
-                        size="sm"
-                        onClick={handleReplySubmit}
-                        disabled={!replyText.trim() || isSubmittingReply}
-                        className="h-8 w-8 p-0 bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 rounded-full"
-                      >
-                        {isSubmittingReply ? (
-                          <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        ) : (
-                          <svg
-                            className="h-4 w-4 text-white"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                            />
-                          </svg>
-                        )}
-                      </Button>
-                    </div>
-                  )}
+                    )}
                 </div>
               </div>
             )}
