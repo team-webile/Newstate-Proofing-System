@@ -56,6 +56,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import Lightbox from "@/components/Lightbox";
 
 interface ProjectAnnotation {
   id: string;
