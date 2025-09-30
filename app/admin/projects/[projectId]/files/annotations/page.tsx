@@ -1251,16 +1251,7 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
               <Download className="h-4 w-4 mr-2" />
               Download
             </Button>
-            {project.status !== 'completed' && project.status !== "rejected" && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowApprovalDialog(true)}
-            >
-              <CheckCircle className="h-4 w-4 mr-2" />
-              Approve/Reject
-            </Button>
-            )}
+             
           <Badge variant="outline">
             Admin Access
           </Badge>

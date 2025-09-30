@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/db'
-import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
+import { projects, clients, users, reviews, elements, comments, approvals, settings, annotations } from '@/db/schema'
 import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
-import { getSocketServer } from '@/lib/socket-server'
 
 export async function PUT(request: NextRequest) {
   try {
@@ -15,32 +14,71 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    // Update annotation status
-    const annotation = await db.annotation.update({
-      where: { id: annotationId },
-      data: {
+    // Update annotation status using Drizzle
+    const [updatedAnnotation] = await db
+      .update(annotations)
+      .set({
         status: status as any,
         isResolved: status === 'COMPLETED',
-      },
-      include: {
-        replies: true,
-      }
-    })
+        updatedAt: new Date()
+      })
+      .where(eq(annotations.id, annotationId))
+      .returning()
+
+    if (!updatedAnnotation) {
+      return NextResponse.json(
+        { status: 'error', message: 'Annotation not found' },
+        { status: 404 }
+      )
+    }
 
     // Note: Notification creation removed as AnnotationNotification model doesn't exist in schema
 
     // Emit socket event for real-time updates
     try {
+      const { getSocketServer } = await import('@/lib/socket-server')
       const io = getSocketServer()
+      
       if (io) {
-        io.to(`project-${annotation.projectId}`).emit('annotationStatusUpdated', {
+        // Determine if this is from admin or client
+        const isFromAdmin = updatedBy === 'Admin' || updatedBy?.includes('Admin')
+        
+        // Emit status update event
+        io.to(`project-${updatedAnnotation.projectId}`).emit('annotationStatusUpdated', {
           annotationId,
           status,
           updatedBy,
           updatedByName: updatedBy,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          isFromAdmin: isFromAdmin
         })
-        console.log(`📡 Emitted annotationStatusUpdated for annotation ${annotationId} in project ${annotation.projectId}`)
+        
+        // Send notification to opposite user type
+        if (isFromAdmin) {
+          // Admin changed status, notify client
+          io.to(`project-${updatedAnnotation.projectId}`).emit('statusNotification', {
+            type: 'status_changed',
+            message: `Admin ${status.toLowerCase()} annotation`,
+            from: 'Admin',
+            to: 'Client',
+            annotationId: annotationId,
+            status: status,
+            timestamp: new Date().toISOString()
+          })
+        } else {
+          // Client changed status, notify admin
+          io.to(`project-${updatedAnnotation.projectId}`).emit('statusNotification', {
+            type: 'status_changed',
+            message: `Client ${status.toLowerCase()} annotation`,
+            from: 'Client',
+            to: 'Admin',
+            annotationId: annotationId,
+            status: status,
+            timestamp: new Date().toISOString()
+          })
+        }
+        
+        console.log(`📡 Emitted annotationStatusUpdated for annotation ${annotationId} in project ${updatedAnnotation.projectId}`)
       }
     } catch (error) {
       console.error('Error emitting socket event:', error)
@@ -48,7 +86,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({
       status: 'success',
-      data: annotation,
+      data: updatedAnnotation,
     })
   } catch (error) {
     console.error('Error updating annotation status:', error)

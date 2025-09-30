@@ -97,6 +97,11 @@ export async function POST(request: NextRequest) {
       
       if (io) {
         console.log('📡 Emitting annotationReplyAdded event for project:', annotation.projectId);
+        
+        // Determine if this is from admin or client
+        const isFromAdmin = reply.addedBy === 'Admin' || reply.addedByName?.includes('Admin');
+        
+        // Emit reply added event
         io.to(`project-${annotation.projectId}`).emit('annotationReplyAdded', {
           projectId: annotation.projectId,
           annotationId: annotationId,
@@ -107,8 +112,35 @@ export async function POST(request: NextRequest) {
             addedByName: reply.addedByName,
             createdAt: reply.createdAt
           },
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          isFromAdmin: isFromAdmin
         });
+        
+        // Send notification to opposite user type
+        if (isFromAdmin) {
+          // Admin replied, notify client
+          io.to(`project-${annotation.projectId}`).emit('replyNotification', {
+            type: 'reply_added',
+            message: `New reply from Admin: "${reply.content}"`,
+            from: 'Admin',
+            to: 'Client',
+            annotationId: annotationId,
+            replyId: reply.id,
+            timestamp: new Date().toISOString()
+          });
+        } else {
+          // Client replied, notify admin
+          io.to(`project-${annotation.projectId}`).emit('replyNotification', {
+            type: 'reply_added',
+            message: `New reply from Client: "${reply.content}"`,
+            from: 'Client',
+            to: 'Admin',
+            annotationId: annotationId,
+            replyId: reply.id,
+            timestamp: new Date().toISOString()
+          });
+        }
+        
         console.log('✅ Socket event emitted successfully');
       } else {
         console.log('⚠️ Socket server not available');
