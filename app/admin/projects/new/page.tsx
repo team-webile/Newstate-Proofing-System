@@ -166,6 +166,18 @@ export default function NewProjectPage() {
           <div className="flex items-center gap-4">
             <ThemeToggle />
             <LogoutButton />
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="p-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="mb-8 flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground mb-2">Create New Project</h1>
+              <p className="text-muted-foreground">Create a new project. You'll be able to add files after creation.</p>
+            </div>
             <Button
               type="submit"
               form="project-form"
@@ -184,16 +196,6 @@ export default function NewProjectPage() {
                 </>
               )}
             </Button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="p-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-foreground mb-2">Create New Project</h1>
-            <p className="text-muted-foreground">Create a new project. You'll be able to add files after creation.</p>
           </div>
 
           {loading ? (
@@ -217,9 +219,12 @@ export default function NewProjectPage() {
                 <div className="lg:col-span-2 space-y-6">
                   {/* Basic Information */}
                   <Card>
-                    <CardHeader>
-                      <CardTitle>Project Information</CardTitle>
-                      <CardDescription>Basic details about the project</CardDescription>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <div>
+                        <CardTitle>Project Information</CardTitle>
+                        <CardDescription>Basic details about the project</CardDescription>
+                      </div>
+                     
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div>

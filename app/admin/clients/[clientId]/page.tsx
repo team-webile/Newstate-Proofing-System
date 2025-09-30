@@ -177,7 +177,7 @@ export default function ClientDetailPage({ params }: ClientDetailPageProps) {
                 <Icons.User />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-foreground">{client.name}</h1>
+                <h1 className="text-3xl font-bold text-foreground">{client.firstName} {client.lastName}</h1>
                 <p className="text-muted-foreground">{client.company}</p>
               </div>
             </div>

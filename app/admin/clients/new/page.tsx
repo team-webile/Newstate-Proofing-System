@@ -19,7 +19,8 @@ export default function NewClient() {
   const [error, setError] = useState<string | null>(null)
   
   const [formData, setFormData] = useState({
-    name: '',
+    firstName: '',
+    lastName: '',
     email: '',
     phone: '',
     company: '',
@@ -30,10 +31,10 @@ export default function NewClient() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!formData.name || !formData.email) {
+    if (!formData.firstName || !formData.lastName || !formData.email) {
       toast({
         title: "Validation Error",
-        description: "Name and email are required fields",
+        description: "First name, last name and email are required fields",
         variant: "destructive"
       })
       return
@@ -123,13 +124,24 @@ export default function NewClient() {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Name *</Label>
+                  <Label htmlFor="firstName">First Name *</Label>
                   <Input
-                    id="name"
-                    name="name"
-                    value={formData.name}
+                    id="firstName"
+                    name="firstName"
+                    value={formData.firstName}
                     onChange={handleInputChange}
-                    placeholder="Client name"
+                    placeholder="First name"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Last Name *</Label>
+                  <Input
+                    id="lastName"
+                    name="lastName"
+                    value={formData.lastName}
+                    onChange={handleInputChange}
+                    placeholder="Last name"
                     required
                   />
                 </div>

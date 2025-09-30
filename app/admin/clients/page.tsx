@@ -190,7 +190,7 @@ export default function ClientsPage() {
                           <Icons.User />
                         </div>
                         <div>
-                          <div className="font-medium text-foreground">{client.name}</div>
+                          <div className="font-medium text-foreground">{client.firstName} {client.lastName}</div>
                         </div>
                       </div>
                     </TableCell>
@@ -254,7 +254,7 @@ export default function ClientsPage() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Delete Client</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Are you sure you want to delete {client.name}? This action cannot be undone and will also
+                                Are you sure you want to delete {client.firstName} {client.lastName}? This action cannot be undone and will also
                                 delete all associated projects.
                               </AlertDialogDescription>
                             </AlertDialogHeader>

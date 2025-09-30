@@ -1486,8 +1486,10 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                       {clientsLoading
                         ? "Loading..."
                         : (Array.isArray(clients)
-                            ? clients.find((c) => c.id === project.clientId)
-                                ?.name
+                            ? (() => {
+                                const client = clients.find((c) => c.id === project.clientId);
+                                return client ? `${client.firstName} ${client.lastName}` : "Unknown Client";
+                              })()
                             : "Unknown Client") || "Unknown Client"}
                     </p>
                   </div>
