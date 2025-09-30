@@ -56,7 +56,7 @@ server {
     
     # Proxy everything else to Next.js
     location / {
-        proxy_pass http://localhost:3000;
+        proxy_pass http://preview.devnstage.xyz;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';

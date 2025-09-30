@@ -26,7 +26,7 @@ app.prepare().then(() => {
 
   // Create Socket.IO server
   const allowedOrigins = [
-    'http://localhost:3000',
+    'http://preview.devnstage.xyz',
   ];
   
   // Add environment-specific origins
