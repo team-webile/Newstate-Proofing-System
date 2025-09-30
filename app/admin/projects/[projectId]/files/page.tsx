@@ -1061,13 +1061,7 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
           </div>
           <div className="flex items-center gap-4">
             <LogoutButton />
-            <Button
-              onClick={handleSaveProject}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              <Icons.Save />
-              <span className="ml-2">Save Changes</span>
-            </Button>
+            
           </div>
         </div>
       </header>
@@ -1272,16 +1266,15 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                           </DialogFooter>
                         </DialogContent>
                       </Dialog>
-                      {currentVersionData?.files &&
-                        currentVersionData.files.length > 0 && (
+                      
                           <Button
                             onClick={handlePublishVersion}
                             className="bg-green-600 hover:bg-green-700"
                           >
                             <Icons.CheckCircle />
-                            <span className="ml-2">Publish for Review</span>
+                            <span className="ml-2">Publish Files</span>
                           </Button>
-                        )}
+                         
                     </div>
                   </CardTitle>
                   <CardDescription>
