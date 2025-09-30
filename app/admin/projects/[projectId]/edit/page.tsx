@@ -871,13 +871,13 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
                         </>
                       )}
                     </Button>
-                    <Button
+                    {/* <Button
                       variant="outline"
                       size="sm"
                       onClick={() => window.open(project.publicLink, "_blank")}
                     >
                       <Icons.ExternalLink />
-                    </Button>
+                    </Button> */}
                   </div>
                 </CardContent>
               </Card>
