@@ -396,7 +396,7 @@ export default function ClientDashboard({ params }: ClientDashboardProps) {
           </p>
           <Button
             onClick={() => window.location.reload()}
-            className="dark:bg-blue-600 dark:hover:bg-blue-700"
+            className="dark:bg-black dark:hover:bg-gray-900"
           >
             Try Again
           </Button>
@@ -481,59 +481,56 @@ export default function ClientDashboard({ params }: ClientDashboardProps) {
     <div className="min-h-screen bg-background dark:bg-gray-900">
       {/* Header */}
       <header className="border-b border-border bg-card dark:bg-gray-900 dark:border-gray-700">
-        <div className="flex h-16 items-center justify-between px-6">
+        <div className="flex h-16 items-center justify-between px-4 md:px-6 lg:px-16">
           <Logo />
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
+           
             <Button
               variant="ghost"
               size="sm"
-              onClick={toggleDarkMode}
-              className="text-muted-foreground hover:text-foreground dark:text-gray-300 dark:hover:text-white"
-            >
-              {isDarkMode ? (
-                <Sun className="h-4 w-4" />
-              ) : (
-                <Moon className="h-4 w-4" />
-              )}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground dark:text-gray-300"
+              className="text-muted-foreground dark:text-gray-300 hidden md:flex"
             >
               <Download className="h-4 w-4 mr-2" />
               Download
             </Button>
-            <Button className="bg-primary text-primary-foreground hover:bg-primary/90 dark:bg-white dark:text-black dark:hover:bg-white/90">
-              APPROVE PROJECT
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground dark:text-gray-300 md:hidden"
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+            <Button className="bg-primary text-primary-foreground hover:bg-primary/90 dark:bg-black dark:text-white dark:hover:bg-gray-900 dark:border dark:border-gray-700 text-xs md:text-sm px-3 md:px-4">
+              <span className="hidden md:inline">APPROVE PROJECT</span>
+              <span className="md:hidden">APPROVE</span>
             </Button>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="p-6">
+      <main className="p-4 md:p-6 mx-4 md:mx-8 lg:mx-16">
         {/* Project Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground dark:text-white mb-2">
+        <div className="mb-6 md:mb-8">
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground dark:text-white mb-2">
             {project.title}
           </h1>
-          <p className="text-muted-foreground dark:text-gray-300 max-w-4xl">
+          <p className="text-sm md:text-base text-muted-foreground dark:text-gray-300 max-w-4xl">
             {project.description ||
               "Please review the project files and provide your feedback."}
           </p>
-          <div className="mt-4 flex items-center gap-4 text-sm text-muted-foreground dark:text-gray-400">
-            <span>Client: {project.client.firstName} {project.client.lastName}</span>
-            <span>•</span>
+          <div className="mt-4 flex flex-wrap items-center gap-2 md:gap-4 text-xs md:text-sm text-muted-foreground dark:text-gray-400">
+            <span>Client: {project.client.name}</span>
+            <span className="hidden md:inline">•</span>
             <span>Status: {project.status}</span>
-            <span>•</span>
+            <span className="hidden md:inline">•</span>
             <span>Last Activity: {formatDate(project.lastActivity)}</span>
           </div>
         </div>
 
         {/* Project Elements Grid */}
         {projectElements.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
             {projectElements.map((element) => (
               <Card
                 key={element.id}
@@ -557,7 +554,7 @@ export default function ClientDashboard({ params }: ClientDashboardProps) {
                       {getStatusIcon(element.status)}
                     </div>
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100">
-                      <div className="flex gap-2">
+                      <div className="flex gap-1 md:gap-2">
                         <Button
                           size="sm"
                           variant="secondary"
@@ -568,26 +565,28 @@ export default function ClientDashboard({ params }: ClientDashboardProps) {
                               ?.map((el: any) => el.thumbnail) || [];
                             handleLightboxOpen(element.thumbnail, allImages);
                           }}
+                          className="text-xs md:text-sm"
                         >
-                          <ZoomIn className="h-4 w-4 mr-2" />
-                          Zoom
+                          <ZoomIn className="h-3 w-3 md:h-4 md:w-4 md:mr-2" />
+                          <span className="hidden md:inline">Zoom</span>
                         </Button>
                         <Button
                           size="sm"
                           variant="secondary"
                           onClick={() => openReviewPage(element.file)}
+                          className="text-xs md:text-sm"
                         >
-                          <PenTool className="h-4 w-4 mr-2" />
-                          Review
+                          <PenTool className="h-3 w-3 md:h-4 md:w-4 md:mr-2" />
+                          <span className="hidden md:inline">Review</span>
                         </Button>
                       </div>
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="p-4">
-                  <div className="space-y-3">
+                <CardContent className="p-3 md:p-4">
+                  <div className="space-y-2 md:space-y-3">
                     <div>
-                      <h3 className="font-medium text-card-foreground dark:text-white text-sm">
+                      <h3 className="font-medium text-card-foreground dark:text-white text-xs md:text-sm truncate">
                         {element.name}
                       </h3>
                       <p className="text-xs text-muted-foreground dark:text-gray-400">
@@ -595,18 +594,18 @@ export default function ClientDashboard({ params }: ClientDashboardProps) {
                       </p>
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <Badge className={getStatusColor(element.status)}>
+                    <div className="flex items-center justify-between gap-2">
+                      <Badge className={`${getStatusColor(element.status)} text-xs`}>
                         {element.status}
                       </Badge>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground dark:text-gray-400">
+                      <div className="flex items-center gap-1 md:gap-2 text-xs text-muted-foreground dark:text-gray-400">
                         {element.comments > 0 && (
                           <div className="flex items-center gap-1">
                             <MessageSquare className="h-3 w-3" />
                             {element.comments}
                           </div>
                         )}
-                        <span>{element.lastUpdated}</span>
+                        <span className="text-[10px] md:text-xs">{element.lastUpdated}</span>
                       </div>
                     </div>
                   </div>
@@ -633,30 +632,31 @@ export default function ClientDashboard({ params }: ClientDashboardProps) {
 
         {/* Chat Messages */}
         {showChat && chatMessages.length > 0 && (
-          <div className="mt-8">
+          <div className="mt-6 md:mt-8">
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5" />
+              <CardHeader className="p-4 md:p-6">
+                <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                  <MessageSquare className="h-4 w-4 md:h-5 md:w-5" />
                   Project Updates
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-3 max-h-60 overflow-y-auto">
+              <CardContent className="p-4 md:p-6 pt-0">
+                <div className="space-y-2 md:space-y-3 max-h-60 overflow-y-auto">
                   {chatMessages.map((message) => (
                     <div
                       key={message.id}
-                      className={`p-3 rounded-lg ${
+                      className={`p-2 md:p-3 rounded-lg ${
                         message.type === "status"
-                          ? "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
+                          ? "bg-blue-50 dark:bg-black/50 border border-blue-200 dark:border-gray-700"
                           : "bg-gray-50 dark:bg-gray-800"
                       }`}
                     >
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-1 md:gap-2 mb-1 flex-wrap">
                         <Badge
                           variant={
                             message.type === "status" ? "default" : "secondary"
                           }
+                          className="text-xs"
                         >
                           {message.type === "status"
                             ? "Status Update"
@@ -668,24 +668,24 @@ export default function ClientDashboard({ params }: ClientDashboardProps) {
                               className={`w-2 h-2 rounded-full ${
                                 message.isFromClient
                                   ? "bg-green-500"
-                                  : "bg-blue-500"
+                                  : "bg-blue-500 dark:bg-gray-400"
                               }`}
                             ></div>
-                            <span className="text-xs font-medium text-foreground">
+                            <span className="text-[10px] md:text-xs font-medium text-foreground">
                               {message.isFromClient
                                 ? "You"
                                 : message.senderName}
                             </span>
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-[10px] md:text-xs text-muted-foreground">
                               {message.isFromClient ? "sent" : "received"}
                             </span>
                           </div>
                         )}
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-[10px] md:text-xs text-muted-foreground">
                           {new Date(message.timestamp).toLocaleString()}
                         </span>
                       </div>
-                      <p className="text-sm">{message.message}</p>
+                      <p className="text-xs md:text-sm break-words">{message.message}</p>
                     </div>
                   ))}
                 </div>
@@ -697,12 +697,12 @@ export default function ClientDashboard({ params }: ClientDashboardProps) {
         {/* Action Buttons */}
 
         {/* Footer Note */}
-        <div className="mt-8 text-center">
-          <p className="text-sm text-muted-foreground dark:text-gray-400">
+        <div className="mt-6 md:mt-8 text-center">
+          <p className="text-xs md:text-sm text-muted-foreground dark:text-gray-400 px-4">
             Need help? Contact us at{" "}
             <a
               href="mailto:support@newstatebranding.com"
-              className="text-primary hover:underline dark:text-white"
+              className="text-primary hover:underline dark:text-gray-300 dark:hover:text-white break-all"
             >
               support@newstatebranding.com
             </a>
