@@ -197,10 +197,16 @@ io.on('connection', (socket) => {
   // Review status update events
   socket.on('reviewStatusChanged', (data) => {
     console.log('📊 Review status changed:', data);
-    // Broadcast to all clients in the project room (including sender)
+    // Broadcast to all clients in the project room
+    io.to(`project-${data.projectId}`).emit('reviewStatusChanged', {
+      ...data,
+      timestamp: data.timestamp || new Date().toISOString()
+    });
+    
+    // Also emit the old event for backward compatibility
     io.to(`project-${data.projectId}`).emit('reviewStatusUpdated', {
       ...data,
-      timestamp: new Date().toISOString()
+      timestamp: data.timestamp || new Date().toISOString()
     });
   });
 

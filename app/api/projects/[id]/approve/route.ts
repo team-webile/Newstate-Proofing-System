@@ -60,10 +60,34 @@ export async function POST(
 
     // Emit socket event for real-time updates
     try {
-      // Note: Socket emission would happen here in a real implementation
-      console.log(`Project ${action}d: ${projectId}`)
+      const { getSocketServer } = await import('@/lib/socket-server');
+      const io = getSocketServer();
+      
+      if (io) {
+        console.log(`📡 Emitting reviewStatusChanged for project ${projectId}, action: ${action}`);
+        
+        // Determine if this is from admin or client
+        const isFromAdmin = approvedByName?.includes('Admin') || approverId === 'Admin';
+        const newStatus = action === 'approve' ? 'approved' : 'rejected';
+        
+        // Emit review status changed event to all clients in the project room
+        io.to(`project-${projectId}`).emit('reviewStatusChanged', {
+          projectId: projectId,
+          status: newStatus,
+          action: action,
+          changedBy: isFromAdmin ? 'Admin' : 'Client',
+          changedByName: approvedByName || approverId,
+          comment: comment,
+          timestamp: new Date().toISOString(),
+          isFromAdmin: isFromAdmin
+        });
+        
+        console.log('✅ Socket event emitted successfully');
+      } else {
+        console.log('⚠️ Socket server not available');
+      }
     } catch (error) {
-      console.log('Socket emission skipped:', error)
+      console.log('Socket emission error:', error)
     }
 
     return NextResponse.json({

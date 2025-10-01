@@ -9,6 +9,7 @@ interface SocketEvents {
   onAnnotationStatusUpdated?: (data: any) => void;
   onAnnotationResolved?: (data: any) => void;
   onReviewStatusUpdated?: (data: any) => void;
+  onReviewStatusChanged?: (data: any) => void;
   onProjectStatusChanged?: (data: any) => void;
   onFileUploaded?: (data: any) => void;
   onStatusChanged?: (data: any) => void;
@@ -102,6 +103,11 @@ export function useUnifiedSocket({
     newSocket.on("reviewStatusUpdated", (data) => {
       console.log("📋 Unified Socket - reviewStatusUpdated:", data);
       events.onReviewStatusUpdated?.(data);
+    });
+
+    newSocket.on("reviewStatusChanged", (data) => {
+      console.log("🔄 Unified Socket - reviewStatusChanged:", data);
+      events.onReviewStatusChanged?.(data);
     });
 
     newSocket.on("projectStatusChanged", (data) => {

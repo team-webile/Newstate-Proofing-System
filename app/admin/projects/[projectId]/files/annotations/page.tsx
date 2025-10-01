@@ -685,19 +685,44 @@ export default function ProjectAnnotationsPage({ params }: ProjectAnnotationsPag
           status: data.status === 'APPROVED' ? 'completed' : 'rejected' as any 
         } : prev)
       },
+      onReviewStatusChanged: (data) => {
+        console.log('🔄 Admin received reviewStatusChanged event:', data)
         
-      //   const senderName = data.updatedByName || data.updatedBy || 'Unknown'
-      //   setChatMessages(prev => [...prev, {
-      //     id: Date.now().toString(),
-      //     type: 'status',
-      //     message: `Review status changed to ${data.status} by ${senderName}`,
-      //     timestamp: data.timestamp,
-      //     addedBy: data.updatedBy,
-      //     senderName: senderName,
-      //     isFromAdmin: data.updatedBy === 'admin-1'
-      //   }])
-      //   setLastUpdate(data.timestamp)
-      // },
+        // Update project status
+        setProject(prev => prev ? { 
+          ...prev, 
+          status: data.status.toUpperCase() as any 
+        } : prev)
+        
+        // Add to chat messages
+        const statusMessage = data.action === 'approve' 
+          ? `✅ Project ${data.status} by ${data.changedByName}`
+          : `❌ Project ${data.status} by ${data.changedByName}${data.comment ? `: ${data.comment}` : ''}`
+        
+        setChatMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          type: 'status',
+          message: statusMessage,
+          timestamp: data.timestamp,
+          addedBy: data.changedBy,
+          senderName: data.changedByName,
+          isFromAdmin: data.isFromAdmin
+        }])
+        
+        // Add notification if from client
+        if (!data.isFromAdmin) {
+          const notification = {
+            id: Date.now().toString(),
+            type: 'status',
+            title: data.action === 'approve' ? 'Project Approved' : 'Project Rejected',
+            message: `Client ${data.action}d the project${data.comment ? `: ${data.comment}` : ''}`,
+            timestamp: data.timestamp
+          }
+          setNotifications(prev => [notification, ...prev.slice(0, 9)])
+        }
+        
+        setLastUpdate(data.timestamp)
+      },
       onProjectStatusChanged: (data) => {
         setProject(prev => prev ? { ...prev, status: data.status as any } : prev)
         
