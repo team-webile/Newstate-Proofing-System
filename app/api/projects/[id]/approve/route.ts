@@ -60,32 +60,30 @@ export async function POST(
 
     // Emit socket event for real-time updates
     try {
-      const { getSocketServer } = await import('@/lib/socket-server');
-      const io = getSocketServer();
+      const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3003';
+      console.log('📡 Sending project status change to socket server:', socketUrl);
       
-      if (io) {
-        console.log(`📡 Emitting reviewStatusChanged for project ${projectId}, action: ${action}`);
-        
-        // Determine if this is from admin or client
-        const isFromAdmin = approvedByName?.includes('Admin') || approverId === 'Admin';
-        const newStatus = action === 'approve' ? 'approved' : 'rejected';
-        
-        // Emit review status changed event to all clients in the project room
-        io.to(`project-${projectId}`).emit('reviewStatusChanged', {
-          projectId: projectId,
-          status: newStatus,
-          action: action,
-          changedBy: isFromAdmin ? 'Admin' : 'Client',
-          changedByName: approvedByName || approverId,
-          comment: comment,
-          timestamp: new Date().toISOString(),
-          isFromAdmin: isFromAdmin
-        });
-        
-        console.log('✅ Socket event emitted successfully');
-      } else {
-        console.log('⚠️ Socket server not available');
-      }
+      const newStatus = action === 'approve' ? 'COMPLETED' : 'REJECTED';
+      
+      // Send HTTP request to trigger socket emission
+      await fetch(`${socketUrl}/api/emit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event: 'projectStatusChanged',
+          room: `project-${projectId}`,
+          data: {
+            projectId: projectId,
+            status: newStatus,
+            changedBy: approverId,
+            changedByName: approvedByName || approverId,
+            comments: comment,
+            timestamp: new Date().toISOString()
+          }
+        })
+      }).catch(err => console.log('Socket emit failed:', err));
+      
+      console.log(`✅ Project ${action}d socket event sent successfully`);
     } catch (error) {
       console.log('Socket emission error:', error)
     }

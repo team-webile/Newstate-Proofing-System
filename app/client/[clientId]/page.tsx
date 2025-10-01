@@ -331,53 +331,6 @@ export default function ClientDashboard({ params }: ClientDashboardProps) {
         }
       );
 
-      // Listen for review status changes (approval/rejection)
-      newSocket.on(
-        "reviewStatusChanged",
-        (data: {
-          projectId: string;
-          status: string;
-          action: string;
-          changedBy: string;
-          changedByName: string;
-          comment?: string;
-          timestamp: string;
-          isFromAdmin: boolean;
-        }) => {
-          console.log("🔄 Review status changed:", data);
-          
-          const statusMessage = data.action === 'approve' 
-            ? `✅ Project ${data.status} by ${data.changedByName}`
-            : `❌ Project ${data.status} by ${data.changedByName}${data.comment ? `: ${data.comment}` : ''}`;
-          
-          setChatMessages((prev) => [
-            ...prev,
-            {
-              id: Date.now().toString(),
-              type: "status",
-              message: statusMessage,
-              timestamp: data.timestamp,
-              addedBy: data.changedBy,
-              senderName: data.changedByName,
-              isFromClient: !data.isFromAdmin,
-            },
-          ]);
-
-          // Update project status
-          setProject((prev) =>
-            prev ? { ...prev, status: data.status.toUpperCase() } : null
-          );
-
-          // Show toast notification
-          if (typeof window !== "undefined") {
-            const notification = data.isFromAdmin
-              ? `Admin ${data.action}d the project`
-              : `You ${data.action}d the project`;
-            console.log("📢 Notification:", notification);
-          }
-        }
-      );
-
       return () => {
         newSocket.emit("leave-project", projectId);
         newSocket.close();

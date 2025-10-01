@@ -90,61 +90,33 @@ export async function POST(request: NextRequest) {
 
     console.log("Reply created successfully:", reply);
 
-    // Emit socket event for real-time updates
+    // Emit socket event for real-time updates via external socket server
     try {
-      const { getSocketServer } = await import('@/lib/socket-server');
-      const io = getSocketServer();
+      const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3003';
+      console.log('📡 Sending socket event to external server:', socketUrl);
       
-      if (io) {
-        console.log('📡 Emitting annotationReplyAdded event for project:', annotation.projectId);
-        
-        // Determine if this is from admin or client
-        const isFromAdmin = reply.addedBy === 'Admin' || reply.addedByName?.includes('Admin');
-        
-        // Emit reply added event
-        io.to(`project-${annotation.projectId}`).emit('annotationReplyAdded', {
-          projectId: annotation.projectId,
-          annotationId: annotationId,
-          reply: {
-            id: reply.id,
-            content: reply.content,
-            addedBy: reply.addedBy,
-            addedByName: reply.addedByName,
-            createdAt: reply.createdAt
-          },
-          timestamp: new Date().toISOString(),
-          isFromAdmin: isFromAdmin
-        });
-        
-        // Send notification to opposite user type
-        if (isFromAdmin) {
-          // Admin replied, notify client
-          io.to(`project-${annotation.projectId}`).emit('replyNotification', {
-            type: 'reply_added',
-            message: `New reply from Admin: "${reply.content}"`,
-            from: 'Admin',
-            to: 'Client',
+      // Send HTTP request to trigger socket emission
+      await fetch(`${socketUrl}/api/emit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event: 'annotationReplyAdded',
+          room: `project-${annotation.projectId}`,
+          data: {
+            projectId: annotation.projectId,
             annotationId: annotationId,
-            replyId: reply.id,
-            timestamp: new Date().toISOString()
-          });
-        } else {
-          // Client replied, notify admin
-          io.to(`project-${annotation.projectId}`).emit('replyNotification', {
-            type: 'reply_added',
-            message: `New reply from Client: "${reply.content}"`,
-            from: 'Client',
-            to: 'Admin',
-            annotationId: annotationId,
-            replyId: reply.id,
-            timestamp: new Date().toISOString()
-          });
-        }
-        
-        console.log('✅ Socket event emitted successfully');
-      } else {
-        console.log('⚠️ Socket server not available');
-      }
+            reply: {
+              id: reply.id,
+              content: reply.content,
+              addedBy: reply.addedBy,
+              addedByName: reply.addedByName,
+              createdAt: reply.createdAt?.toISOString() || new Date().toISOString()
+            }
+          }
+        })
+      }).catch(err => console.log('Socket emit failed:', err));
+      
+      console.log('✅ Socket event sent successfully');
     } catch (error) {
       console.log("Socket emission error:", error);
     }

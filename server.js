@@ -214,17 +214,26 @@ app.prepare().then(() => {
     // Review status update events
     socket.on('reviewStatusChanged', (data) => {
       console.log('📊 Review status changed:', data);
-      // Broadcast to all clients in the project room
-      io.to(`project-${data.projectId}`).emit('reviewStatusChanged', {
-        ...data,
-        timestamp: data.timestamp || new Date().toISOString()
-      });
-      
-      // Also emit the old event for backward compatibility
+      // Broadcast to all clients in the project room (including sender)
       io.to(`project-${data.projectId}`).emit('reviewStatusUpdated', {
         ...data,
-        timestamp: data.timestamp || new Date().toISOString()
+        timestamp: new Date().toISOString()
       });
+    });
+
+    // Project status change events (when client approves/rejects)
+    socket.on('projectStatusChanged', (data) => {
+      console.log('🔄 Project status changed:', data);
+      // Broadcast to all clients in the project room
+      io.to(`project-${data.projectId}`).emit('projectStatusChanged', {
+        projectId: data.projectId,
+        status: data.status,
+        changedBy: data.updatedBy || data.changedBy || 'Client',
+        changedByName: data.updatedByName || data.changedByName || 'Client',
+        comments: data.comments || '',
+        timestamp: new Date().toISOString()
+      });
+      console.log('✅ Broadcasted projectStatusChanged event');
     });
 
     // Disconnect handler

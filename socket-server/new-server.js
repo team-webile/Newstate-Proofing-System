@@ -29,6 +29,39 @@ app.get('/health', (req, res) => {
   });
 });
 
+// API endpoint to emit socket events from Next.js API routes
+app.post('/api/emit', (req, res) => {
+  try {
+    const { event, room, data } = req.body;
+    
+    if (!event || !room || !data) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Missing required fields: event, room, data'
+      });
+    }
+
+    console.log(`📡 Emitting event "${event}" to room "${room}"`);
+    console.log('📦 Data:', JSON.stringify(data, null, 2));
+
+    // Emit the event to the specified room
+    io.to(room).emit(event, data);
+
+    res.json({
+      status: 'success',
+      message: `Event "${event}" emitted to room "${room}"`,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error emitting socket event:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to emit socket event',
+      error: error.message
+    });
+  }
+});
+
 // Socket.IO CORS configuration
 const allowedOrigins = [
   '*',
@@ -106,7 +139,7 @@ io.on('connection', (socket) => {
     // Handle both old and new data structures
     const replyContent = typeof data.reply === 'string' ? data.reply : data.reply.content;
     const replyId = typeof data.reply === 'object' && data.reply.id ? data.reply.id : Date.now().toString();
-    const replyCreatedAt = typeof data.reply === 'object' && data.reply.createdAt ? data.reply.createdAt : data.timestamp;
+    const replyCreatedAt = typeof data.reply === 'object' && data.reply.createdAt ? data.reply.createdAt : new Date().toISOString();
 
     console.log('🔍 Processing reply data:', {
       replyType: typeof data.reply,
@@ -125,8 +158,7 @@ io.on('connection', (socket) => {
         addedBy: data.addedBy,
         addedByName: data.addedByName,
         createdAt: replyCreatedAt
-      },
-      timestamp: data.timestamp
+      }
     };
 
     console.log('📡 Broadcasting annotationReplyAdded:', broadcastData);
@@ -208,6 +240,21 @@ io.on('connection', (socket) => {
       ...data,
       timestamp: data.timestamp || new Date().toISOString()
     });
+  });
+
+  // Project status change events (for approve/reject from client)
+  socket.on('projectStatusChanged', (data) => {
+    console.log('📊 Project status changed:', data);
+    // Broadcast to all clients in the project room
+    io.to(`project-${data.projectId}`).emit('projectStatusChanged', {
+      projectId: data.projectId,
+      status: data.status,
+      changedBy: data.changedBy || data.updatedBy,
+      changedByName: data.changedByName || data.updatedByName,
+      comments: data.comments,
+      timestamp: new Date().toISOString()
+    });
+    console.log('✅ Broadcasted projectStatusChanged event');
   });
 
   // Disconnect handler

@@ -1388,11 +1388,13 @@ console.log(reviewData,'reviewData')
           status: "COMPLETED",
         }));
 
-        // Emit socket event
+        // Emit socket event (note: API will also emit via HTTP to socket server)
         emitProjectStatusChange({
           projectId: params.reviewId,
           status: "COMPLETED",
-          updatedBy: "Client",
+          changedBy: "Client",
+          changedByName: signatureName,
+          comments: "Approved by client",
         });
 
         toast({
@@ -1460,11 +1462,12 @@ console.log(reviewData,'reviewData')
           status: "REJECTED",
         }));
 
-        // Emit socket event
+        // Emit socket event (note: API will also emit via HTTP to socket server)
         emitProjectStatusChange({
           projectId: params.reviewId,
           status: "REJECTED",
-          updatedBy: "Client",
+          changedBy: "Client",
+          changedByName: signatureName,
           comments: revisionComments,
         });
 

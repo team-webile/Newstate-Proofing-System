@@ -9,7 +9,6 @@ interface SocketEvents {
   onAnnotationStatusUpdated?: (data: any) => void;
   onAnnotationResolved?: (data: any) => void;
   onReviewStatusUpdated?: (data: any) => void;
-  onReviewStatusChanged?: (data: any) => void;
   onProjectStatusChanged?: (data: any) => void;
   onFileUploaded?: (data: any) => void;
   onStatusChanged?: (data: any) => void;
@@ -77,7 +76,14 @@ export function useUnifiedSocket({
 
     newSocket.on("annotationReplyAdded", (data) => {
       console.log("💬 Unified Socket - annotationReplyAdded:", data);
-      events.onAnnotationReplyAdded?.(data);
+      // Normalize the data structure
+      const normalizedData = {
+        projectId: data.projectId,
+        annotationId: data.annotationId,
+        reply: data.reply,
+        // Don't include redundant timestamp at root level
+      };
+      events.onAnnotationReplyAdded?.(normalizedData);
     });
 
     newSocket.on("replyEdited", (data) => {
@@ -103,11 +109,6 @@ export function useUnifiedSocket({
     newSocket.on("reviewStatusUpdated", (data) => {
       console.log("📋 Unified Socket - reviewStatusUpdated:", data);
       events.onReviewStatusUpdated?.(data);
-    });
-
-    newSocket.on("reviewStatusChanged", (data) => {
-      console.log("🔄 Unified Socket - reviewStatusChanged:", data);
-      events.onReviewStatusChanged?.(data);
     });
 
     newSocket.on("projectStatusChanged", (data) => {
