@@ -78,23 +78,13 @@ export default function LoginPage() {
       [e.target.name]: e.target.value,
     }));
   };
-  const handleBack = () => {
-    window.history.back();
-  };
+ 
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-8">
         <div className="flex items-center justify-between">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleBack}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <Icons.ArrowLeft />
-            <span className="ml-2">Back</span>
-          </Button>
+           
           <div className="flex-1" />
         </div>
 

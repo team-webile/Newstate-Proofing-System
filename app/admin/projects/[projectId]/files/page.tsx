@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { LogoutButton } from "@/components/logout-button";
-import { Eye, MessageSquare, PenTool, X, FileText, ZoomIn } from "lucide-react";
+import { Eye, MessageSquare, PenTool, X, FileText, ZoomIn, ChevronDown } from "lucide-react";
 import Lightbox from "@/components/Lightbox";
 import io from "socket.io-client";
 import { useRouter } from "next/navigation";
@@ -138,6 +138,7 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [newVersionName, setNewVersionName] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isProjectInfoOpen, setIsProjectInfoOpen] = useState(true);
   const [isPublishing, setIsPublishing] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
   const [clientsLoading, setClientsLoading] = useState(true);
@@ -201,6 +202,12 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
         const projectWithLink = {
           id: projectInfo.id,
           name: projectInfo.title,
+          client: {
+            id: projectInfo.client.clientId,
+            firstName: projectInfo.client.firstName,
+            lastName: projectInfo.client.lastName,
+            email: projectInfo.client.email
+          },
           clientId: projectInfo.clientId,
           description: projectInfo.description || "",
           allowDownloads: projectInfo.downloadEnabled,
@@ -1071,6 +1078,7 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
       </div>
     );
   }
+  console.log('🔍 Project data:', project);
 
   return (
     <div className="min-h-screen bg-background">
@@ -1563,13 +1571,26 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
             <div className="space-y-6">
               {/* Project Information */}
               <Card>
-                <CardHeader>
-                  <CardTitle>Project Information</CardTitle>
-                  <CardDescription>
-                    Project details and statistics
-                  </CardDescription>
+                <CardHeader 
+                  className="cursor-pointer hover:bg-accent/50 transition-colors"
+                  onClick={() => setIsProjectInfoOpen(!isProjectInfoOpen)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Project Information</CardTitle>
+                      <CardDescription>
+                        Project details and statistics
+                      </CardDescription>
+                    </div>
+                    <ChevronDown 
+                      className={`h-5 w-5 transition-transform duration-200 ${
+                        isProjectInfoOpen ? 'transform rotate-180' : ''
+                      }`}
+                    />
+                  </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                {isProjectInfoOpen && (
+                  <CardContent className="space-y-4">
                   <div>
                     <Label className="text-sm font-medium">Project ID</Label>
                     <p className="text-sm text-muted-foreground">
@@ -1587,14 +1608,7 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                   <div>
                     <Label className="text-sm font-medium">Client</Label>
                     <p className="text-sm text-muted-foreground">
-                      {clientsLoading
-                        ? "Loading..."
-                        : (Array.isArray(clients)
-                            ? (() => {
-                                const client = clients.find((c) => c.id === project.clientId);
-                                return client ? `${client.firstName} ${client.lastName}` : "Unknown Client";
-                              })()
-                            : "Unknown Client") || "Unknown Client"}
+                      {project?.client.firstName} {project?.client.lastName}
                     </p>
                   </div>
 
@@ -1630,8 +1644,9 @@ export default function ProjectFilesPage({ params }: ProjectFilesPageProps) {
                     </Badge>
                   </div>
                 </CardContent>
+                )}
               </Card>
-
+                
               {/* Shareable Link */}  
               <Card>
                 <CardHeader>

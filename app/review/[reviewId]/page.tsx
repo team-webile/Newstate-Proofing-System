@@ -1351,10 +1351,12 @@ console.log(reviewData,'reviewData')
   const handleApproval = async () => {
     setIsApproving(true);
     try {
-      // Validate digital signature
-      const clientName = `${reviewData?.project?.client?.firstName} ${reviewData?.project?.client?.lastName}`;
-      const signatureName = `${digitalSignature.firstName} ${digitalSignature.lastName}`;
       
+      // Validate digital signature
+      const clientName = `${reviewData?.project?.client?.firstName}${reviewData?.project?.client?.lastName}`;
+      const signatureName = `${digitalSignature.firstName} ${digitalSignature.lastName}`;
+      console.log(clientName,'clientName')
+      console.log(signatureName,'signatureName')
       if (clientName.toLowerCase().trim() !== signatureName.toLowerCase().trim()) {
         toast({
           title: "Signature Mismatch",

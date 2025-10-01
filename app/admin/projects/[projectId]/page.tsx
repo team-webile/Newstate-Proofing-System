@@ -112,7 +112,6 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
       </div>
     )
   }
-
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
