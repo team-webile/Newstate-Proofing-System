@@ -1,87 +1,38 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/db'
-import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
-import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
-import { withAuth, AuthUser } from '@/lib/auth'
+import { NextResponse } from "next/server"
+import { createApproval, createActivityLog, prisma } from "@/lib/db"
 
-async function handler(req: NextRequest, user: AuthUser) {
+export const dynamic = 'force-dynamic'
+
+export async function POST(request: Request) {
   try {
-    if (req.method === 'GET') {
-      const { searchParams } = new URL(req.url)
-      const elementId = searchParams.get('elementId')
-      const projectId = searchParams.get('projectId')
-      const type = searchParams.get('type')
-
-      let approvals
-      if (elementId) {
-        approvals = await ApprovalModel.findByElementId(elementId)
-      } else if (projectId) {
-        approvals = await ApprovalModel.findByProjectId(projectId)
-      } else if (type) {
-        approvals = await ApprovalModel.findByType(type as any)
-      } else {
-        approvals = await ApprovalModel.findAll()
-      }
-
-      return NextResponse.json({
-        status: 'success',
-        message: 'Approvals retrieved successfully',
-        data: approvals
+    const data = await request.json()
+    const approval = await createApproval(data)
+    
+    // Get the review to find the project ID for logging
+    const review = await prisma.review.findUnique({
+      where: { id: data.reviewId },
+      include: { project: true },
+    })
+    
+    if (review) {
+      // Log activity
+      await createActivityLog({
+        projectId: review.projectId,
+        userName: `${data.firstName} ${data.lastName}`,
+        action: "REVIEW_APPROVED",
+        details: `${data.decision === "approved" ? "Approved" : "Requested revisions for"} review ${review.shareLink}`,
       })
     }
-
-    if (req.method === 'POST') {
-      const data: CreateApprovalData = await req.json()
-
-      if (!data.firstName || !data.lastName || !data.type) {
-        return NextResponse.json({ 
-          status: 'error', 
-          message: 'First name, last name, and type are required' 
-        }, { status: 400 })
-      }
-
-      if (data.type === 'ELEMENT' && !data.elementId) {
-        return NextResponse.json({ 
-          status: 'error', 
-          message: 'Element ID is required for element approval' 
-        }, { status: 400 })
-      }
-
-      if (data.type === 'PROJECT' && !data.projectId) {
-        return NextResponse.json({ 
-          status: 'error', 
-          message: 'Project ID is required for project approval' 
-        }, { status: 400 })
-      }
-
-      const approval = await ApprovalModel.create(data)
-
-      // Update element or project status
-      if (data.type === 'ELEMENT' && data.elementId) {
-        await ElementModel.updateStatus(data.elementId, 'APPROVED')
-      } else if (data.type === 'PROJECT' && data.projectId) {
-        await ProjectModel.updateStatus(data.projectId, 'COMPLETED')
-      }
-
-      return NextResponse.json({
-        status: 'success',
-        message: 'Approval recorded successfully',
-        data: approval
-      })
-    }
-
-    return NextResponse.json({
-      status: 'error',
-      message: 'Method not allowed'
-    }, { status: 405 })
+    
+    console.log("Approval created:", approval)
+    
+    // In production, you would emit a socket event here:
+    // io.to(`project_${review.project_id}`).emit('approval_received', approval)
+    // io.to(`review_${data.reviewId}`).emit('status_updated', { status: approval.decision })
+    
+    return NextResponse.json(approval)
   } catch (error) {
-    console.error('Approval API error:', error)
-    return NextResponse.json({ 
-      status: 'error', 
-      message: 'Internal server error' 
-    }, { status: 500 })
+    console.error("Error creating approval:", error)
+    return NextResponse.json({ error: "Failed to create approval" }, { status: 500 })
   }
 }
-
-export const GET = withAuth(handler)
-export const POST = withAuth(handler)

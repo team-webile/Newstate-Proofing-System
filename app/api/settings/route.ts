@@ -1,68 +1,77 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/db'
-import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
-import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
-import { withAuth, AuthUser } from '@/lib/auth'
+import { NextResponse } from "next/server"
+import { prisma } from "@/lib/db"
 
-async function handler(req: NextRequest, user: AuthUser) {
+export const dynamic = 'force-dynamic'
+
+export async function GET() {
   try {
-    if (req.method === 'GET') {
-      const settings = await SettingsModel.findByUserId(user.id)
-      
-      if (!settings) {
-        // Create default settings if none exist
-        const defaultSettings = await SettingsModel.create({
-          userId: user.id,
-          approvalMessage: 'Thank you for your approval!',
-          signatureMessage: 'By signing below, I approve this design element.',
-          companyName: 'New State Branding'
-        })
-        
-        return NextResponse.json({
-          status: 'success',
-          message: 'Settings retrieved successfully',
-          data: defaultSettings
-        })
-      }
-
-      return NextResponse.json({
-        status: 'success',
-        message: 'Settings retrieved successfully',
-        data: settings
-      })
-    }
-
-    if (req.method === 'PUT') {
-      const body = await req.json()
-      const { approvalMessage, signatureMessage, companyName } = body
-
-      const updateData = {
-        approvalMessage,
-        signatureMessage,
-        companyName
-      }
-
-      const settings = await SettingsModel.updateByUserId(user.id, updateData)
-
-      return NextResponse.json({
-        status: 'success',
-        message: 'Settings updated successfully',
-        data: settings
+    // Try to get existing settings from database
+    let settings = await prisma.settings.findFirst()
+    
+    // If no settings exist, create default settings
+    if (!settings) {
+      settings = await prisma.settings.create({
+        data: {
+          siteName: 'Proofing System',
+          siteDescription: 'Professional design proofing and client feedback system',
+          adminEmail: 'admin@proofing-system.com',
+          logoUrl: '/images/nsb-logo.png',
+        }
       })
     }
 
     return NextResponse.json({
-      status: 'error',
-      message: 'Method not allowed'
-    }, { status: 405 })
+      siteName: settings.siteName,
+      siteDescription: settings.siteDescription,
+      adminEmail: settings.adminEmail,
+      logoUrl: settings.logoUrl,
+    })
   } catch (error) {
-    console.error('Settings API error:', error)
-    return NextResponse.json({
-      status: 'error',
-      message: 'Internal server error'
-    }, { status: 500 })
+    console.error("Error fetching settings:", error)
+    return NextResponse.json({ error: "Failed to fetch settings" }, { status: 500 })
   }
 }
 
-export const GET = withAuth(handler)
-export const PUT = withAuth(handler)
+export async function PUT(request: Request) {
+  try {
+    const data = await request.json()
+    
+    // Try to get existing settings
+    let settings = await prisma.settings.findFirst()
+    
+    if (settings) {
+      // Update existing settings
+      settings = await prisma.settings.update({
+        where: { id: settings.id },
+        data: {
+          siteName: data.siteName || settings.siteName,
+          siteDescription: data.siteDescription || settings.siteDescription,
+          adminEmail: data.adminEmail || settings.adminEmail,
+          logoUrl: data.logoUrl || settings.logoUrl,
+        }
+      })
+    } else {
+      // Create new settings if none exist
+      settings = await prisma.settings.create({
+        data: {
+          siteName: data.siteName || 'Proofing System',
+          siteDescription: data.siteDescription || 'Professional design proofing and client feedback system',
+          adminEmail: data.adminEmail || 'admin@proofing-system.com',
+          logoUrl: data.logoUrl || '/images/nsb-logo.png',
+        }
+      })
+    }
+
+    console.log("Settings updated in database:", settings)
+    
+    return NextResponse.json({
+      siteName: settings.siteName,
+      siteDescription: settings.siteDescription,
+      adminEmail: settings.adminEmail,
+      logoUrl: settings.logoUrl,
+    })
+  } catch (error) {
+    console.error("Error updating settings:", error)
+    return NextResponse.json({ error: "Failed to update settings" }, { status: 500 })
+  }
+}

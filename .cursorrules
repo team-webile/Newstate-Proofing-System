@@ -1,154 +1,41 @@
-# Cursor Rules for Client Proofing System
+# Cursor Rules for Proofing System
 
-## Project Structure Guidelines
+## Database Configuration
+- **ALWAYS use this PostgreSQL connection string**: `postgresql://neondb_owner:npg_ft6DHlhFMQU5@ep-raspy-night-ad4utwoj-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require`
+- **NEVER use Prisma Studio** or any GUI database tools
+- **ALWAYS use Prisma CLI** for database operations
+- Store connection string in `DATABASE_URL` environment variable
 
-### Folder Organization
-- `models/` - Separate model files for each Prisma model
-- `api/` - API routes organized by feature
-- `components/` - Reusable React components
-- `lib/` - Utility functions and configurations
-- `types/` - TypeScript type definitions
-- `prisma/` - Database schema and migrations
+## Database Operations
+- Use `npx prisma migrate dev` for schema changes
+- Use `npx prisma generate` to update Prisma client
+- Use `npx prisma db push` for quick schema updates
+- Use `npx prisma db seed` to run seed scripts
+- **NEVER use Prisma Studio** for database management
 
-### Code Standards
+## API Development
+- All APIs must use the same Prisma client instance from `lib/db.ts`
+- Use database query helpers from `lib/db.ts` instead of direct Prisma calls
+- Ensure consistent database connections across all API endpoints
 
-#### Database & Prisma
-- **CRITICAL: ALWAYS use the centralized database connection from `lib/prisma.ts`**
-- **NEVER create new PrismaClient instances directly in API routes or components**
-- **ONLY import `prisma` from `@/lib/prisma` for all database operations**
-- Create separate model files in `models/` folder that use the centralized connection
-- Use proper TypeScript types for all database models
-- Always create migration files when changing schema
-- Use Neon PostgreSQL database with single connection URL in `.env.local`
-- **Database connection must be managed by the singleton pattern in `lib/prisma.ts`**
-- **All API routes must import and use the centralized `prisma` instance**
-- **No manual `$disconnect()` calls - handled automatically by the centralized connection**
+## Environment Variables
+- `DATABASE_URL`: The PostgreSQL connection string above
+- `JWT_SECRET`: Secret key for JWT authentication
 
-#### API Routes
-- Organize API routes by feature in separate folders
-- Use proper HTTP status codes
-- Implement proper error handling
-- Use TypeScript for all API routes
-- Validate input data
+## Project Structure
+- Keep database models in `prisma/schema.prisma`
+- Keep migrations in `prisma/migrations/`
+- Keep database helpers in `lib/db.ts`
+- Use TypeScript for all database operations
 
-#### Components
-- Use functional components with TypeScript
-- Implement proper prop types
-- Use Tailwind CSS for styling
-- Create reusable components
-- Follow React best practices
+## Prohibited Actions
+- **NEVER use Prisma Studio** (`npx prisma studio`)
+- **NEVER use Neon Studio** or other GUI database tools
+- **NEVER hardcode database connection strings** in source code
+- **NEVER mix different database drivers** - use only Prisma
 
-#### File Naming
-- Use kebab-case for file names
-- Use PascalCase for component names
-- Use camelCase for function and variable names
-- Use UPPER_CASE for constants
-
-### Database Models Structure
-Each model should have its own file in `models/` folder:
-- `models/User.ts`
-- `models/Project.ts`
-- `models/Review.ts`
-- `models/Element.ts`
-- `models/Comment.ts`
-- `models/Approval.ts`
-
-### API Structure
-Organize API routes by feature:
-- `api/auth/` - Authentication routes
-- `api/projects/` - Project management routes
-- `api/reviews/` - Review management routes
-- `api/elements/` - Element management routes
-- `api/comments/` - Comment management routes
-- `api/approvals/` - Approval management routes
-
-### Migration Guidelines
-- Always create migration files for schema changes
-- Use descriptive migration names
-- Test migrations on development database first
-- Document breaking changes
-
-### Environment Variables
-- **CRITICAL: Use ONLY `.env.local` for local development**
-- **Use `env.example` as template for environment setup**
-- **NEVER commit sensitive environment variables to git**
-- **Use single DATABASE_URL in `.env.local` - no multiple database connections**
-- Use Neon PostgreSQL database URL format
-- **Environment variables must be loaded from `.env.local` only**
-- **No hardcoded database URLs or connection strings in code**
-
-### TypeScript
-- Use strict TypeScript configuration
-- Define proper interfaces for all data structures
-- Use Prisma generated types
-- Avoid `any` type usage
-
-### Security
-- Implement proper authentication
-- Validate all inputs
-- Use environment variables for secrets
-- Implement proper CORS policies
-- Use HTTPS in production
-
-### Performance
-- **Use centralized Prisma client with singleton pattern for optimal performance**
-- **Leverage automatic connection pooling through centralized connection**
-- Implement proper caching strategies
-- Optimize database queries
-- Use Next.js optimization features
-- **No multiple PrismaClient instances that could cause connection pool issues**
-
-### Testing
-- Write unit tests for utility functions
-- Test API endpoints
-- Test database operations
-- Use proper test data
-
-### Documentation
-- Document all API endpoints
-- Document database schema changes
-- Keep README updated
-- Document environment setup
-
-## Database Connection Rules (CRITICAL)
-
-### Mandatory Database Connection Usage
-- **ALL database operations MUST use `import { prisma } from '@/lib/prisma'`**
-- **NEVER use `new PrismaClient()` anywhere in the codebase**
-- **NEVER import `PrismaClient` directly from `@prisma/client`**
-- **Database connection is managed centrally in `lib/prisma.ts`**
-
-### Forbidden Patterns
-```typescript
-// ❌ FORBIDDEN - Creating new PrismaClient instances
-import { PrismaClient } from '@prisma/client'
-const prisma = new PrismaClient()
-
-// ❌ FORBIDDEN - Multiple database connections
-const db1 = new PrismaClient()
-const db2 = new PrismaClient()
-
-// ❌ FORBIDDEN - Manual disconnect calls
-await prisma.$disconnect()
-```
-
-### Required Patterns
-```typescript
-// ✅ REQUIRED - Use centralized connection
-import { prisma, checkDatabaseConnection } from '@/lib/prisma'
-
-// ✅ REQUIRED - Use helper functions when needed
-const isConnected = await checkDatabaseConnection()
-```
-
-### Environment Configuration
-- **Single source of truth: `.env.local` file**
-- **Template: `env.example` file**
-- **Database URL: `DATABASE_URL` environment variable**
-- **No multiple database configurations**
-
-### Connection Management
-- **Automatic connection pooling through singleton pattern**
-- **Graceful shutdown handling built into centralized connection**
-- **Development hot-reload protection**
-- **Production-optimized connection management**
+## Required Actions
+- Always use the specified PostgreSQL connection string
+- Always use Prisma as the single ORM
+- Always use environment variables for database configuration
+- Always use the database query helpers from `lib/db.ts`

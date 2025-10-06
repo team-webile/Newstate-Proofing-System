@@ -1,130 +1,48 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/db'
-import { projects, clients, users, reviews, elements, comments, approvals, settings } from '@/db/schema'
-import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
-import { withAuth, AuthUser } from '@/lib/auth'
+import { NextResponse } from "next/server"
+import { createReview, createActivityLog, getReviewsByProjectId } from "@/lib/db"
+import { nanoid } from "nanoid"
 
-async function handler(req: NextRequest, user: AuthUser) {
+export const dynamic = 'force-dynamic'
+
+export async function GET(request: Request) {
   try {
-    if (req.method === 'GET') {
-      const { searchParams } = new URL(req.url)
-      const projectId = searchParams.get('projectId')
-
-      let reviews
-      if (projectId) {
-        reviews = await ReviewModel.findByProjectId(projectId)
-      } else {
-        reviews = await ReviewModel.findAll()
-      }
-
-      return NextResponse.json({
-        status: 'success',
-        message: 'Reviews retrieved successfully',
-        data: reviews
-      })
-    }
-
-    if (req.method === 'POST') {
-      const body = await req.json()
-      const { name, description, projectId } = body
-
-      // Validate required fields
-      if (!name || !projectId) {
-        return NextResponse.json({
-          status: 'error',
-          message: 'Name and project ID are required'
-        }, { status: 400 })
-      }
-
-      const reviewData: CreateReviewData = {
-        name,
-        description,
-        projectId
-      }
-
-      const review = await ReviewModel.create(reviewData)
-
-      return NextResponse.json({
-        status: 'success',
-        message: 'Review created successfully',
-        data: review
-      })
-    }
-
-    return NextResponse.json({
-      status: 'error',
-      message: 'Method not allowed'
-    }, { status: 405 })
-  } catch (error) {
-    console.error('Review API error:', error)
-    return NextResponse.json({
-      status: 'error',
-      message: 'Internal server error'
-    }, { status: 500 })
-  }
-}
-
-// GET handler without authentication
-export async function GET(req: NextRequest) {
-  try {
-    const { searchParams } = new URL(req.url)
+    const { searchParams } = new URL(request.url)
     const projectId = searchParams.get('projectId')
-
-    let reviews
-    if (projectId) {
-      reviews = await ReviewModel.findByProjectId(projectId)
-    } else {
-      reviews = await ReviewModel.findAll()
+    
+    if (!projectId) {
+      return NextResponse.json({ error: "Project ID is required" }, { status: 400 })
     }
-
-    return NextResponse.json({
-      status: 'success',
-      message: 'Reviews retrieved successfully',
-      data: reviews
-    })
+    
+    const reviews = await getReviewsByProjectId(parseInt(projectId))
+    return NextResponse.json(reviews)
   } catch (error) {
-    console.error('Review API error:', error)
-    return NextResponse.json({
-      status: 'error',
-      message: 'Internal server error'
-    }, { status: 500 })
+    console.error("Error fetching reviews:", error)
+    return NextResponse.json({ error: "Failed to fetch reviews" }, { status: 500 })
   }
 }
 
-// POST handler without authentication for creating reviews
-export async function POST(req: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const body = await req.json()
-    const { name, description, projectId } = body
-
-    // Validate required fields
-    if (!name || !projectId) {
-      return NextResponse.json({
-        status: 'error',
-        message: 'Name and project ID are required'
-      }, { status: 400 })
-    }
-
-    const reviewData: CreateReviewData = {
-      reviewName: name,
-      description,
-      projectId,
-      shareLink: `review-${projectId}`,
-      updatedAt: new Date()
-    }
-
-    const review = await ReviewModel.create(reviewData)
-
-    return NextResponse.json({
-      status: 'success',
-      message: 'Review created successfully',
-      data: review
+    const { projectId } = await request.json()
+    const shareLink = nanoid(10)
+    const review = await createReview(projectId, shareLink)
+    
+    // Log activity
+    await createActivityLog({
+      projectId: projectId,
+      userName: "Admin",
+      action: "REVIEW_CREATED",
+      details: `Created review ${shareLink}`,
     })
+    
+    console.log("Review created:", review)
+    
+    // In production, you would emit a socket event here:
+    // io.to(`project_${projectId}`).emit('review_created', review)
+    
+    return NextResponse.json(review)
   } catch (error) {
-    console.error('Review API error:', error)
-    return NextResponse.json({
-      status: 'error',
-      message: 'Internal server error'
-    }, { status: 500 })
+    console.error("Error creating review:", error)
+    return NextResponse.json({ error: "Failed to create review" }, { status: 500 })
   }
 }

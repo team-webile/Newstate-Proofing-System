@@ -1,35 +1,38 @@
 'use client'
 
-import { useToast } from '@/hooks/use-toast'
-import {
-  Toast,
-  ToastClose,
-  ToastDescription,
-  ToastProvider,
-  ToastTitle,
-  ToastViewport,
-} from '@/components/ui/toast'
+import { Toaster as HotToaster } from 'react-hot-toast'
 
 export function Toaster() {
-  const { toasts } = useToast()
-
   return (
-    <ToastProvider>
-      {toasts.map(function ({ id, title, description, action, ...props }) {
-        return (
-          <Toast key={id} {...props}>
-            <div className="grid gap-1">
-              {title && <ToastTitle>{title}</ToastTitle>}
-              {description && (
-                <ToastDescription>{description}</ToastDescription>
-              )}
-            </div>
-            {action}
-            <ToastClose />
-          </Toast>
-        )
-      })}
-      <ToastViewport />
-    </ToastProvider>
+    <HotToaster
+      position="top-right"
+      toastOptions={{
+        duration: 4000,
+        style: {
+          background: '#1f2937',
+          color: '#f9fafb',
+          border: '1px solid #374151',
+          borderRadius: '8px',
+        },
+        success: {
+          iconTheme: {
+            primary: '#fbbf24',
+            secondary: '#1f2937',
+          },
+        },
+        error: {
+          iconTheme: {
+            primary: '#ef4444',
+            secondary: '#1f2937',
+          },
+        },
+        loading: {
+          iconTheme: {
+            primary: '#3b82f6',
+            secondary: '#1f2937',
+          },
+        },
+      }}
+    />
   )
 }

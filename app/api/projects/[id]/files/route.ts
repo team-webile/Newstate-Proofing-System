@@ -2,20 +2,19 @@ import { NextRequest, NextResponse } from 'next/server'
 import { writeFile, mkdir, unlink, readdir, stat } from 'fs/promises'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
-import { db } from '@/db'
-import { projects } from '@/db/schema'
-import { eq, and, or, like, desc, asc, count } from 'drizzle-orm'
+import { getProjectById, createDesignItem, getDesignItemsByReviewId, deleteDesignItem, getReviewsByProjectId, createReview } from '@/lib/db'
+
+export const dynamic = 'force-dynamic'
 
 // POST - Upload file to project
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id: projectId } = await params
+    const projectId = parseInt(params.id)
     const formData = await req.formData()
     const file = formData.get('file') as File
-    const version = formData.get('version') as string || 'V1'
 
     if (!file) {
       return NextResponse.json({
@@ -25,7 +24,7 @@ export async function POST(
     }
 
     // Verify project exists
-    const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
+    const project = await getProjectById(projectId)
 
     if (!project) {
       return NextResponse.json({
@@ -34,8 +33,8 @@ export async function POST(
       }, { status: 404 })
     }
 
-    // Create upload directory in public folder with version subdirectory
-    const uploadDir = join(process.cwd(), 'public', 'uploads', 'projects', projectId, 'versions', version)
+    // Create upload directory in public folder
+    const uploadDir = join(process.cwd(), 'public', 'uploads', 'projects', projectId.toString())
     await mkdir(uploadDir, { recursive: true })
 
     // Generate unique filename
@@ -48,21 +47,39 @@ export async function POST(
     const buffer = Buffer.from(bytes)
     await writeFile(filePath, buffer)
 
-    // Update project's lastActivity
-    await db.update(projects)
-      .set({ lastActivity: new Date() })
-      .where(eq(projects.id, projectId))
+    // Create a review if none exists
+    let reviewId = null
+    const reviews = await getReviewsByProjectId(projectId)
+    if (reviews.length === 0) {
+      // Create a default review for the project
+      const review = await createReview({
+        projectId: projectId,
+        shareLink: generateShareLink(),
+        status: 'PENDING'
+      })
+      reviewId = review.id
+    } else {
+      reviewId = reviews[0].id
+    }
+
+    // Save file info to database
+    const designItem = await createDesignItem({
+      reviewId: reviewId,
+      fileName: file.name,
+      fileUrl: `/uploads/projects/${projectId}/${filename}`,
+      fileType: file.type,
+      fileSize: file.size
+    })
 
     return NextResponse.json({
       status: 'success',
       message: 'File uploaded successfully',
       data: {
-        id: randomUUID(),
+        id: designItem.id,
         name: file.name,
-        url: `/uploads/projects/${projectId}/versions/${version}/${filename}`,
+        url: `/uploads/projects/${projectId}/${filename}`,
         type: file.type,
         size: file.size,
-        version: version,
         uploadedAt: new Date().toISOString()
       }
     })
@@ -78,13 +95,13 @@ export async function POST(
 // GET - Get project files
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id: projectId } = await params
+    const projectId = parseInt(params.id)
 
     // Verify project exists
-    const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
+    const project = await getProjectById(projectId)
 
     if (!project) {
       return NextResponse.json({
@@ -93,82 +110,28 @@ export async function GET(
       }, { status: 404 })
     }
 
-    // Read files from all version directories
-    const projectDir = join(process.cwd(), 'public', 'uploads', 'projects', projectId)
-    const fileList = []
+    // Get all design items for this project through reviews
+    const reviews = await getReviewsByProjectId(projectId)
+    const allDesignItems = []
     
-    try {
-      // Check if versions directory exists
-      const versionsDir = join(projectDir, 'versions')
-      try {
-        const versionDirs = await readdir(versionsDir)
-        
-        for (const versionDir of versionDirs) {
-          const versionPath = join(versionsDir, versionDir)
-          const versionStats = await stat(versionPath)
-          
-          // Skip if not a directory
-          if (!versionStats.isDirectory()) continue
-          
-          // Read files in this version directory
-          const files = await readdir(versionPath)
-          
-          for (const file of files) {
-            const filePath = join(versionPath, file)
-            const stats = await stat(filePath)
-            
-            // Skip directories and hidden files
-            if (stats.isDirectory() || file.startsWith('.')) continue
-            
-            fileList.push({
-              id: `${versionDir}-${file.split('.')[0]}`, // Use version and filename as ID
-              name: file,
-              url: `/uploads/projects/${projectId}/versions/${versionDir}/${file}`,
-              type: getMimeType(file),
-              size: stats.size,
-              uploadedAt: stats.mtime.toISOString(),
-              version: versionDir
-            })
-          }
-        }
-      } catch (versionsError) {
-        // Versions directory doesn't exist, check root project directory
-        const files = await readdir(projectDir)
-        
-        for (const file of files) {
-          const filePath = join(projectDir, file)
-          const stats = await stat(filePath)
-          
-          // Skip directories and hidden files
-          if (stats.isDirectory() || file.startsWith('.')) continue
-          
-          fileList.push({
-            id: `V1-${file.split('.')[0]}`, // Use V1 as default version
-            name: file,
-            url: `/uploads/projects/${projectId}/${file}`,
-            type: getMimeType(file),
-            size: stats.size,
-            uploadedAt: stats.mtime.toISOString(),
-            version: 'V1'
-          })
-        }
-      }
-      
-      return NextResponse.json({
-        status: 'success',
-        data: {
-          files: fileList
-        }
-      })
-    } catch (dirError) {
-      // Directory doesn't exist yet, return empty array
-      return NextResponse.json({
-        status: 'success',
-        data: {
-          files: []
-        }
-      })
+    for (const review of reviews) {
+      const items = await getDesignItemsByReviewId(review.id)
+      allDesignItems.push(...items)
     }
+
+    return NextResponse.json({
+      status: 'success',
+      data: {
+        files: allDesignItems.map(item => ({
+          id: item.id,
+          name: item.fileName,
+          url: item.fileUrl,
+          type: item.fileType,
+          size: item.fileSize,
+          uploadedAt: item.createdAt
+        }))
+      }
+    })
   } catch (error) {
     console.error('Get files error:', error)
     return NextResponse.json({
@@ -178,50 +141,25 @@ export async function GET(
   }
 }
 
-// Helper function to get MIME type based on file extension
-function getMimeType(filename: string): string {
-  const ext = filename.split('.').pop()?.toLowerCase()
-  switch (ext) {
-    case 'jpg':
-    case 'jpeg':
-      return 'image/jpeg'
-    case 'png':
-      return 'image/png'
-    case 'gif':
-      return 'image/gif'
-    case 'pdf':
-      return 'application/pdf'
-    case 'psd':
-      return 'image/vnd.adobe.photoshop'
-    case 'ai':
-      return 'application/postscript'
-    case 'eps':
-      return 'application/postscript'
-    default:
-      return 'application/octet-stream'
-  }
-}
-
 // DELETE - Delete file from project
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id: projectId } = await params
+    const projectId = parseInt(params.id)
     const { searchParams } = new URL(req.url)
-    const fileName = searchParams.get('fileName')
-    const version = searchParams.get('version') || 'V1'
+    const fileId = searchParams.get('fileId')
 
-    if (!fileName) {
+    if (!fileId) {
       return NextResponse.json({
         status: 'error',
-        message: 'File name is required'
+        message: 'File ID is required'
       }, { status: 400 })
     }
 
     // Verify project exists
-    const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
+    const project = await getProjectById(projectId)
 
     if (!project) {
       return NextResponse.json({
@@ -230,30 +168,37 @@ export async function DELETE(
       }, { status: 404 })
     }
 
-    // Try to delete from version directory first, then fallback to root
-    let filePath = join(process.cwd(), 'public', 'uploads', 'projects', projectId, 'versions', version, fileName)
-
-    try {
-      // Delete file from filesystem
-      await unlink(filePath)
-    } catch (fileError) {
-      // Try deleting from root directory for backward compatibility
-      const rootFilePath = join(process.cwd(), 'public', 'uploads', 'projects', projectId, fileName)
-      try {
-        await unlink(rootFilePath)
-      } catch (rootError) {
-        console.error('File deletion error:', rootError)
-        return NextResponse.json({
-          status: 'error',
-          message: 'File not found'
-        }, { status: 404 })
+    // Get the design item to find the file path
+    const reviews = await getReviewsByProjectId(projectId)
+    let designItem = null
+    
+    for (const review of reviews) {
+      const items = await getDesignItemsByReviewId(review.id)
+      const item = items.find(item => item.id === parseInt(fileId))
+      if (item) {
+        designItem = item
+        break
       }
     }
 
-    // Update project's lastActivity
-    await db.update(projects)
-      .set({ lastActivity: new Date() })
-      .where(eq(projects.id, projectId))
+    if (!designItem) {
+      return NextResponse.json({
+        status: 'error',
+        message: 'File not found'
+      }, { status: 404 })
+    }
+
+    // Delete file from filesystem
+    const filePath = join(process.cwd(), 'public', designItem.fileUrl)
+    try {
+      await unlink(filePath)
+    } catch (fileError) {
+      console.warn('File not found on filesystem:', fileError)
+      // Continue with database deletion even if file doesn't exist
+    }
+
+    // Delete from database
+    await deleteDesignItem(parseInt(fileId))
 
     return NextResponse.json({
       status: 'success',
@@ -266,4 +211,9 @@ export async function DELETE(
       message: 'Failed to delete file'
     }, { status: 500 })
   }
+}
+
+// Helper function to generate share link
+function generateShareLink(): string {
+  return randomUUID().replace(/-/g, '').substring(0, 12)
 }

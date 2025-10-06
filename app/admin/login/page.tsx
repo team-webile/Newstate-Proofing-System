@@ -1,172 +1,140 @@
-"use client";
+'use client'
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Eye, EyeOff, Mail, Lock, LogIn } from "lucide-react";
-import { authApi } from "@/lib/api-client";
-import { useAuth } from "@/lib/auth-context";
-import { Button } from "@/components/ui/button";
-import { Icons } from "@/components/icons";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Logo } from "@/components/logo";
-import { useToast } from "@/hooks/use-toast";
+import { useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import toast from 'react-hot-toast'
 
-export default function LoginPage() {
-  const router = useRouter();
-  const { login } = useAuth();
-  const { toast } = useToast();
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-  });
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+function LoginForm() {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
+  
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams.get('redirect') || '/admin/dashboard'
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
+    e.preventDefault()
+    setIsLoading(true)
+    setError('')
 
     try {
-      const response = await authApi.login(formData.email, formData.password);
+      const response = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      })
 
-      if (response.status === "success") {
-        // Use auth context login method which handles localStorage and redirects
-        login(response.data.user, response.data.token);
-
-        // Show success toast
-        toast({
-          title: "Login Successful",
-          description: `Welcome back, ${response.data.user.name}!`,
-        });
-
-        console.log("Login successful, user role:", response.data.user.role);
-      } else {
-        const errorMessage = response.message || "Login failed";
-        setError(errorMessage);
-        toast({
-          title: "Login Failed",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      const errorMessage = "An error occurred during login";
-      setError(errorMessage);
-      toast({
-        title: "Login Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
-  };
- 
+      const data = await response.json()
+      console.log(data,'data')
+              if (data.success) {
+                toast.success('Login successful!')
+                // Login successful, redirect to intended page or default dashboard
+                router.push(redirectTo)
+                router.refresh()
+              } else {
+                setError(data.error || 'Login failed')
+                toast.error(data.error || 'Login failed')
+              }
+            } catch (error) {
+              setError('Network error. Please try again.')
+              toast.error('Network error. Please try again.')
+              console.error('Login error:', error)
+            } finally {
+              setIsLoading(false)
+            }
+  }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-8">
-        <div className="flex items-center justify-between">
-           
-          <div className="flex-1" />
+    <div className="min-h-screen flex items-center justify-center bg-black py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        <div className="text-center">
+          <h2 className="mt-6 text-3xl font-extrabold text-white">
+            Admin Login
+          </h2>
+          <p className="mt-2 text-sm text-gray-300">
+            Sign in to access the admin dashboard
+          </p>
         </div>
-
-        {/* Logo */}
-        <div className="flex justify-center">
-          <Logo size="lg" />
-        </div>
-
-        {/* Login Card */}
-        <Card className="border-border bg-card">
-          <CardHeader className="space-y-1 text-center">
-            <CardTitle className="text-2xl font-bold text-card-foreground">
-              Admin Login
-            </CardTitle>
-            <CardDescription className="text-muted-foreground">
-              Sign in to access the proofing system dashboard
+        
+        <Card className="bg-black border-gray-800">
+          <CardHeader>
+            <CardTitle className="text-white">Sign In</CardTitle>
+            <CardDescription className="text-gray-300">
+              Enter your admin credentials to continue
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+              
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-card-foreground">
-                  Email
-                </Label>
+                <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
-                  name="email"
                   type="email"
-                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="admin@example.com"
                   required
-                  value={formData.email}
-                  onChange={handleChange}
-                  className="bg-input border-border text-foreground placeholder:text-muted-foreground"
+                  disabled={isLoading}
                 />
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-card-foreground">
-                  Password
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    name="password"
-                    type={showPassword ? "text" : "password"}
-                    autoComplete="current-password"
-                    required
-                    value={formData.password}
-                    onChange={handleChange}
-                    className="bg-input border-border text-foreground placeholder:text-muted-foreground pr-10"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <Icons.EyeOff /> : <Icons.Eye />}
-                  </Button>
-                </div>
-              </div>
-
-              <Button
-                type="submit"
-                className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                disabled={loading}
-              >
-                {loading ? "Signing in..." : "Sign In"}
-              </Button>
-
-              {/* Test Toast Button */}
               
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+              
+              <Button 
+                type="submit" 
+                className="w-full" 
+                disabled={isLoading}
+              >
+                {isLoading ? 'Signing in...' : 'Sign In'}
+              </Button>
             </form>
           </CardContent>
         </Card>
-
-        {/* Footer */}
-        <div className="text-center text-sm text-muted-foreground">
-          <p>© 2025 NewState Branding Co. All rights reserved.</p>
+        
+        <div className="text-center">
+          <p className="text-sm text-gray-300">
+            Default admin credentials:
+          </p>
+          <p className="text-xs text-gray-400 mt-1">
+            Email: admin@proofing-system.com<br />
+            Password: AdminPass123!
+          </p>
         </div>
       </div>
     </div>
-  );
+  )
+}
+
+export default function AdminLoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-black"><div className="text-white">Loading...</div></div>}>
+      <LoginForm />
+    </Suspense>
+  )
 }

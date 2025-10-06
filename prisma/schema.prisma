@@ -1,0 +1,179 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model for authentication
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  firstName String
+  lastName  String
+  role      Role     @default(CLIENT)
+  password  String   // In production, this should be hashed
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+enum Role {
+  ADMIN
+  CLIENT
+}
+
+// Projects model
+model Project {
+  id              Int      @id @default(autoincrement())
+  projectNumber   String   @unique @map("project_number")
+  name            String
+  description     String?
+  clientEmail     String?  @map("client_email")
+  downloadEnabled Boolean  @default(true) @map("download_enabled")
+  archived        Boolean  @default(false)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  reviews      Review[]
+  activityLogs ActivityLog[]
+
+  @@map("projects")
+}
+
+// Reviews model (individual proof sessions within a project)
+model Review {
+  id        Int      @id @default(autoincrement())
+  projectId Int      @map("project_id")
+  shareLink String   @unique @map("share_link")
+  status    Status   @default(PENDING)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  project     Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  designItems DesignItem[]
+  approvals   Approval[]
+
+  @@map("reviews")
+}
+
+enum Status {
+  PENDING
+  APPROVED
+  REVISION_REQUESTED
+}
+
+// Design items model (individual design files in a review)
+model DesignItem {
+  id        Int      @id @default(autoincrement())
+  reviewId  Int      @map("review_id")
+  fileUrl   String   @map("file_url")
+  fileName  String   @map("file_name")
+  fileType  String?  @map("file_type")
+  fileSize  Int?     @map("file_size")
+  version   Int      @default(1)
+  orderIndex Int     @default(0) @map("order_index")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  review      Review       @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  comments    Comment[]
+  annotations Annotation[]
+
+  @@map("design_items")
+}
+
+// Comments model
+model Comment {
+  id           Int      @id @default(autoincrement())
+  designItemId Int      @map("design_item_id")
+  author       String
+  content      String
+  type         String   @default("comment") // "comment" or "annotation"
+  drawingData  String?  @map("drawing_data") // Base64 image data for annotations
+  canvasX      Float?   @map("canvas_x") // Canvas position X coordinate
+  canvasY      Float?   @map("canvas_y") // Canvas position Y coordinate
+  canvasWidth  Float?   @map("canvas_width") // Canvas width
+  canvasHeight Float?   @map("canvas_height") // Canvas height
+  imageWidth   Float?   @map("image_width") // Original image width when drawing was made
+  imageHeight  Float?   @map("image_height") // Original image height when drawing was made
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
+  designItem DesignItem @relation(fields: [designItemId], references: [id], onDelete: Cascade)
+
+  @@map("comments")
+}
+
+// Annotations model (for marking up designs)
+model Annotation {
+  id           Int     @id @default(autoincrement())
+  designItemId Int     @map("design_item_id")
+  xPosition    Decimal @map("x_position")
+  yPosition    Decimal @map("y_position")
+  content      String
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
+  designItem DesignItem @relation(fields: [designItemId], references: [id], onDelete: Cascade)
+
+  @@map("annotations")
+}
+
+// Approvals model
+model Approval {
+  id          Int      @id @default(autoincrement())
+  reviewId    Int      @map("review_id")
+  firstName   String   @map("first_name")
+  lastName    String   @map("last_name")
+  signatureData String? @map("signature_data")
+  decision    Decision
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  review Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@map("approvals")
+}
+
+enum Decision {
+  APPROVED
+  REVISION_REQUESTED
+}
+
+// Activity logs model
+model ActivityLog {
+  id        Int      @id @default(autoincrement())
+  projectId Int      @map("project_id")
+  userName  String   @map("user_name")
+  action    String
+  details   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("activity_logs")
+}
+
+// Settings model for system configuration
+model Settings {
+  id              Int      @id @default(autoincrement())
+  siteName        String   @default("Proofing System") @map("site_name")
+  siteDescription String?  @map("site_description")
+  adminEmail      String?  @map("admin_email")
+  logoUrl         String?  @default("/images/nsb-logo.png") @map("logo_url")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}
