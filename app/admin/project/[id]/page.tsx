@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { Upload, Settings, Save, X, Image as ImageIcon } from "lucide-react"
+import { Upload, Settings, Save, X, Image as ImageIcon, ArrowLeft } from "lucide-react"
 import { CopyLinkButton } from "@/components/copy-link-button"
 import AdminLayout from "../../components/AdminLayout"
 import toast from 'react-hot-toast'
@@ -158,6 +158,17 @@ export default function ProjectDetailsPage() {
   return (
     <AdminLayout title="Edit Project" description="Update project details" icon={<Save className="h-8 w-8 text-brand-yellow" />}>
             <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-8 max-w-7xl">
+        {/* Back Button */}
+        <div className="mb-4 sm:mb-6">
+          <Link
+            href="/admin/projects"
+            className="inline-flex items-center gap-2 p-2 bg-neutral-900 rounded-lg hover:bg-neutral-800 transition-colors border border-neutral-800 text-neutral-400 hover:text-brand-yellow"
+          >
+            <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="text-sm sm:text-base">Back to Projects</span>
+          </Link>
+        </div>
+
         {/* Project Name Section */}
         <div className="mb-6 sm:mb-8">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 gap-4">
