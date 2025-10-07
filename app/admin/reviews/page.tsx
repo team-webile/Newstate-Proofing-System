@@ -188,11 +188,6 @@ export default function ReviewsPage() {
                     <CardDescription className="text-neutral-400 font-mono text-sm">{review.project.projectNumber}</CardDescription>
                   </div>
                   <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0 text-neutral-400 hover:text-brand-yellow hover:bg-neutral-800">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
                     <DropdownMenuContent className="bg-neutral-900 border-neutral-700">
                       <DropdownMenuItem 
                         onClick={() => window.open(`/review/${review.shareLink}`, '_blank')}
