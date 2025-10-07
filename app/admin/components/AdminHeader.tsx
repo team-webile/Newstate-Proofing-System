@@ -62,6 +62,9 @@ export default function AdminHeader({ title, description, icon }: AdminHeaderPro
 
           {/* Mobile Menu */}
           <nav className="flex flex-wrap justify-center items-center gap-3 sm:gap-6 text-xs sm:text-sm">
+            <Link href="/admin/projects" className="text-white hover:text-brand-yellow transition-colors">
+              Dashboard
+            </Link>
             <span className="hidden sm:block text-neutral-600">|</span>
             <Link href="/admin/new-project" className="text-white hover:text-brand-yellow transition-colors">
               ADD NEW PROJECT
