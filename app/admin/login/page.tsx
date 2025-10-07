@@ -7,17 +7,31 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { FullScreenLoading } from '@/components/ui/loading'
 import toast from 'react-hot-toast'
+import LogoImage from '@/components/LogoImage'
+import { Eye, EyeOff } from 'lucide-react'
 
 function LoginForm() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [formData, setFormData] = useState({
+    email: '',
+    password: ''
+  })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirect') || '/admin/dashboard'
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }))
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -30,46 +44,49 @@ function LoginForm() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: formData.email, password: formData.password }),
       })
 
       const data = await response.json()
-      console.log(data,'data')
-              if (data.success) {
-                toast.success('Login successful!')
-                // Login successful, redirect to intended page or default dashboard
-                router.push(redirectTo)
-                router.refresh()
-              } else {
-                setError(data.error || 'Login failed')
-                toast.error(data.error || 'Login failed')
-              }
-            } catch (error) {
-              setError('Network error. Please try again.')
-              toast.error('Network error. Please try again.')
-              console.error('Login error:', error)
-            } finally {
-              setIsLoading(false)
-            }
+      console.log(data, 'data')
+      if (data.success) {
+        toast.success('Login successful!')
+        // Login successful, redirect to intended page or default dashboard
+        router.push(redirectTo)
+        router.refresh()
+      } else {
+        setError(data.error || 'Login failed')
+        toast.error(data.error || 'Login failed')
+      }
+    } catch (error) {
+      setError('Network error. Please try again.')
+      toast.error('Network error. Please try again.')
+      console.error('Login error:', error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-black py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
-          <h2 className="mt-6 text-3xl font-extrabold text-white">
-            Admin Login
-          </h2>
-          <p className="mt-2 text-sm text-gray-300">
-            Sign in to access the admin dashboard
-          </p>
+    <div className="min-h-screen bg-black flex items-center justify-center p-4">
+      <div className="w-full max-w-md space-y-8">
+        <div className="flex items-center justify-between">
+          <div className="flex-1" />
         </div>
-        
-        <Card className="bg-black border-gray-800">
-          <CardHeader>
-            <CardTitle className="text-white">Sign In</CardTitle>
-            <CardDescription className="text-gray-300">
-              Enter your admin credentials to continue
+
+        {/* Logo */}
+        <div className="flex justify-center">
+          <LogoImage width={200} height={60} className="h-12 w-auto" />
+        </div>
+
+        {/* Login Card */}
+        <Card className="border-gray-800 bg-gray-900">
+          <CardHeader className="space-y-1 text-center">
+            <CardTitle className="text-2xl font-bold text-white">
+              Admin Login
+            </CardTitle>
+            <CardDescription className="text-gray-400">
+              Sign in to access the proofing system dashboard
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -81,43 +98,67 @@ function LoginForm() {
               )}
               
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="text-white">
+                  Email
+                </Label>
                 <Input
                   id="email"
+                  name="email"
                   type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@example.com"
+                  autoComplete="email"
                   required
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-400 focus:border-yellow-500 focus:ring-yellow-500"
                   disabled={isLoading}
                 />
               </div>
-              
+
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  required
-                  disabled={isLoading}
-                />
+                <Label htmlFor="password" className="text-white">
+                  Password
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    required
+                    value={formData.password}
+                    onChange={handleChange}
+                    className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-400 pr-10 focus:border-yellow-500 focus:ring-yellow-500"
+                    disabled={isLoading}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-gray-700 text-gray-400 hover:text-white"
+                    onClick={() => setShowPassword(!showPassword)}
+                    disabled={isLoading}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
               </div>
-              
-              <Button 
-                type="submit" 
-                className="w-full" 
+
+              <Button
+                type="submit"
+                className="w-full bg-yellow-500 text-black hover:bg-yellow-400 font-semibold"
                 disabled={isLoading}
               >
-                {isLoading ? 'Signing in...' : 'Sign In'}
+                {isLoading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                    Signing in...
+                  </div>
+                ) : (
+                  "Sign In"
+                )}
               </Button>
             </form>
-          </CardContent>
-        </Card>
-        
-        <div className="text-center">
+            <div className="text-center mt-6">
           <p className="text-sm text-gray-300">
             Default admin credentials:
           </p>
@@ -126,6 +167,13 @@ function LoginForm() {
             Password: AdminPass123!
           </p>
         </div>
+          </CardContent>
+        </Card>
+
+        {/* Footer */}
+        <div className="text-center text-sm text-gray-500">
+          <p>© 2025 NewState Branding Co. All rights reserved.</p>
+        </div>
       </div>
     </div>
   )
@@ -133,7 +181,7 @@ function LoginForm() {
 
 export default function AdminLoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-black"><div className="text-white">Loading...</div></div>}>
+    <Suspense fallback={<FullScreenLoading text="Loading login page..." />}>
       <LoginForm />
     </Suspense>
   )

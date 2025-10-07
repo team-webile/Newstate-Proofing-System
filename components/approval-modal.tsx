@@ -5,6 +5,7 @@ import type React from "react"
 import { useState } from "react"
 import { X } from "lucide-react"
 import { useRouter } from "next/navigation"
+import toast from "react-hot-toast"
 
 interface ApprovalModalProps {
   reviewId: number
@@ -34,10 +35,10 @@ export function ApprovalModal({ reviewId, decision, onClose }: ApprovalModalProp
       })
       
       // Show success message
-      alert(
+      toast.success(
         decision === "approved"
-          ? "✓ Project approved successfully!"
-          : "✓ Revision request submitted successfully!"
+          ? "Project approved successfully!"
+          : "Revision request submitted successfully!"
       )
       
       setIsSubmitting(false)

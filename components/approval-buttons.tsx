@@ -6,6 +6,7 @@ import { ApprovalModal } from "./approval-modal"
 import { DrawingCanvas } from "./drawing-canvas"
 import { WelcomeModal } from "./welcome-modal"
 import Image from "next/image"
+import toast from "react-hot-toast"
 import { saveComment, getCommentsByReview, StoredComment } from "@/lib/storage"
 
 interface ApprovalButtonsProps {
@@ -68,6 +69,13 @@ export function ApprovalButtons({ reviewId }: ApprovalButtonsProps) {
     if (newName && newName.trim()) {
       setAuthorName(newName.trim())
       localStorage.setItem('client_proofing_author_name', newName.trim())
+      toast.success("✅ Name updated successfully!", {
+        duration: 3000,
+      })
+    } else if (newName !== null) {
+      toast.error("Please enter a valid name", {
+        duration: 3000,
+      })
     }
   }
 
@@ -86,12 +94,17 @@ export function ApprovalButtons({ reviewId }: ApprovalButtonsProps) {
   }
 
   const handleAnnotations = () => {
-    alert("💡 Annotation mode coming soon!")
+    toast("💡 Annotation mode coming soon!", {
+      icon: "💡",
+      duration: 4000,
+    })
   }
 
   const handleAddComment = () => {
     if (!newCommentText.trim() || !authorName.trim()) {
-      alert("Please enter your name and comment")
+      toast.error("Please enter your name and comment", {
+        duration: 3000,
+      })
       return
     }
 
@@ -135,16 +148,22 @@ export function ApprovalButtons({ reviewId }: ApprovalButtonsProps) {
     
     // Show success message
     if (hasDrawing) {
-      alert("✅ Annotation with drawing saved successfully!")
+      toast.success("✅ Annotation with drawing saved successfully!", {
+        duration: 4000,
+      })
     } else {
-      alert("✅ Comment saved successfully!")
+      toast.success("✅ Comment saved successfully!", {
+        duration: 4000,
+      })
     }
   }
 
   const handleSaveDrawing = (dataUrl: string) => {
     setCurrentDrawing(dataUrl)
     setShowDrawingCanvas(false)
-    alert("✅ Drawing saved! Now add your comment text and submit.")
+    toast.success("✅ Drawing saved! Now add your comment text and submit.", {
+      duration: 4000,
+    })
   }
 
   const getTimeAgo = (date: Date) => {

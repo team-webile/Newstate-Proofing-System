@@ -90,14 +90,14 @@ export default function EditProjectPage() {
 
   if (isLoading) {
     return (
-      <AdminLayout title="Edit Project" description="Update project details" icon={<Save className="h-8 w-8 text-brand-yellow" />}>
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin text-brand-yellow mx-auto mb-4" />
-            <p className="text-neutral-400">Loading project...</p>
-          </div>
+      <AdminLayout title="Project Edit" description="Project Edit" icon={<Save className="h-8 w-8 text-brand-yellow" />}>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-brand-yellow border-t-transparent mx-auto"></div>
+          <p className="mt-4 text-xl text-gray-300">Loading Data...</p>
         </div>
-      </AdminLayout>
+      </div>
+    </AdminLayout>
     )
   }
 

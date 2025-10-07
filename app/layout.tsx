@@ -31,6 +31,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${inter.variable} antialiased`}>
+      <head>
+        <link rel="icon" href="/favicon.png" />
+      </head>
       <body className="bg-neutral-950 text-white min-h-screen flex flex-col">
         <LogoProvider>
           <SocketProvider>

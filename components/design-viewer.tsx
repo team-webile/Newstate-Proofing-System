@@ -23,7 +23,6 @@ import {
 import { WelcomeModal } from "./welcome-modal";
 import { useSocket } from "@/contexts/SocketContext";
 import toast from 'react-hot-toast';
-
 interface DesignItem {
   id: number;
   file_url?: string;
@@ -331,7 +330,9 @@ export function DesignViewer({
     }
 
     if (!newCommentText.trim() || !authorName.trim()) {
-      alert("Please enter your name and message");
+      toast.error("Please enter your name and message", {
+        duration: 3000,
+      });
       return;
     }
 
@@ -458,20 +459,26 @@ export function DesignViewer({
         }
 
         if (hasDrawing) {
-          alert("✅ Annotation with drawing saved successfully!");
+          toast.success("✅ Annotation with drawing saved successfully!", {
+            duration: 4000,
+          });
           // Clear canvas after submit
           if (canvasRef.current) {
             canvasRef.current.clearCanvas();
           }
         } else {
-          alert("✅ Comment saved successfully!");
+          toast.success("✅ Comment saved successfully!", {
+            duration: 4000,
+          });
         }
       } else {
         throw new Error('Failed to save comment');
       }
     } catch (error) {
       console.error('Error saving comment:', error);
-      alert("❌ Failed to save comment. Please try again.");
+      toast.error("❌ Failed to save comment. Please try again.", {
+        duration: 4000,
+      });
     }
 
     // Save author name for future use
@@ -554,16 +561,25 @@ export function DesignViewer({
         }
 
         if (status === 'APPROVED') {
-          alert('🎉 Project approved successfully!');
+          toast.success('🎉 Project approved successfully!', {
+            duration: 5000,
+            icon: '✅'
+          });
         } else {
-          alert('📝 Revision requested successfully!');
+          toast.success('📝 Revision requested successfully!', {
+            duration: 5000,
+            icon: '✅'
+          });
         }
       } else {
         throw new Error('Failed to update status');
       }
     } catch (error) {
       console.error('Error updating review status:', error);
-      alert('❌ Failed to update status. Please try again.');
+      toast.error('❌ Failed to update status. Please try again.', {
+        duration: 5000,
+        icon: '❌'
+      });
     } finally {
       setIsUpdatingStatus(false);
     }

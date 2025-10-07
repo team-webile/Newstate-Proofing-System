@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { CardLoading } from '@/components/ui/loading'
 import AdminLayout from '../components/AdminLayout'
 import { 
   Plus, 
@@ -17,7 +18,8 @@ import {
   Mail,
   FileText,
   MoreHorizontal,
-  ArchiveX
+  ArchiveX,
+  Save
 } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import toast from 'react-hot-toast'
@@ -139,14 +141,14 @@ export default function AllProjectsPage() {
 
   if (isLoading) {
     return (
-      <AdminLayout title="All Projects" description="Manage and view all projects" icon={<FileText className="h-8 w-8 text-blue-400" />}>
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto"></div>
-            <p className="mt-2 text-gray-300">Loading projects...</p>
-          </div>
+      <AdminLayout title="Project Details" description="View project details and files" icon={<Save className="h-8 w-8 text-brand-yellow" />}>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-brand-yellow border-t-transparent mx-auto"></div>
+          <p className="mt-4 text-xl text-gray-300">Loading project...</p>
         </div>
-      </AdminLayout>
+      </div>
+    </AdminLayout>
     )
   }
 

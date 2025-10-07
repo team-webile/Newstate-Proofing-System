@@ -4,6 +4,7 @@ import { useState, useRef } from "react"
 import Image from "next/image"
 import { ReactSketchCanvas } from "react-sketch-canvas"
 import { MapPin, Circle, Square, ArrowRight, Type, Pencil, X, Trash2, Undo } from "lucide-react"
+import toast from "react-hot-toast"
 
 interface DesignItem {
   id: number
@@ -58,7 +59,9 @@ export function DesignViewer({ designItems, reviewId, projectName }: DesignViewe
 
   const handleSubmitAnnotation = async () => {
     if (!newCommentText.trim() || !authorName.trim()) {
-      alert("Please enter your name and message")
+      toast.error("Please enter your name and message", {
+        duration: 3000,
+      })
       return
     }
 
@@ -92,13 +95,17 @@ export function DesignViewer({ designItems, reviewId, projectName }: DesignViewe
     setIsAddingAnnotation(false)
     
     if (hasDrawing) {
-      alert("✅ Annotation with drawing submitted successfully!")
+      toast.success("✅ Annotation with drawing submitted successfully!", {
+        duration: 4000,
+      })
       // Clear canvas after submit
       if (canvasRef.current) {
         canvasRef.current.clearCanvas()
       }
     } else {
-      alert("✅ Comment submitted successfully!")
+      toast.success("✅ Comment submitted successfully!", {
+        duration: 4000,
+      })
     }
   }
 

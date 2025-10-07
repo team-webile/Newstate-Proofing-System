@@ -1,8 +1,11 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
 import { getReviewByShareLink, getDesignItemsByReviewId } from "@/lib/db"
 import { CopyLinkButton } from "@/components/copy-link-button"
 import LogoImage from "@/components/LogoImage"
+
+export const dynamic = 'force-dynamic'
 
 export default async function ClientApprovePage({
   params,
