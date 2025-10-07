@@ -200,7 +200,7 @@ export default function ProjectDetailsPage() {
                     designItems.forEach((item, index) => {
                       setTimeout(() => {
                         const link = document.createElement('a');
-                        link.href = item.fileUrl;
+                        link.href = item.url;
                         link.download = item.fileName || `design-${index + 1}`;
                         link.target = '_blank';
                         document.body.appendChild(link);
