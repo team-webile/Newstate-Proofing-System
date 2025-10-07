@@ -274,13 +274,7 @@ export default function ArchivesPage() {
               </Button>
             </div>
 
-            <Button 
-              onClick={() => router.push('/admin/new-project')}
-              className="bg-brand-yellow hover:bg-brand-yellow/90 text-black font-semibold w-full sm:w-auto text-sm sm:text-base"
-            >
-              <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2" />
-              Add New Project
-            </Button>
+            
           </div>
         </div>
 
