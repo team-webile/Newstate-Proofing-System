@@ -197,7 +197,7 @@ export default function AllProjectsPage() {
                     <CardDescription className="text-neutral-400 font-mono text-sm">{project.projectNumber}</CardDescription>
                   </div>
                   <DropdownMenu>
-                   
+                      
                     <DropdownMenuContent className="bg-neutral-900 border-neutral-700">
                       <DropdownMenuItem 
                         onClick={() => router.push(`/admin/project/${project.id}`)}
