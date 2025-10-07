@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { Upload, Settings, Save, X, Image as ImageIcon, ArrowLeft } from "lucide-react"
+import { Upload, Settings, Save, X, Image as ImageIcon, ArrowLeft, Trash } from "lucide-react"
 import { CopyLinkButton } from "@/components/copy-link-button"
 import AdminLayout from "../../components/AdminLayout"
 import toast from 'react-hot-toast'
@@ -289,7 +289,7 @@ export default function ProjectDetailsPage() {
                       className="px-2 py-1.5 sm:px-3 sm:py-2 bg-[#fdb913] text-black rounded font-semibold hover:bg-[#e5a711] transition-colors text-xs sm:text-sm sm:w-full text-center"
                       title="View client feedback"
                     >
-                    <span className="hidden md:inline">View Client Feedback</span>
+                    <span className="hidden md:inline">Feedback</span>
                     <span className="md:hidden">👁️</span>
                   </Link>
                   )}
@@ -298,9 +298,8 @@ export default function ProjectDetailsPage() {
                     className="px-2 py-1.5 sm:px-3 sm:py-2 bg-red-600 text-white rounded font-semibold hover:bg-red-700 transition-colors sm:w-full flex items-center justify-center gap-1"
                     title="Delete file"
                   >
-                    <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    <span className="hidden md:inline">Delete</span>
-                  </button>
+                    <Trash className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                   </button>
                 </div>
               </div>
             ))}
