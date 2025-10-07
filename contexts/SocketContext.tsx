@@ -27,7 +27,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     // Get socket URL from environment variable or use default localhost
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001'
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'https://socket.devnstage.xyz'
     
     // Create socket connection
     const newSocket = io(socketUrl, {
