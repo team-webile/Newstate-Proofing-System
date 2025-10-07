@@ -193,9 +193,28 @@ export default function ProjectDetailsPage() {
               </div>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 lg:gap-4">
-              <button className="flex items-center justify-center gap-2 px-4 py-2 bg-neutral-800 text-white rounded hover:bg-neutral-700 transition-colors text-sm">
-                📥 Download
-              </button>
+              {project.downloadEnabled && designItems.length > 0 && (
+                <button 
+                  onClick={() => {
+                    // Download all files
+                    designItems.forEach((item, index) => {
+                      setTimeout(() => {
+                        const link = document.createElement('a');
+                        link.href = item.fileUrl;
+                        link.download = item.fileName || `design-${index + 1}`;
+                        link.target = '_blank';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                      }, index * 500); // Stagger downloads by 500ms
+                    });
+                    toast.success('Download started for all files!');
+                  }}
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-neutral-800 text-white rounded hover:bg-neutral-700 transition-colors text-sm"
+                >
+                  📥 Download All
+                </button>
+              )}
               {reviews.length > 0 && (
                 <CopyLinkButton shareLink={reviews[0].shareLink} showUrl />
               )}
