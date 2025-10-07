@@ -16,7 +16,7 @@ interface Comment {
   id: number
   author: string
   content: string
-  timestamp: Date
+  timestamp: Date 
   replies: Reply[]
   avatar?: string
   isAdmin?: boolean
