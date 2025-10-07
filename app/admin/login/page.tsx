@@ -23,7 +23,7 @@ function LoginForm() {
   
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirectTo = searchParams.get('redirect') || '/admin/dashboard'
+  const redirectTo = searchParams.get('redirect') || '/admin/projects'
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target

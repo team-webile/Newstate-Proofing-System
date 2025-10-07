@@ -122,7 +122,7 @@ export default function AdminReviewPage() {
           <div className="px-8 py-4">
             <div className="flex items-center gap-8">
               <Link
-                href="/admin/dashboard"
+                href="/admin/projects"
                 className="p-2 bg-neutral-900 rounded-lg hover:bg-neutral-800 transition-colors border border-neutral-800"
               >
                 <ArrowLeft className="w-5 h-5 text-neutral-400" />

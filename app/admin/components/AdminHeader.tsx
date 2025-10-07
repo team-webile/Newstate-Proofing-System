@@ -40,7 +40,7 @@ export default function AdminHeader({ title, description, icon }: AdminHeaderPro
   }
 
   const navigationItems = [
-    { path: '/admin/dashboard', label: 'Dashboard', icon: Home },
+    { path: '/admin/projects', label: 'Projects', icon: Home },
     { path: '/admin/projects', label: 'All Projects', icon: FileText },
     { path: '/admin/new-project', label: 'New Project', icon: Plus },
     { path: '/admin/archives', label: 'Archives', icon: Archive },
@@ -50,7 +50,7 @@ export default function AdminHeader({ title, description, icon }: AdminHeaderPro
     <header className="border-b border-neutral-800 bg-black">
       <div className="container mx-auto px-4 sm:px-6 py-4">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-0">
-          <Link href="/admin/dashboard">
+          <Link href="/admin/projects">
             <Image
               src={logoUrl}
               alt="Newstate Branding Co."
@@ -62,16 +62,13 @@ export default function AdminHeader({ title, description, icon }: AdminHeaderPro
 
           {/* Mobile Menu */}
           <nav className="flex flex-wrap justify-center items-center gap-3 sm:gap-6 text-xs sm:text-sm">
-            <Link href="/admin/dashboard" className="text-neutral-400 hover:text-brand-yellow transition-colors">
-              DASHBOARD
-            </Link>
             <span className="hidden sm:block text-neutral-600">|</span>
             <Link href="/admin/new-project" className="text-white hover:text-brand-yellow transition-colors">
-              ADD NEW
+              ADD NEW PROJECT
             </Link>
             <span className="hidden sm:block text-neutral-600">|</span>
             <Link href="/admin/archives" className="text-neutral-400 hover:text-brand-yellow transition-colors">
-              ARCHIVES
+              ARCHIVES PROJECTS
             </Link>
             <span className="hidden sm:block text-neutral-600">|</span>
             {isAdmin && (

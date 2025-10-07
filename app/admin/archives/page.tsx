@@ -143,7 +143,7 @@ export default function ArchivesPage() {
         <header className="border-b border-neutral-800 bg-black">
           <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4">
             <div className="flex items-center justify-between">
-              <Link href="/admin/dashboard">
+              <Link href="/admin/projects">
                 <LogoImage 
                   width={200}
                   height={60}
@@ -152,9 +152,6 @@ export default function ArchivesPage() {
               </Link>
 
               <nav className="hidden lg:flex items-center gap-6 text-sm">
-                <Link href="/admin/dashboard" className="text-neutral-400 hover:text-brand-yellow transition-colors">
-                  DASHBOARD
-                </Link>
                 <span className="text-neutral-600">|</span>
                 <Link href="/admin/new-project" className="text-neutral-400 hover:text-brand-yellow transition-colors">
                   ADD NEW PROJECT
@@ -163,6 +160,7 @@ export default function ArchivesPage() {
                 <Link href="/admin/archives" className="text-white hover:text-brand-yellow transition-colors">
                   PROJECT ARCHIVES
                 </Link>
+                
               </nav>
             </div>
           </div>
@@ -172,7 +170,7 @@ export default function ArchivesPage() {
         <main className="container mx-auto px-4 sm:px-6 py-4 sm:py-8">
           <div className="flex items-center gap-3 sm:gap-4 mb-6 sm:mb-8">
             <Link
-              href="/admin/dashboard"
+              href="/admin/projects"
               className="p-2 bg-neutral-900 rounded-lg hover:bg-neutral-800 transition-colors border border-neutral-800"
             >
               <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 text-neutral-400" />
@@ -203,7 +201,7 @@ export default function ArchivesPage() {
       <header className="border-b border-neutral-800 bg-black">
         <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between">
-            <Link href="/admin/dashboard">
+            <Link href="/admin/projects">
               <LogoImage 
                 width={200}
                 height={60}
@@ -212,7 +210,7 @@ export default function ArchivesPage() {
             </Link>
 
             <nav className="hidden lg:flex items-center gap-6 text-sm">
-              <Link href="/admin/dashboard" className="text-neutral-400 hover:text-brand-yellow transition-colors">
+              <Link href="/admin/projects" className="text-neutral-400 hover:text-brand-yellow transition-colors">
                 DASHBOARD
               </Link>
               <span className="text-neutral-600">|</span>
@@ -233,7 +231,7 @@ export default function ArchivesPage() {
         {/* Page Header */}
         <div className="flex items-center gap-3 sm:gap-4 mb-6 sm:mb-8">
           <Link
-            href="/admin/dashboard"
+            href="/admin/projects"
             className="p-2 bg-neutral-900 rounded-lg hover:bg-neutral-800 transition-colors border border-neutral-800"
           >
             <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 text-neutral-400" />

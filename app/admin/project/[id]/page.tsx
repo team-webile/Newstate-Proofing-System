@@ -24,7 +24,7 @@ interface Project {
 interface DesignItem {
   id: number
   fileName: string
-  fileUrl: string
+  url: string
   fileType: string
   fileSize: number
   createdAt: string

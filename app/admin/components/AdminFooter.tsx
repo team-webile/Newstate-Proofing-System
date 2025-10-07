@@ -25,11 +25,7 @@ export default function AdminFooter() {
           <div>
             <h4 className="text-sm font-semibold text-white mb-3">Quick Links</h4>
             <ul className="space-y-2">
-              <li>
-                <a href="/admin/dashboard" className="text-gray-400 hover:text-white text-sm transition-colors">
-                  Dashboard
-                </a>
-              </li>
+             
               <li>
                 <a href="/admin/projects" className="text-gray-400 hover:text-white text-sm transition-colors">
                   All Projects
