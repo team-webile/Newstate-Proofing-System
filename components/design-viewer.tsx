@@ -18,6 +18,7 @@ import {
   Droplets,
   Copy,
   Check,
+  Loader2,
 } from "lucide-react";
 // Removed localStorage imports - now using database APIs
 import { WelcomeModal } from "./welcome-modal";
@@ -93,6 +94,7 @@ export function DesignViewer({
   const [reviewStatus, setReviewStatus] = useState<string>('PENDING');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
 
   const { socket, isConnected } = useSocket();
   const commentsContainerRef = useRef<HTMLDivElement>(null);
@@ -336,6 +338,8 @@ export function DesignViewer({
       return;
     }
 
+    setIsSubmittingComment(true);
+
     let hasDrawing = false;
     let drawingData = undefined;
     let canvasPosition = null;
@@ -479,6 +483,8 @@ export function DesignViewer({
       toast.error("❌ Failed to save comment. Please try again.", {
         duration: 4000,
       });
+    } finally {
+      setIsSubmittingComment(false);
     }
 
     // Save author name for future use
@@ -1101,10 +1107,18 @@ export function DesignViewer({
                   </button>
                   <button
                     onClick={handleSubmitAnnotation}
-                    disabled={!newCommentText.trim() || !authorName.trim() || reviewStatus === 'APPROVED'}
-                    className="ml-auto px-3 lg:px-4 py-1.5 lg:py-2 bg-[#fdb913] text-black font-bold rounded hover:bg-[#e5a711] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-xs lg:text-sm"
+                    disabled={!newCommentText.trim() || !authorName.trim() || reviewStatus === 'APPROVED' || isSubmittingComment}
+                    className="ml-auto px-3 lg:px-4 py-1.5 lg:py-2 bg-[#fdb913] text-black font-bold rounded hover:bg-[#e5a711] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-xs lg:text-sm flex items-center gap-2"
                   >
-                    {reviewStatus === 'APPROVED' ? "Disabled" : isAddingAnnotation ? "Add Annotation" : "Add"}
+                    {isSubmittingComment && <Loader2 className="w-3 h-3 lg:w-4 lg:h-4 animate-spin" />}
+                    {isSubmittingComment 
+                      ? "Submitting..." 
+                      : reviewStatus === 'APPROVED' 
+                        ? "Disabled" 
+                        : isAddingAnnotation 
+                          ? "Add Annotation" 
+                          : "Add"
+                    }
                   </button>
                 </div>
 
