@@ -197,6 +197,7 @@ export default function AdminReviewPage() {
             reviewId={review.id}
             projectName={`${review.project.projectNumber} - ${review.project.name.toUpperCase()}`}
             hideApprovalButtons={true}
+            initialStatus={review.status}
           />
         )}
       </main>

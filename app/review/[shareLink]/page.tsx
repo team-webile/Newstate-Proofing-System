@@ -178,7 +178,8 @@ export default function ClientReviewPage() {
           <DesignViewer 
             designItems={designItems} 
             reviewId={review.id} 
-            projectName={`${review.project.projectNumber} - ${review.project.name.toUpperCase()}`} 
+            projectName={`${review.project.projectNumber} - ${review.project.name.toUpperCase()}`}
+            initialStatus={review.status}
           />
         )}
       </main>

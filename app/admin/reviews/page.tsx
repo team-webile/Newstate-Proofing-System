@@ -128,10 +128,10 @@ export default function ReviewsPage() {
   if (isLoading) {
     return (
       <AdminLayout title="Reviews" description="Manage and monitor all reviews" icon={<FileText className="h-8 w-8 text-brand-yellow" />}>
-        <div className="flex items-center justify-center py-12">
+        <div className="flex items-center justify-center py-8 sm:py-12 px-4">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto"></div>
-            <p className="mt-2 text-gray-300">Loading reviews...</p>
+            <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-white mx-auto"></div>
+            <p className="mt-3 sm:mt-4 text-sm sm:text-base text-gray-300">Loading reviews...</p>
           </div>
         </div>
       </AdminLayout>
@@ -140,31 +140,31 @@ export default function ReviewsPage() {
 
   return (
     <AdminLayout title="Reviews" description="Manage and monitor all reviews" icon={<FileText className="h-8 w-8 text-brand-yellow" />}>
-      <div className="container mx-auto px-6 py-8">
+      <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-8">
         {/* Page Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">All Reviews</h1>
-          <p className="text-neutral-400">Monitor client feedback and review status</p>
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">All Reviews</h1>
+          <p className="text-sm sm:text-base text-neutral-400">Monitor client feedback and review status</p>
         </div>
 
         {/* Controls */}
-        <div className="mb-8 space-y-6">
-          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-              <div className="relative">
+        <div className="mb-6 sm:mb-8 space-y-4 sm:space-y-6">
+          <div className="flex flex-col gap-3 sm:gap-4">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full">
+              <div className="relative flex-1 sm:flex-initial">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-400" />
                 <Input
                   placeholder="Search reviews..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 bg-neutral-900 border-neutral-700 text-white placeholder-neutral-400 w-64 focus:border-brand-yellow focus:ring-brand-yellow/20"
+                  className="pl-10 bg-neutral-900 border-neutral-700 text-white placeholder-neutral-400 w-full sm:w-64 focus:border-brand-yellow focus:ring-brand-yellow/20 text-sm sm:text-base"
                 />
               </div>
               
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-neutral-900 border border-neutral-700 text-white px-3 py-2 rounded focus:border-brand-yellow focus:ring-brand-yellow/20"
+                className="bg-neutral-900 border border-neutral-700 text-white px-3 py-2 rounded focus:border-brand-yellow focus:ring-brand-yellow/20 w-full sm:w-auto text-sm sm:text-base"
               >
                 <option value="all">All Status</option>
                 <option value="PENDING">Pending</option>
@@ -173,25 +173,23 @@ export default function ReviewsPage() {
               </select>
             </div>
           </div>
-
-        
         </div>
 
         {/* Reviews Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {filteredReviews.map((review) => (
             <Card key={review.id} className="bg-neutral-900 border-neutral-800 hover:border-brand-yellow/30 hover:shadow-lg hover:shadow-brand-yellow/10 transition-all duration-300 group">
-              <CardHeader className="pb-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="text-white text-lg group-hover:text-brand-yellow transition-colors">{review.project.name}</CardTitle>
-                    <CardDescription className="text-neutral-400 font-mono text-sm">{review.project.projectNumber}</CardDescription>
+              <CardHeader className="pb-3 sm:pb-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="text-white text-base sm:text-lg group-hover:text-brand-yellow transition-colors truncate">{review.project.name}</CardTitle>
+                    <CardDescription className="text-neutral-400 font-mono text-xs sm:text-sm truncate">{review.project.projectNumber}</CardDescription>
                   </div>
                   <DropdownMenu>
                     <DropdownMenuContent className="bg-neutral-900 border-neutral-700">
                       <DropdownMenuItem 
                         onClick={() => window.open(`/review/${review.shareLink}`, '_blank')}
-                        className="text-neutral-300 hover:bg-neutral-800 hover:text-brand-yellow focus:bg-neutral-800 focus:text-brand-yellow"
+                        className="text-neutral-300 hover:bg-neutral-800 hover:text-brand-yellow focus:bg-neutral-800 focus:text-brand-yellow text-sm"
                       >
                         <Eye className="h-4 w-4 mr-2" />
                         View Review
@@ -200,36 +198,37 @@ export default function ReviewsPage() {
                   </DropdownMenu>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center space-x-2 text-neutral-400 text-sm">
-                  <Mail className="h-4 w-4 text-brand-yellow/70" />
+              <CardContent className="space-y-3 sm:space-y-4">
+                <div className="flex items-center space-x-2 text-neutral-400 text-xs sm:text-sm">
+                  <Mail className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-brand-yellow/70 flex-shrink-0" />
                   <span className="truncate">{review.project.clientEmail}</span>
                 </div>
 
-                <div className="flex items-center space-x-2 text-neutral-400 text-sm">
-                  <Calendar className="h-4 w-4 text-brand-yellow/70" />
-                  <span>Created {formatDate(review.createdAt)}</span>
+                <div className="flex items-center space-x-2 text-neutral-400 text-xs sm:text-sm">
+                  <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-brand-yellow/70 flex-shrink-0" />
+                  <span className="truncate">Created {formatDate(review.createdAt)}</span>
                 </div>
 
                 <div className="flex items-center justify-between">
                   <Badge 
                     variant="outline" 
-                    className={`${getStatusColor(review.status)} flex items-center gap-2`}
+                    className={`${getStatusColor(review.status)} flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm px-2 sm:px-2.5 py-0.5 sm:py-1`}
                   >
                     {getStatusIcon(review.status)}
-                    {review.status.replace('_', ' ')}
+                    <span className="truncate">{review.status.replace('_', ' ')}</span>
                   </Badge>
                 </div>
 
-                <div className="flex space-x-2 pt-2">
+                <div className="flex space-x-2 pt-1 sm:pt-2">
                   <Button 
                     variant="outline" 
                     size="sm"
                     onClick={() => window.open(`/review/${review.shareLink}`, '_blank')}
-                    className="flex-1 border-neutral-600 text-neutral-300 hover:bg-brand-yellow hover:text-black hover:border-brand-yellow transition-colors bg-neutral-900"
+                    className="flex-1 border-neutral-600 text-neutral-300 hover:bg-brand-yellow hover:text-black hover:border-brand-yellow transition-colors bg-neutral-900 text-xs sm:text-sm"
                   >
-                    <Eye className="h-4 w-4 mr-2" />
-                    View Review
+                    <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
+                    <span className="hidden sm:inline">View Review</span>
+                    <span className="sm:hidden">View</span>
                   </Button>
                 </div>
               </CardContent>
@@ -238,18 +237,18 @@ export default function ReviewsPage() {
         </div>
 
         {filteredReviews.length === 0 && (
-          <div className="text-center py-16">
-            <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-12 max-w-md mx-auto">
-              <FileText className="h-16 w-16 text-brand-yellow mx-auto mb-6" />
-              <h3 className="text-xl font-semibold text-white mb-3">No reviews found</h3>
-              <p className="text-neutral-400 mb-6 leading-relaxed">
+          <div className="text-center py-8 sm:py-12 lg:py-16">
+            <div className="bg-neutral-900 border border-neutral-800 rounded-xl sm:rounded-2xl p-6 sm:p-8 lg:p-12 max-w-md mx-auto">
+              <FileText className="h-12 w-12 sm:h-16 sm:w-16 text-brand-yellow mx-auto mb-4 sm:mb-6" />
+              <h3 className="text-lg sm:text-xl font-semibold text-white mb-2 sm:mb-3">No reviews found</h3>
+              <p className="text-sm sm:text-base text-neutral-400 mb-4 sm:mb-6 leading-relaxed px-2">
                 {searchQuery || statusFilter !== 'all' ? 'Try adjusting your search terms or filters.' : 'No reviews have been created yet.'}
               </p>
               <Button 
                 onClick={() => router.push('/admin/projects')}
-                className="bg-brand-yellow hover:bg-brand-yellow/90 text-black font-semibold px-6 py-2"
+                className="bg-brand-yellow hover:bg-brand-yellow/90 text-black font-semibold px-4 sm:px-6 py-2 text-sm sm:text-base w-full sm:w-auto"
               >
-                <FileText className="h-4 w-4 mr-2" />
+                <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2" />
                 Go to Projects
               </Button>
             </div>

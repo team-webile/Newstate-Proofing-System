@@ -40,6 +40,7 @@ interface DesignViewerProps {
   reviewId: number;
   projectName: string;
   hideApprovalButtons?: boolean; // Add this new prop
+  initialStatus?: string; // Add initial status prop
 }
 
 interface Comment {
@@ -76,6 +77,7 @@ export function DesignViewer({
   reviewId,
   projectName,
   hideApprovalButtons = false,
+  initialStatus = 'PENDING',
 }: DesignViewerProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [comments, setComments] = useState<Record<number, Comment[]>>({});
@@ -91,7 +93,7 @@ export function DesignViewer({
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
-  const [reviewStatus, setReviewStatus] = useState<string>('PENDING');
+  const [reviewStatus, setReviewStatus] = useState<string>(initialStatus);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
@@ -266,6 +268,11 @@ export function DesignViewer({
       };
     }
   }, [socket, isConnected, reviewId]);
+
+  // Sync initial status when prop changes
+  useEffect(() => {
+    setReviewStatus(initialStatus);
+  }, [initialStatus]);
 
   // Check for author name and show welcome modal if needed
   useEffect(() => {
