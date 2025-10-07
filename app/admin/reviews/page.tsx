@@ -174,25 +174,7 @@ export default function ReviewsPage() {
             </div>
           </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6 hover:border-neutral-700 transition-colors">
-              <div className="text-3xl font-bold text-brand-yellow">{filteredReviews.length}</div>
-              <div className="text-sm text-neutral-400 mt-1">Total Reviews</div>
-            </div>
-            <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6 hover:border-neutral-700 transition-colors">
-              <div className="text-3xl font-bold text-yellow-400">{reviews.filter(r => r.status === 'PENDING').length}</div>
-              <div className="text-sm text-neutral-400 mt-1">Pending</div>
-            </div>
-            <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6 hover:border-neutral-700 transition-colors">
-              <div className="text-3xl font-bold text-green-400">{reviews.filter(r => r.status === 'APPROVED').length}</div>
-              <div className="text-sm text-neutral-400 mt-1">Approved</div>
-            </div>
-            <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6 hover:border-neutral-700 transition-colors">
-              <div className="text-3xl font-bold text-red-400">{reviews.filter(r => r.status === 'REVISION_REQUESTED').length}</div>
-              <div className="text-sm text-neutral-400 mt-1">Revision Needed</div>
-            </div>
-          </div>
+        
         </div>
 
         {/* Reviews Grid */}
