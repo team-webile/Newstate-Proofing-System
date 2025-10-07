@@ -26,8 +26,11 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   const [isConnected, setIsConnected] = useState(false)
 
   useEffect(() => {
-    // Create socket connection to port 3001
-    const newSocket = io('http://localhost:3001', {
+    // Get socket URL from environment variable or use default localhost
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001'
+    
+    // Create socket connection
+    const newSocket = io(socketUrl, {
       transports: ['websocket', 'polling']
     })
 

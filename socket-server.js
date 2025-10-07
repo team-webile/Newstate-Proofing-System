@@ -4,11 +4,17 @@ const http = require('http');
 // Create HTTP server
 const server = http.createServer();
 
-// Create Socket.IO server on port 3001
+// Get allowed origins from environment variable or use defaults
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : ["http://localhost:3000", "https://devnstage.xyz", "https://www.devnstage.xyz"];
+
+// Create Socket.IO server
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:3000",
-    methods: ["GET", "POST"]
+    origin: allowedOrigins,
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
 
@@ -45,10 +51,11 @@ io.on('connection', (socket) => {
   });
 });
 
-// Start server on port 3001
-const PORT = 3001;
+// Start server on specified port or default to 3001
+const PORT = process.env.SOCKET_PORT || 3001;
 server.listen(PORT, () => {
   console.log(`Socket.IO server running on port ${PORT}`);
+  console.log(`Allowed origins: ${allowedOrigins.join(', ')}`);
 });
 
 module.exports = { io };
