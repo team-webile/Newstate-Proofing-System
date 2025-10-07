@@ -203,7 +203,7 @@ export default function AllProjectsPage() {
                         onClick={() => router.push(`/admin/project/${project.id}`)}
                         className="text-neutral-300 hover:bg-neutral-800 hover:text-brand-yellow focus:bg-neutral-800 focus:text-brand-yellow"
                       >
-                        <Eye className="h-4 w-4 mr-2" />
+                        <Eye className="h-4 w-4 mr-2" />      
                         View Details
                       </DropdownMenuItem>
                       <DropdownMenuItem 
