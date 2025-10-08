@@ -103,6 +103,7 @@ export default function ProjectDetailsPage() {
       if (response.ok) {
         toast.success('File uploaded successfully!')
         await loadFiles() // Reload files
+        await loadProjectData() // Reload project data including reviews to show share link
       } else {
         toast.error('Failed to upload file')
       }
@@ -215,9 +216,9 @@ export default function ProjectDetailsPage() {
                   📥 Download All
                 </button>
               )}
-              
+              {reviews.length > 0 && (
                 <CopyLinkButton shareLink={reviews[0].shareLink} showUrl />
-              
+              )}
               <Link href={`/admin/project/${projectId}/edit`} className="flex items-center justify-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 bg-transparent border-2 border-[#fdb913] text-[#fdb913] font-bold rounded hover:bg-[#fdb913] hover:text-black transition-all uppercase tracking-wide text-xs sm:text-sm">
                 <Settings className="w-4 h-4" />
                 <span className="hidden sm:inline">Edit Project</span>
