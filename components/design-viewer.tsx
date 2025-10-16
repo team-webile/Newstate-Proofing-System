@@ -19,11 +19,24 @@ import {
   Copy,
   Check,
   Loader2,
+  FileText,
 } from "lucide-react";
 // Removed localStorage imports - now using database APIs
 import { WelcomeModal } from "./welcome-modal";
 import { useSocket } from "@/contexts/SocketContext";
 import toast from 'react-hot-toast';
+import { PDFViewer } from "./pdf-viewer";
+import dynamic from 'next/dynamic';
+
+// Dynamically import PDFViewer to avoid SSR issues
+const PDFViewerDynamic = dynamic(() => import('./pdf-viewer').then(mod => mod.PDFViewer), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-full">
+      <Loader2 className="h-8 w-8 animate-spin text-brand-yellow" />
+    </div>
+  )
+});
 interface DesignItem {
   id: number;
   file_url?: string;
@@ -61,6 +74,7 @@ interface Comment {
   };
   designItemId: number;
   createdAt: string;
+  pdfPage?: number; // PDF page number (null for images, 1-based for PDFs)
 }
 
 interface Annotation {
@@ -97,6 +111,8 @@ export function DesignViewer({
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [currentPdfPage, setCurrentPdfPage] = useState(1); // Current page for PDF files
+  const [isPdfFile, setIsPdfFile] = useState(false); // Track if current file is PDF
 
   const { socket, isConnected } = useSocket();
   const commentsContainerRef = useRef<HTMLDivElement>(null);
@@ -111,7 +127,37 @@ export function DesignViewer({
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
 
   const selectedItem = designItems[selectedIndex];
-  const itemComments = comments[selectedItem.id] || [];
+
+  // Helper function to check if file is PDF
+  const checkIfPdf = (item: DesignItem) => {
+    const fileUrl = item.url || item.file_url || '';
+    const fileName = item.name || item.file_name || '';
+    const fileType = item.type || '';
+
+    return fileUrl.toLowerCase().endsWith('.pdf') ||
+      fileName.toLowerCase().endsWith('.pdf') ||
+      fileType.toLowerCase().includes('pdf');
+  };
+
+  // Helper function to get absolute URL for files
+  const getAbsoluteUrl = (relativeUrl: string) => {
+    if (typeof window === 'undefined') return relativeUrl;
+
+    // If already absolute URL, return as is
+    if (relativeUrl.startsWith('http://') || relativeUrl.startsWith('https://')) {
+      return relativeUrl;
+    }
+
+    // Convert relative to absolute
+    const origin = window.location.origin;
+    return `${origin}${relativeUrl.startsWith('/') ? '' : '/'}${relativeUrl}`;
+  };
+
+  // Get comments for current item and current PDF page (if PDF)
+  const allItemComments = comments[selectedItem.id] || [];
+  const itemComments = isPdfFile
+    ? allItemComments.filter(c => c.pdfPage === currentPdfPage)
+    : allItemComments;
 
   const colors = [
     "#ef4444",
@@ -132,30 +178,40 @@ export function DesignViewer({
         const annotationsMap: Record<number, Annotation[]> = {};
 
         // Load comments and annotations for all design items
+        const drawingsMap: Record<number, string> = {};
+
         for (const item of designItems) {
           // Load comments
           const commentsResponse = await fetch(`/api/comments?designItemId=${item.id}`);
           if (commentsResponse.ok) {
             const commentsData = await commentsResponse.json();
-            commentsMap[item.id] = commentsData.map((c: any) => ({
-              id: c.id,
-              author: c.author,
-              content: c.content,
-              timestamp: new Date(c.createdAt),
-              type: c.type,
-              hasDrawing: !!c.drawingData,
-              drawingData: c.drawingData,
-              canvasPosition: c.canvasX !== null ? {
-                x: c.canvasX,
-                y: c.canvasY,
-                width: c.canvasWidth,
-                height: c.canvasHeight,
-                imageWidth: c.imageWidth,
-                imageHeight: c.imageHeight
-              } : undefined,
-              designItemId: c.designItemId,
-              createdAt: c.createdAt
-            }));
+            commentsMap[item.id] = commentsData.map((c: any) => {
+              // Store drawing data separately for overlay display
+              if (c.drawingData) {
+                drawingsMap[c.id] = c.drawingData;
+              }
+
+              return {
+                id: c.id,
+                author: c.author,
+                content: c.content,
+                timestamp: new Date(c.createdAt),
+                type: c.type,
+                hasDrawing: !!c.drawingData,
+                drawingData: c.drawingData,
+                canvasPosition: c.canvasX !== null ? {
+                  x: c.canvasX,
+                  y: c.canvasY,
+                  width: c.canvasWidth,
+                  height: c.canvasHeight,
+                  imageWidth: c.imageWidth,
+                  imageHeight: c.imageHeight
+                } : undefined,
+                designItemId: c.designItemId,
+                createdAt: c.createdAt,
+                pdfPage: c.pdfPage || undefined
+              };
+            });
           }
 
           // Load annotations
@@ -175,6 +231,7 @@ export function DesignViewer({
 
         setComments(commentsMap);
         setAnnotations(annotationsMap);
+        setAnnotationDrawings(drawingsMap);
         setLoaded(true);
       } catch (error) {
         console.error('Error loading comments and annotations:', error);
@@ -209,7 +266,8 @@ export function DesignViewer({
           drawingData: data.drawingData || undefined,
           canvasPosition: data.canvasPosition,
           designItemId: data.designItemId,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          pdfPage: data.pdfPage || undefined
         };
 
         // Update comments state
@@ -232,15 +290,7 @@ export function DesignViewer({
           icon: data.hasDrawing ? '🎨' : '💬'
         });
 
-        // Auto-scroll to bottom for new comments
-        setTimeout(() => {
-          if (commentsContainerRef.current) {
-            commentsContainerRef.current.scrollTo({
-              top: commentsContainerRef.current.scrollHeight,
-              behavior: 'smooth'
-            });
-          }
-        }, 100);
+        // Don't auto-scroll - let user stay where they are
       });
 
       // Listen for status updates
@@ -273,6 +323,15 @@ export function DesignViewer({
   useEffect(() => {
     setReviewStatus(initialStatus);
   }, [initialStatus]);
+
+  // Check if selected item is PDF and reset page when switching files
+  useEffect(() => {
+    const isPdf = checkIfPdf(selectedItem);
+    setIsPdfFile(isPdf);
+    setCurrentPdfPage(1); // Reset to page 1 when switching files
+    setAnnotationMode(false); // Exit annotation mode when switching files
+    setIsAddingAnnotation(false);
+  }, [selectedIndex, selectedItem.id]);
 
   // Check for author name and show welcome modal if needed
   useEffect(() => {
@@ -406,7 +465,8 @@ export function DesignViewer({
           content: newCommentText,
           type: isAddingAnnotation ? "annotation" : "comment",
           drawingData: drawingData || null,
-          canvasPosition: canvasPosition
+          canvasPosition: canvasPosition,
+          pdfPage: isPdfFile ? currentPdfPage : null
         }),
       });
 
@@ -423,7 +483,8 @@ export function DesignViewer({
           hasDrawing: !!savedComment.drawingData,
           drawingData: savedComment.drawingData,
           designItemId: savedComment.designItemId,
-          createdAt: savedComment.createdAt
+          createdAt: savedComment.createdAt,
+          pdfPage: savedComment.pdfPage || undefined
         };
 
         // Update state
@@ -432,15 +493,7 @@ export function DesignViewer({
           [selectedItem.id]: [...itemComments, newComment],
         });
 
-        // Auto-scroll to bottom after adding comment
-        setTimeout(() => {
-          if (commentsContainerRef.current) {
-            commentsContainerRef.current.scrollTo({
-              top: commentsContainerRef.current.scrollHeight,
-              behavior: 'smooth'
-            });
-          }
-        }, 100);
+        // Don't auto-scroll - let user stay where they are
 
         // Store drawing separately for overlay display
         if (drawingData) {
@@ -465,7 +518,8 @@ export function DesignViewer({
             designItemId: savedComment.designItemId,
             hasDrawing: hasDrawing,
             drawingData: drawingData || null,
-            canvasPosition: canvasPosition
+            canvasPosition: canvasPosition,
+            pdfPage: savedComment.pdfPage || null
           });
         }
 
@@ -501,12 +555,27 @@ export function DesignViewer({
   };
 
   const handleCommentClick = (comment: Comment) => {
+    console.log('Comment clicked:', comment.id, 'Has drawing:', comment.hasDrawing, 'PDF page:', comment.pdfPage);
+
     if (comment.hasDrawing) {
-      // Toggle viewing annotation on image
-      if (selectedComment === comment.id) {
-        setSelectedComment(null); // Hide annotation
+      // For PDF annotations, navigate to the correct page first
+      if (isPdfFile && comment.pdfPage && comment.pdfPage !== currentPdfPage) {
+        console.log('Navigating to PDF page:', comment.pdfPage, 'from current page:', currentPdfPage);
+        setCurrentPdfPage(comment.pdfPage);
+        // Small delay to ensure page loads before showing annotation
+        setTimeout(() => {
+          setSelectedComment(comment.id);
+          console.log('Selected comment after page navigation:', comment.id);
+        }, 100);
       } else {
-        setSelectedComment(comment.id); // Show annotation
+        // Toggle viewing annotation on image/PDF
+        if (selectedComment === comment.id) {
+          console.log('Hiding annotation for comment:', comment.id);
+          setSelectedComment(null); // Hide annotation
+        } else {
+          console.log('Showing annotation for comment:', comment.id);
+          setSelectedComment(comment.id); // Show annotation
+        }
       }
     } else {
       // For regular comments, just select/deselect
@@ -599,7 +668,9 @@ export function DesignViewer({
   };
 
   return (
-    <div className="h-full flex flex-col bg-[#1a1a1a]">
+    <div className="min-h-screen flex flex-col bg-[#1a1a1a]" style={{
+      overscrollBehavior: 'contain'
+    }}>
       {/* Thumbnails Row with Buttons */}
       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between p-4 lg:p-6 bg-[#1a1a1a] gap-4 lg:gap-0">
         {/* Thumbnails */}
@@ -612,17 +683,23 @@ export function DesignViewer({
               <button
                 onClick={() => setSelectedIndex(index)}
                 className={`w-24 h-16 lg:w-32 lg:h-20 rounded overflow-hidden border-2 transition-all ${selectedIndex === index
-                    ? "border-[#fdb913] ring-2 ring-[#fdb913]/50"
-                    : "border-neutral-700 hover:border-neutral-600"
+                  ? "border-[#fdb913] ring-2 ring-[#fdb913]/50"
+                  : "border-neutral-700 hover:border-neutral-600"
                   }`}
               >
-                <Image
-                  src={item.url || item.file_url || "/placeholder.svg"}
-                  alt={item.name || item.file_name || "Design file"}
-                  width={128}
-                  height={80}
-                  className="w-full h-full object-cover"
-                />
+                {item.url?.toLowerCase().endsWith('.pdf') ? (
+                  <div className="w-full h-full bg-neutral-800 flex items-center justify-center">
+                    <FileText className="w-8 h-8 text-neutral-400" />
+                  </div>
+                ) : (
+                  <Image
+                    src={item.url || item.file_url || "/placeholder.svg"}
+                    alt={item.name || item.file_name || "Design file"}
+                    width={128}
+                    height={80}
+                    className="w-full h-full object-cover"
+                  />
+                )}
               </button>
 
             </div>
@@ -642,122 +719,259 @@ export function DesignViewer({
               >
                 {isUpdatingStatus ? 'Updating...' : reviewStatus === 'APPROVED' ? 'Project Approved' : 'Approve Project'}
               </button>
-              <button
-                onClick={() => updateReviewStatus('REVISION_REQUESTED')}
-                disabled={isUpdatingStatus || reviewStatus === 'REVISION_REQUESTED' || reviewStatus === 'APPROVED'}
-                className="flex-1 lg:w-full px-4 lg:px-6 py-2.5 lg:py-3.5 bg-transparent border-2 border-yellow-500 text-yellow-500 font-bold rounded hover:bg-yellow-500 hover:text-black transition-all uppercase tracking-wide text-xs lg:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isUpdatingStatus ? 'Updating...' : reviewStatus === 'APPROVED' ? 'Cannot Request Revisions' : 'Request Revisions'}
-              </button>
+
             </div>
           </div>
         )}
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
-        {/* Image Display Area with Drawing Canvas */}
-        <div className="flex-1 bg-black flex items-center justify-center p-1 lg:p-2 overflow-hidden relative min-h-0 max-h-[calc(100vh-200px)] lg:max-h-[calc(100vh-120px)]">
-          <div className="relative w-full h-full flex items-center justify-center">
-            <Image
-              ref={imageRef}
-              src={selectedItem.url || selectedItem.file_url || "/placeholder.svg"}
-              alt={selectedItem.name || selectedItem.file_name || "Design file"}
-              width={1200}
-              height={900}
-              className="h-full w-auto object-contain"
-              style={{ maxWidth: '100%', maxHeight: '100%' }}
-              priority
-              onLoad={() => {
-                // Trigger size update when image loads
-                setTimeout(() => {
-                  if (imageRef.current) {
-                    const rect = imageRef.current.getBoundingClientRect();
-                    setImageSize({ width: rect.width, height: rect.height });
-                  }
-                }, 100);
-              }}
-            />
+      <div className="flex-1 flex flex-col lg:flex-row min-h-0" style={{ overscrollBehavior: 'contain' }}>
+        {/* Image/PDF Display Area with Drawing Canvas */}
+        <div className="flex-1 bg-black flex items-center justify-center p-1 lg:p-2 overflow-hidden relative min-h-0 max-h-[calc(100vh-200px)] lg:max-h-[calc(100vh-120px)]" style={{ overscrollBehavior: 'contain' }}>
+          {isPdfFile ? (
+            // PDF Viewer
+            <div className="relative w-full h-full">
+              {(() => {
+                try {
+                  return (
+                    <PDFViewerDynamic
+                      fileUrl={getAbsoluteUrl(selectedItem.url || selectedItem.file_url || "")}
+                      currentPage={currentPdfPage}
+                      onPageChange={(page) => {
+                        setCurrentPdfPage(page);
+                        setAnnotationMode(false); // Exit annotation mode when changing pages
+                        setIsAddingAnnotation(false);
+                      }}
+                      className="w-full h-full"
+                      enableAnnotations={annotationMode}
+                      annotationOverlay={
+                        annotationMode ? (
+                          <ReactSketchCanvas
+                            ref={canvasRef}
+                            strokeColor={strokeColor}
+                            strokeWidth={strokeWidth}
+                            canvasColor="transparent"
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              overscrollBehavior: 'contain',
+                              transform: 'translateZ(0)',
+                              backfaceVisibility: 'hidden',
+                              WebkitTransform: 'translateZ(0)',
+                              WebkitBackfaceVisibility: 'hidden'
+                            }}
+                          />
+                        ) : selectedComment && itemComments.find(c => c.id === selectedComment)?.hasDrawing && (
+                          (() => {
+                            const selectedCommentData = itemComments.find(c => c.id === selectedComment);
+                            if (!selectedCommentData) return null;
 
-            {/* Annotation Mode - Drawing Canvas */}
-            {annotationMode && (
-              <div className="absolute inset-0">
-                <ReactSketchCanvas
-                  ref={canvasRef}
-                  strokeColor={strokeColor}
-                  strokeWidth={strokeWidth}
-                  canvasColor="transparent"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                  }}
-                />
-              </div>
-            )}
+                            // Check if selected annotation is on current PDF page
+                            if (selectedCommentData.pdfPage && selectedCommentData.pdfPage !== currentPdfPage) {
+                              return null; // Don't show annotation if it's on a different page
+                            }
 
-            {/* View Mode - Show Selected Annotation Drawing on Image */}
-            {!annotationMode && selectedComment && itemComments.find(c => c.id === selectedComment)?.hasDrawing && (() => {
-              const selectedCommentData = itemComments.find(c => c.id === selectedComment);
-              if (!selectedCommentData?.canvasPosition) {
-                // Fallback to full overlay if no position data
-                return (
-                  <div className="absolute inset-0 pointer-events-none">
-                    <Image
-                      src={selectedCommentData?.drawingData || ""}
-                      alt="Selected Annotation Drawing"
-                      width={1200}
-                      height={900}
-                      className="h-full w-full object-contain opacity-90"
+                            const drawingData = selectedCommentData.drawingData || annotationDrawings[selectedCommentData.id];
+                            console.log('Showing selected annotation:', selectedCommentData.id, 'Drawing data available:', !!drawingData);
+
+                            if (!selectedCommentData.canvasPosition) {
+                              return (
+                                <div className="absolute inset-0 pointer-events-none">
+                                  <img
+                                    src={drawingData || ""}
+                                    alt={`Annotation by ${selectedCommentData.author}`}
+                                    className="h-full w-full object-contain"
+                                    style={{ maxWidth: '100%', maxHeight: '100%' }}
+                                    onError={(e) => {
+                                      console.error('Failed to load annotation image:', drawingData);
+                                      e.currentTarget.style.display = 'none';
+                                    }}
+                                    onLoad={() => {
+                                      console.log('Annotation image loaded successfully for comment:', selectedCommentData.id);
+                                    }}
+                                  />
+                                </div>
+                              );
+                            }
+
+                            const position = selectedCommentData.canvasPosition;
+                            return (
+                              <div
+                                className="absolute pointer-events-none"
+                                style={{
+                                  left: `${position.x * 100}%`,
+                                  top: `${position.y * 100}%`,
+                                  width: `${position.width * 100}%`,
+                                  height: `${position.height * 100}%`,
+                                }}
+                              >
+                                <img
+                                  src={drawingData || ""}
+                                  alt={`Annotation by ${selectedCommentData.author}`}
+                                  className="w-full h-full object-contain"
+                                  style={{ maxWidth: '100%', maxHeight: '100%' }}
+                                  onError={(e) => {
+                                    console.error('Failed to load positioned annotation image:', drawingData);
+                                    e.currentTarget.style.display = 'none';
+                                  }}
+                                  onLoad={() => {
+                                    console.log('Positioned annotation image loaded successfully for comment:', selectedCommentData.id);
+                                  }}
+                                />
+                              </div>
+                            );
+                          })()
+                        )
+                      }
                     />
-                  </div>
-                );
-              }
+                  );
+                } catch (error) {
+                  console.error('PDF Viewer Error:', error);
+                  return (
+                    <div className="flex flex-col items-center justify-center h-full bg-neutral-900 rounded-lg">
+                      <div className="text-red-400 text-4xl mb-3">⚠️</div>
+                      <p className="text-red-400 text-sm text-center">
+                        PDF Viewer Error: {error instanceof Error ? error.message : 'Unknown error'}
+                      </p>
+                    </div>
+                  );
+                }
+              })()}
 
-              // Use percentage-based positioning for responsive design
-              const position = selectedCommentData.canvasPosition;
 
-              return (
-                <div
-                  className="absolute pointer-events-none"
-                  style={{
-                    left: `${position.x * 100}%`,
-                    top: `${position.y * 100}%`,
-                    width: `${position.width * 100}%`,
-                    height: `${position.height * 100}%`,
-                  }}
-                >
-                  <Image
-                    src={selectedCommentData.drawingData || ""}
-                    alt="Selected Annotation Drawing"
-                    width={1200}
-                    height={900}
-                    className="w-full h-full object-contain opacity-90"
+
+              {/* Selected Annotation Badge for PDFs */}
+              {!annotationMode && selectedComment && itemComments.find(c => c.id === selectedComment)?.hasDrawing && (
+                <div className="absolute top-4 right-4 px-2 lg:px-4 py-1 lg:py-2 bg-[#fdb913] text-black rounded-lg font-bold text-xs lg:text-sm shadow-xl flex items-center gap-1 lg:gap-2 animate-pulse">
+                  <Pencil className="w-3 h-3 lg:w-4 lg:h-4" />
+                  <span>
+                    Showing annotation by {itemComments.find(c => c.id === selectedComment)?.author}
+                  </span>
+                  <button
+                    onClick={() => setSelectedComment(null)}
+                    className="ml-2 px-2 py-1 bg-black/20 hover:bg-black/40 rounded text-xs transition-colors"
+                    title="Hide annotation"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            // Image Viewer
+            <div className="relative w-full h-full flex items-center justify-center">
+              <Image
+                ref={imageRef}
+                src={selectedItem.url || selectedItem.file_url || "/placeholder.svg"}
+                alt={selectedItem.name || selectedItem.file_name || "Design file"}
+                width={1200}
+                height={900}
+                className="h-full w-auto object-contain"
+                style={{ maxWidth: '100%', maxHeight: '100%' }}
+                priority
+                onLoad={() => {
+                  // Trigger size update when image loads
+                  setTimeout(() => {
+                    if (imageRef.current) {
+                      const rect = imageRef.current.getBoundingClientRect();
+                      setImageSize({ width: rect.width, height: rect.height });
+                    }
+                  }, 100);
+                }}
+              />
+
+              {/* Annotation Mode - Drawing Canvas for Images */}
+              {annotationMode && (
+                <div className="absolute inset-0" style={{ overscrollBehavior: 'contain' }}>
+                  <ReactSketchCanvas
+                    ref={canvasRef}
+                    strokeColor={strokeColor}
+                    strokeWidth={strokeWidth}
+                    canvasColor="transparent"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      overscrollBehavior: 'contain',
+                      transform: 'translateZ(0)',
+                      backfaceVisibility: 'hidden',
+                      WebkitTransform: 'translateZ(0)',
+                      WebkitBackfaceVisibility: 'hidden'
+                    }}
                   />
                 </div>
-              );
-            })()}
+              )}
 
-            {/* Selected Annotation Badge */}
-            {!annotationMode && selectedComment && itemComments.find(c => c.id === selectedComment)?.hasDrawing && (
-              <div className="absolute top-2 left-2 lg:top-4 lg:left-4 px-2 lg:px-4 py-1 lg:py-2 bg-[#fdb913] text-black rounded-lg font-bold text-xs lg:text-sm shadow-xl flex items-center gap-1 lg:gap-2 animate-pulse">
-                <Pencil className="w-3 h-3 lg:w-4 lg:h-4" />
-                <span>
-                  Showing annotation by {itemComments.find(c => c.id === selectedComment)?.author}
-                </span>
-                <button
-                  onClick={() => setSelectedComment(null)}
-                  className="ml-2 px-2 py-1 bg-black/20 hover:bg-black/40 rounded text-xs transition-colors"
-                  title="Hide annotation"
-                >
-                  ✕
-                </button>
-              </div>
-            )}
-          </div>
+              {/* View Mode - Show Selected Annotation on Image */}
+              {!annotationMode && selectedComment && itemComments.find(c => c.id === selectedComment)?.hasDrawing && (
+                (() => {
+                  const selectedCommentData = itemComments.find(c => c.id === selectedComment);
+                  if (!selectedCommentData || selectedCommentData.pdfPage) return null; // Images don't have pdfPage
+
+                  const drawingData = selectedCommentData.drawingData || annotationDrawings[selectedCommentData.id];
+                  console.log('Showing selected image annotation:', selectedCommentData.id, 'Drawing data available:', !!drawingData);
+
+                  if (!selectedCommentData.canvasPosition) {
+                    return (
+                      <div className="absolute inset-0 pointer-events-none">
+                        <Image
+                          src={drawingData || ""}
+                          alt={`Annotation by ${selectedCommentData.author}`}
+                          width={1200}
+                          height={900}
+                          className="h-full w-full object-contain"
+                        />
+                      </div>
+                    );
+                  }
+
+                  // Use percentage-based positioning for responsive design
+                  const position = selectedCommentData.canvasPosition;
+
+                  return (
+                    <div
+                      className="absolute pointer-events-none"
+                      style={{
+                        left: `${position.x * 100}%`,
+                        top: `${position.y * 100}%`,
+                        width: `${position.width * 100}%`,
+                        height: `${position.height * 100}%`,
+                      }}
+                    >
+                      <Image
+                        src={drawingData || ""}
+                        alt={`Annotation by ${selectedCommentData.author}`}
+                        width={1200}
+                        height={900}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                  );
+                })()
+              )}
+
+              {/* Annotation Badge */}
+              {!annotationMode && selectedComment && itemComments.find(c => c.id === selectedComment)?.hasDrawing && (
+                <div className="absolute top-2 left-2 lg:top-4 lg:left-4 px-2 lg:px-4 py-1 lg:py-2 bg-[#fdb913] text-black rounded-lg font-bold text-xs lg:text-sm shadow-xl flex items-center gap-1 lg:gap-2">
+                  <Pencil className="w-3 h-3 lg:w-4 lg:h-4" />
+                  <span>
+                    Showing annotation by {itemComments.find(c => c.id === selectedComment)?.author}
+                  </span>
+                  <button
+                    onClick={() => setSelectedComment(null)}
+                    className="ml-2 px-2 py-1 bg-black/20 hover:bg-black/40 rounded text-xs transition-colors"
+                    title="Hide annotation"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right Sidebar - Comments & Annotations */}
-        <div className="w-full lg:w-96 bg-black border-t lg:border-t-0 lg:border-l border-neutral-800 flex flex-col overflow-hidden" style={{ maxHeight: 'calc(100vh - 120px)' }}>
+        <div className="w-full lg:w-96 bg-black border-t lg:border-t-0 lg:border-l border-neutral-800 flex flex-col" style={{ maxHeight: 'calc(100vh - 120px)', overscrollBehavior: 'contain' }}>
           {/* Section Header */}
           <div className="p-3 lg:p-4 border-b border-neutral-800 flex-shrink-0">
             <h3 className="text-base lg:text-lg font-bold text-white flex items-center gap-2">
@@ -772,8 +986,9 @@ export function DesignViewer({
             className="flex-1 overflow-y-auto p-3 lg:p-6 comments-scrollbar relative"
             style={{
               maxHeight: 'calc(100vh - 400px)',
-              scrollBehavior: 'smooth',
-              WebkitOverflowScrolling: 'touch'
+              scrollBehavior: 'auto',
+              WebkitOverflowScrolling: 'touch',
+              overscrollBehavior: 'contain'
             }}
             onScroll={(e) => {
               const container = e.target as HTMLDivElement;
@@ -788,22 +1003,22 @@ export function DesignViewer({
                   <div
                     key={comment.id}
                     className={`cursor-pointer transition-all ${comment.type === "annotation"
-                        ? `p-2 lg:p-3 rounded-lg ${selectedComment === comment.id
-                          ? "bg-[#fdb913]/30 border-2 border-[#fdb913]"
-                          : "bg-[#fdb913]/10 border border-[#fdb913]/30"
-                        } hover:bg-[#fdb913]/20`
-                        : `p-2 rounded ${selectedComment === comment.id
-                          ? "bg-neutral-800 border border-neutral-600"
-                          : "hover:bg-neutral-900/50"
-                        }`
+                      ? `p-2 lg:p-3 rounded-lg ${selectedComment === comment.id
+                        ? "bg-[#fdb913]/30 border-2 border-[#fdb913]"
+                        : "bg-[#fdb913]/10 border border-[#fdb913]/30"
+                      } hover:bg-[#fdb913]/20`
+                      : `p-2 rounded ${selectedComment === comment.id
+                        ? "bg-neutral-800 border border-neutral-600"
+                        : "hover:bg-neutral-900/50"
+                      }`
                       }`}
                     onClick={() => handleCommentClick(comment)}
                   >
                     <div className="flex gap-2 lg:gap-3">
                       <div
                         className={`w-8 h-8 lg:w-10 lg:h-10 rounded-full flex items-center justify-center text-white font-bold text-xs lg:text-sm flex-shrink-0 ${comment.type === "annotation"
-                            ? "bg-gradient-to-br from-[#fdb913] to-orange-500"
-                            : "bg-gradient-to-br from-purple-500 to-pink-500"
+                          ? "bg-gradient-to-br from-[#fdb913] to-orange-500"
+                          : "bg-gradient-to-br from-purple-500 to-pink-500"
                           }`}
                       >
                         {comment.type === "annotation"
@@ -818,6 +1033,11 @@ export function DesignViewer({
                           {comment.type === "annotation" && (
                             <span className="px-1.5 lg:px-2 py-0.5 bg-[#fdb913]/20 text-[#fdb913] text-xs rounded font-semibold">
                               Annotation
+                            </span>
+                          )}
+                          {comment.pdfPage && (
+                            <span className="px-1.5 lg:px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded font-semibold">
+                              Page {comment.pdfPage}
                             </span>
                           )}
                           <span className="text-neutral-500 text-xs">
@@ -885,11 +1105,11 @@ export function DesignViewer({
                 </div>
               </div>
             )}
- 
+
           </div>
 
           {/* Add Comment/Annotation Input - WeTransfer Style with Custom Icons */}
-          <div className="p-3 lg:p-4 border-t border-neutral-800 space-y-2 lg:space-y-3 flex-shrink-0 bg-black">
+          <div className="p-3 lg:p-4 border-t border-neutral-800 space-y-2 lg:space-y-3 flex-shrink-0 bg-black" style={{ overscrollBehavior: 'contain' }}>
             {/* Approved Status Message */}
             {reviewStatus === 'APPROVED' && (
               <div className="bg-green-500/20 border border-green-500/50 rounded-lg p-4 text-center">
@@ -939,8 +1159,8 @@ export function DesignViewer({
                 )}
 
                 {/* Name Display */}
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 flex items-center gap-2 lg:gap-3 px-3 lg:px-4 py-2 lg:py-2.5 bg-neutral-900/50 rounded-lg border border-neutral-700">
+                <div className="flex items-center gap-2" style={{ overscrollBehavior: 'contain' }}>
+                  <div className="flex-1 flex items-center gap-2 lg:gap-3 px-3 lg:px-4 py-2 lg:py-2.5 bg-neutral-900/50 rounded-lg border border-neutral-700" style={{ overscrollBehavior: 'contain' }}>
                     <div className="w-6 h-6 lg:w-8 lg:h-8 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center flex-shrink-0">
                       <PenTool className="w-3 h-3 lg:w-4 lg:h-4 text-white" />
                     </div>
@@ -958,9 +1178,9 @@ export function DesignViewer({
                 </div>
 
                 {/* Comment Input Box - WeTransfer Style */}
-                <div className="bg-neutral-800 rounded-lg border border-neutral-700 p-2 lg:p-3">
+                <div className="bg-neutral-800 rounded-lg border border-neutral-700 p-2 lg:p-3" style={{ overscrollBehavior: 'contain' }}>
                   {/* Annotation Controls Row - WeTransfer Style */}
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-2 mb-2" style={{ overscrollBehavior: 'contain' }}>
                     {/* Color Swatches - Only show when annotation mode is active */}
                     {isAddingAnnotation && (
                       <div className="flex items-center gap-1">
@@ -969,8 +1189,8 @@ export function DesignViewer({
                             key={c}
                             onClick={() => setStrokeColor(c)}
                             className={`w-3 h-3 lg:w-4 lg:h-4 rounded-full border transition-transform hover:scale-110 ${strokeColor === c
-                                ? "border-white scale-110"
-                                : "border-transparent"
+                              ? "border-white scale-110"
+                              : "border-transparent"
                               }`}
                             style={{ backgroundColor: c }}
                             title={`Select ${c} color`}
@@ -993,10 +1213,10 @@ export function DesignViewer({
                         }}
                         disabled={reviewStatus === 'APPROVED'}
                         className={`p-1 lg:p-1.5 rounded transition-colors ${isAddingAnnotation
-                            ? "bg-red-600 text-white hover:bg-red-700"
-                            : reviewStatus === 'APPROVED'
-                              ? "bg-neutral-800 text-neutral-500 cursor-not-allowed"
-                              : "bg-neutral-700 text-white hover:bg-neutral-600"
+                          ? "bg-red-600 text-white hover:bg-red-700"
+                          : reviewStatus === 'APPROVED'
+                            ? "bg-neutral-800 text-neutral-500 cursor-not-allowed"
+                            : "bg-neutral-700 text-white hover:bg-neutral-600"
                           }`}
                         title={
                           reviewStatus === 'APPROVED'
@@ -1026,10 +1246,10 @@ export function DesignViewer({
                         }}
                         disabled={reviewStatus === 'APPROVED'}
                         className={`p-1 lg:p-1.5 rounded transition-colors ${isAddingAnnotation
-                            ? "bg-red-600 text-white hover:bg-red-700"
-                            : reviewStatus === 'APPROVED'
-                              ? "bg-neutral-800 text-neutral-500 cursor-not-allowed"
-                              : "bg-neutral-700 text-red-500 hover:bg-neutral-600 hover:text-red-400"
+                          ? "bg-red-600 text-white hover:bg-red-700"
+                          : reviewStatus === 'APPROVED'
+                            ? "bg-neutral-800 text-neutral-500 cursor-not-allowed"
+                            : "bg-neutral-700 text-red-500 hover:bg-neutral-600 hover:text-red-400"
                           }`}
                         title={
                           reviewStatus === 'APPROVED'
@@ -1097,11 +1317,26 @@ export function DesignViewer({
                     disabled={reviewStatus === 'APPROVED'}
                     className={`w-full bg-transparent text-white text-xs lg:text-sm outline-none placeholder:text-neutral-500 resize-none ${reviewStatus === 'APPROVED' ? 'cursor-not-allowed opacity-50' : ''
                       }`}
+                    style={{
+                      overscrollBehavior: 'contain',
+                      transform: 'translateZ(0)',
+                      backfaceVisibility: 'hidden',
+                      WebkitTransform: 'translateZ(0)',
+                      WebkitBackfaceVisibility: 'hidden'
+                    }}
+                    onFocus={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onBlur={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
                   />
                 </div>
 
                 {/* Action Buttons - WeTransfer Style */}
-                <div className="flex gap-2">
+                <div className="flex gap-2" style={{ overscrollBehavior: 'contain' }}>
                   <button
                     onClick={() => {
                       setIsAddingAnnotation(false);
@@ -1118,12 +1353,12 @@ export function DesignViewer({
                     className="ml-auto px-3 lg:px-4 py-1.5 lg:py-2 bg-[#fdb913] text-black font-bold rounded hover:bg-[#e5a711] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-xs lg:text-sm flex items-center gap-2"
                   >
                     {isSubmittingComment && <Loader2 className="w-3 h-3 lg:w-4 lg:h-4 animate-spin" />}
-                    {isSubmittingComment 
-                      ? "Submitting..." 
-                      : reviewStatus === 'APPROVED' 
-                        ? "Disabled" 
-                        : isAddingAnnotation 
-                          ? "Add Annotation" 
+                    {isSubmittingComment
+                      ? "Submitting..."
+                      : reviewStatus === 'APPROVED'
+                        ? "Disabled"
+                        : isAddingAnnotation
+                          ? "Add Annotation"
                           : "Add"
                     }
                   </button>

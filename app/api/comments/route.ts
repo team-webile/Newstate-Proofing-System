@@ -34,7 +34,8 @@ export async function POST(request: NextRequest) {
       content, 
       type, 
       drawingData, 
-      canvasPosition 
+      canvasPosition,
+      pdfPage 
     } = await request.json()
 
     if (!designItemId || !author || !content) {
@@ -53,7 +54,8 @@ export async function POST(request: NextRequest) {
         canvasWidth: canvasPosition?.width || null,
         canvasHeight: canvasPosition?.height || null,
         imageWidth: canvasPosition?.imageWidth || null,
-        imageHeight: canvasPosition?.imageHeight || null
+        imageHeight: canvasPosition?.imageHeight || null,
+        pdfPage: pdfPage || null
       }
     })
 

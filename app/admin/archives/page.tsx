@@ -286,45 +286,7 @@ export default function ArchivesPage() {
                       <CardTitle className="text-white text-base sm:text-lg group-hover:text-brand-yellow transition-colors truncate">{project.name}</CardTitle>
                       <CardDescription className="text-neutral-400 font-mono text-xs sm:text-sm truncate">{project.projectNumber}</CardDescription>
           </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0 text-neutral-400 hover:text-brand-yellow hover:bg-neutral-800">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent className="bg-neutral-900 border-neutral-700">
-                        <DropdownMenuItem 
-                          onClick={() => router.push(`/admin/project/${project.id}`)}
-                          className="text-neutral-300 hover:bg-neutral-800 hover:text-brand-yellow focus:bg-neutral-800 focus:text-brand-yellow"
-                        >
-                          <Eye className="h-4 w-4 mr-2" />
-                          View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={() => router.push(`/admin/project/${project.id}/edit`)}
-                          className="text-neutral-300 hover:bg-neutral-800 hover:text-brand-yellow focus:bg-neutral-800 focus:text-brand-yellow"
-                        >
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit Project
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={() => toggleArchiveStatus(project.id, project.archived)}
-                          className="text-neutral-300 hover:bg-neutral-800 hover:text-brand-yellow focus:bg-neutral-800 focus:text-brand-yellow"
-                        >
-                          {project.archived ? (
-                            <>
-                              <ArchiveX className="h-4 w-4 mr-2" />
-                              Unarchive Project
-                            </>
-                          ) : (
-                            <>
-                              <Archive className="h-4 w-4 mr-2" />
-                              Archive Project
-                            </>
-                          )}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                     
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3 sm:space-y-4">

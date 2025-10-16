@@ -160,4 +160,153 @@
   .comments-scrollbar::-webkit-scrollbar-thumb:active {
     background: #f3f4f6;
   }
+  
+  /* PDF Viewer Styles */
+  .pdf-document {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .pdf-page canvas {
+    max-width: 100%;
+    height: auto !important;
+  }
+  
+  .react-pdf__Page {
+    position: relative;
+  }
+  
+  .react-pdf__Page__canvas {
+    margin: 0 auto;
+    display: block;
+  }
+  
+  .react-pdf__Page__textContent {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow: hidden;
+    opacity: 0.2;
+    line-height: 1;
+  }
+  
+  .react-pdf__Page__textContent span {
+    position: absolute;
+    white-space: pre;
+    cursor: text;
+    transform-origin: 0% 0%;
+  }
+  
+  .react-pdf__Page__annotations {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+  }
+}
+
+/* Prevent page jerk on actions */
+html, body {
+  overscroll-behavior: contain;
+  scroll-behavior: auto;
+  overflow-x: hidden;
+}
+
+* {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* PDF Viewer specific fixes */
+.pdf-document {
+  overscroll-behavior: contain;
+}
+
+.pdf-page {
+  overscroll-behavior: contain;
+}
+
+.react-pdf__Page {
+  overscroll-behavior: contain;
+}
+
+.react-pdf__Page__canvas {
+  overscroll-behavior: contain;
+}
+
+/* Textarea and input fixes */
+textarea, input {
+  overscroll-behavior: contain;
+  scroll-behavior: auto;
+}
+
+textarea:focus, input:focus {
+  overscroll-behavior: contain;
+  outline: none;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* Prevent input focus from causing page jump */
+textarea, input {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: text;
+  -khtml-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+/* Prevent keyboard from moving viewport */
+@supports (-webkit-touch-callout: none) {
+  .ios-keyboard-fix {
+    position: fixed;
+    height: 100vh;
+    overflow: hidden;
+  }
+}
+
+/* Canvas and drawing fixes */
+canvas {
+  overscroll-behavior: contain;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  touch-action: none;
+}
+
+/* React Sketch Canvas specific */
+.react-sketch-canvas {
+  overscroll-behavior: contain !important;
+  transform: translateZ(0) !important;
+  backface-visibility: hidden !important;
+  -webkit-transform: translateZ(0) !important;
+  -webkit-backface-visibility: hidden !important;
+  touch-action: none !important;
+}
+
+.react-sketch-canvas canvas {
+  overscroll-behavior: contain !important;
+  transform: translateZ(0) !important;
+  backface-visibility: hidden !important;
+  -webkit-transform: translateZ(0) !important;
+  -webkit-backface-visibility: hidden !important;
+  touch-action: none !important;
+}
+
+/* Ensure page can scroll to show footer */
+body {
+  min-height: 100vh;
+}
+
+/* Smooth scrolling for better UX */
+html {
+  scroll-behavior: smooth;
 }

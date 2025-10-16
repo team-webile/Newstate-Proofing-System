@@ -231,15 +231,18 @@ export default function ProjectDetailsPage() {
         {/* Upload Section */}
         <div className="bg-[#1a1d26] rounded-lg border-2 border-dashed border-neutral-700 p-6 sm:p-8 lg:p-12 mb-6 sm:mb-8">
           <div className="text-center">
-            <p className="text-neutral-400 mb-4 text-sm sm:text-base px-2">
+            <p className="text-neutral-400 mb-2 text-sm sm:text-base px-2">
               <span className="font-semibold">Drag & drop</span> some files from your computer or hit the button below
+            </p>
+            <p className="text-neutral-500 text-xs mb-4">
+              Supported: JPG, PNG, GIF, PDF, PSD, AI, EPS
             </p>
             <input
               type="file"
               id="file-upload"
               onChange={handleFileUpload}
               className="hidden"
-              accept="image/*,.pdf,.psd,.ai,.eps"
+              accept="image/*,application/pdf,.pdf,.psd,.ai,.eps"
             />
             <label
               htmlFor="file-upload"
@@ -265,22 +268,41 @@ export default function ProjectDetailsPage() {
         {/* Files Grid */}
         {designItems.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-            {designItems.map((item) => (
+            {designItems.map((item) => {
+              const isPdf = item.fileName?.toLowerCase().endsWith('.pdf') || 
+                           item.fileType?.toLowerCase().includes('pdf') ||
+                           item.url?.toLowerCase().endsWith('.pdf');
+              
+              return (
               <div
                 key={item.id}
                 className="aspect-square bg-neutral-900 rounded-lg overflow-hidden border border-neutral-800 hover:border-brand-yellow transition-all group relative"
               >
-                <Image
-                  src={item.url || "/placeholder.svg"}
-                  alt={item.fileName}
-                  width={300}       
-                  height={300}
-                  className="w-full h-full object-cover"
-                />
+                {isPdf ? (
+                  // PDF Thumbnail
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-red-900/20 to-red-700/10">
+                    <div className="text-6xl sm:text-7xl mb-2">📄</div>
+                    <div className="px-4 py-2 bg-red-600/20 border border-red-500/30 rounded-lg">
+                      <span className="text-red-400 font-bold text-sm uppercase tracking-wider">PDF</span>
+                    </div>
+                  </div>
+                ) : (
+                  // Image Thumbnail
+                  <Image
+                    src={item.url || "/placeholder.svg"}
+                    alt={item.fileName}
+                    width={300}       
+                    height={300}
+                    className="w-full h-full object-cover"
+                  />
+                )}
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-3 sm:p-4">
                   <p className="text-white text-xs sm:text-sm font-semibold truncate">
                     {item.fileName}
                   </p>
+                  {isPdf && (
+                    <p className="text-red-400 text-xs mt-1">PDF Document</p>
+                  )}
                 </div>
                 {/* Mobile: Always visible buttons, Desktop: Show on hover */}
                 <div className="absolute top-2 right-2 sm:inset-0 sm:bg-black/50 sm:opacity-0 sm:group-hover:opacity-100 sm:transition-opacity flex flex-row sm:flex-row items-start sm:items-center justify-end sm:justify-center gap-2 p-2 sm:p-3">
@@ -303,7 +325,8 @@ export default function ProjectDetailsPage() {
                    </button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="text-center py-8 sm:py-12 lg:py-16">
