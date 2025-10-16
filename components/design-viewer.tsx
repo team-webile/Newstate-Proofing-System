@@ -487,10 +487,10 @@ export function DesignViewer({
           pdfPage: savedComment.pdfPage || undefined
         };
 
-        // Update state
+        // Update state - use allItemComments to preserve comments from all pages
         setComments({
           ...comments,
-          [selectedItem.id]: [...itemComments, newComment],
+          [selectedItem.id]: [...allItemComments, newComment],
         });
 
         // Don't auto-scroll - let user stay where they are
