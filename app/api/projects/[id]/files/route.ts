@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { writeFile, mkdir, unlink, readdir, stat } from 'fs/promises'
-import { join } from 'path'
 import { randomUUID } from 'crypto'
 import { getProjectById, createDesignItem, getDesignItemsByReviewId, deleteDesignItem, getReviewsByProjectId, createReview } from '@/lib/db'
 
@@ -33,19 +31,33 @@ export async function POST(
       }, { status: 404 })
     }
 
-    // Create upload directory in public folder
-    const uploadDir = join(process.cwd(), 'public', 'uploads', 'projects', projectId.toString())
-    await mkdir(uploadDir, { recursive: true })
-
     // Generate unique filename
     const fileExtension = file.name.split('.').pop()
     const filename = `${randomUUID()}.${fileExtension}`
-    const filePath = join(uploadDir, filename)
+    const bunnyFilePath = `projects/${projectId}/${filename}`
 
-    // Save file
-    const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
-    await writeFile(filePath, buffer)
+    // Upload to Bunny CDN
+    const arrayBuffer = await file.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
+
+    const uploadUrl = `https://${process.env.BUNNY_STORAGE_HOSTNAME}/${process.env.BUNNY_STORAGE_ZONE_NAME}/${bunnyFilePath}`
+
+    const uploadResponse = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'AccessKey': process.env.BUNNY_ACCESS_KEY || '',
+        'Content-Type': file.type || 'application/octet-stream',
+      },
+      body: buffer,
+    })
+
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text()
+      throw new Error(`Bunny CDN upload failed: ${errorText}`)
+    }
+
+    // CDN URL for the uploaded file
+    const cdnUrl = `https://${process.env.BUNNY_CDN_HOSTNAME}/${bunnyFilePath}`
 
     // Create a review if none exists
     let reviewId = null
@@ -66,7 +78,7 @@ export async function POST(
     const designItem = await createDesignItem({
       reviewId: reviewId,
       fileName: file.name,
-      fileUrl: `/uploads/projects/${projectId}/${filename}`,
+      fileUrl: cdnUrl,
       fileType: file.type,
       fileSize: file.size
     })
@@ -77,7 +89,7 @@ export async function POST(
       data: {
         id: designItem.id,
         name: file.name,
-        url: `/uploads/projects/${projectId}/${filename}`,
+        url: cdnUrl,
         type: file.type,
         size: file.size,
         uploadedAt: new Date().toISOString()
@@ -188,13 +200,28 @@ export async function DELETE(
       }, { status: 404 })
     }
 
-    // Delete file from filesystem
-    const filePath = join(process.cwd(), 'public', designItem.fileUrl)
+    // Delete file from Bunny CDN
     try {
-      await unlink(filePath)
+      // Extract the file path from the CDN URL
+      const cdnHostname = process.env.BUNNY_CDN_HOSTNAME || ''
+      const filePath = designItem.fileUrl.replace(`https://${cdnHostname}/`, '')
+      
+      const deleteUrl = `https://${process.env.BUNNY_STORAGE_HOSTNAME}/${process.env.BUNNY_STORAGE_ZONE_NAME}/${filePath}`
+
+      const deleteResponse = await fetch(deleteUrl, {
+        method: 'DELETE',
+        headers: {
+          'AccessKey': process.env.BUNNY_ACCESS_KEY || '',
+        },
+      })
+
+      if (!deleteResponse.ok) {
+        console.warn('Failed to delete file from Bunny CDN:', await deleteResponse.text())
+        // Continue with database deletion even if CDN deletion fails
+      }
     } catch (fileError) {
-      console.warn('File not found on filesystem:', fileError)
-      // Continue with database deletion even if file doesn't exist
+      console.warn('Error deleting file from Bunny CDN:', fileError)
+      // Continue with database deletion even if file deletion fails
     }
 
     // Delete from database

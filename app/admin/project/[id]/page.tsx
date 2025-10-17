@@ -46,6 +46,7 @@ export default function ProjectDetailsPage() {
   const [designItems, setDesignItems] = useState<DesignItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isUploading, setIsUploading] = useState(false)
+  const [deletingFileId, setDeletingFileId] = useState<number | null>(null)
 
   useEffect(() => {
     loadProjectData()
@@ -116,6 +117,7 @@ export default function ProjectDetailsPage() {
   }
 
   const handleDeleteFile = async (fileId: number) => {
+    setDeletingFileId(fileId)
     try {
       const response = await fetch(`/api/projects/${projectId}/files?fileId=${fileId}`, {
         method: 'DELETE',
@@ -130,6 +132,8 @@ export default function ProjectDetailsPage() {
     } catch (error) {
       console.error('Error deleting file:', error)
       toast.error('Failed to delete file')
+    } finally {
+      setDeletingFileId(null)
     }
   }
 
@@ -318,10 +322,17 @@ export default function ProjectDetailsPage() {
                   )}
                   <button
                     onClick={() => handleDeleteFile(item.id)}
-                    className="px-2 py-1.5 sm:px-3 sm:py-2 bg-red-600 text-white rounded font-semibold hover:bg-red-700 transition-colors sm:w-full flex items-center justify-center gap-1"
+                    disabled={deletingFileId === item.id}
+                    className={`px-2 py-1.5 sm:px-3 sm:py-2 bg-red-600 text-white rounded font-semibold hover:bg-red-700 transition-colors sm:w-full flex items-center justify-center gap-1 ${
+                      deletingFileId === item.id ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
                     title="Delete file"
                   >
-                    <Trash className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    {deletingFileId === item.id ? (
+                      <div className="animate-spin rounded-full h-3.5 w-3.5 sm:h-4 sm:w-4 border-2 border-white border-t-transparent"></div>
+                    ) : (
+                      <Trash className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    )}
                    </button>
                 </div>
               </div>
