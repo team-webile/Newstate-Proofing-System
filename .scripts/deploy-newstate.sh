@@ -23,6 +23,6 @@ echo "Building application..."
 /root/.nvm/versions/node/v18.20.8/bin/npm run build --ignore-engines
 
 # Restart the PM2 process
-pm2 restart newstate-portal
+pm2 restart client-proofing
 
 echo "Deployment finished!"
