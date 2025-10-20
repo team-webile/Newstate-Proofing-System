@@ -1,0 +1,25 @@
+name: Deploy to NewState Branding
+
+# Trigger the workflow on push and pull request events on the production branch
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+      
+# Authenticate to the server via ssh and run our deployment script 
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Deploy to NewState Branding Server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.FLK_HOST }}
+          username: ${{ secrets.FLK_USERNAME }}
+          port: ${{ secrets.FLK_PORT }}
+          key: ${{ secrets.FLK_SSH_KEY }}
+          script: "cd /var/www/vhosts/newstatebranding.com/portal.newstatebranding.com && chmod 777 ./.scripts/deploy-newstate.sh && ./.scripts/deploy-newstate.sh"
