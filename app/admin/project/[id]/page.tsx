@@ -48,11 +48,30 @@ export default function ProjectDetailsPage() {
   const [isUploading, setIsUploading] = useState(false)
   const [deletingFileId, setDeletingFileId] = useState<number | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [filesPerPage] = useState(12) // Show 12 files per page
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filteredFiles, setFilteredFiles] = useState<DesignItem[]>([])
 
   useEffect(() => {
     loadProjectData()
     loadFiles()
   }, [projectId])
+
+  // Filter files based on search term
+  useEffect(() => {
+    if (searchTerm.trim() === '') {
+      setFilteredFiles(designItems)
+    } else {
+      const filtered = designItems.filter(item => 
+        item.fileName.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+      setFilteredFiles(filtered)
+    }
+    setCurrentPage(1) // Reset to first page when filtering
+  }, [designItems, searchTerm])
 
   const loadProjectData = async () => {
     try {
@@ -347,11 +366,14 @@ export default function ProjectDetailsPage() {
             )}
           </div>
         </div>
-
+ 
         {/* Files Grid */}
-        {designItems.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-            {designItems.map((item) => {
+        {filteredFiles.length > 0 ? (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+              {filteredFiles
+                .slice((currentPage - 1) * filesPerPage, currentPage * filesPerPage)
+                .map((item) => {
               const isPdf = item.fileName?.toLowerCase().endsWith('.pdf') || 
                            item.fileType?.toLowerCase().includes('pdf') ||
                            item.url?.toLowerCase().endsWith('.pdf');
@@ -377,6 +399,9 @@ export default function ProjectDetailsPage() {
                     width={300}       
                     height={300}
                     className="w-full h-full object-contain"
+                    loading="lazy"
+                    placeholder="blur"
+                    blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
                   />
                 )}
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-3 sm:p-4">
@@ -417,6 +442,70 @@ export default function ProjectDetailsPage() {
               </div>
               );
             })}
+            </div>
+            
+            {/* Pagination Controls */}
+            {filteredFiles.length > filesPerPage && (
+              <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="text-sm text-neutral-400">
+                  Page {currentPage} of {Math.ceil(filteredFiles.length / filesPerPage)}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-2 bg-neutral-800 text-white rounded hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <div className="flex gap-1">
+                    {Array.from({ length: Math.ceil(filteredFiles.length / filesPerPage) }, (_, i) => i + 1)
+                      .filter(page => {
+                        const totalPages = Math.ceil(filteredFiles.length / filesPerPage)
+                        return page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1
+                      })
+                      .map((page, index, array) => (
+                        <div key={page} className="flex items-center">
+                          {index > 0 && array[index - 1] !== page - 1 && <span className="px-2 text-neutral-500">...</span>}
+                          <button
+                            onClick={() => setCurrentPage(page)}
+                            className={`px-3 py-2 rounded transition-colors ${
+                              currentPage === page
+                                ? 'bg-brand-yellow text-black font-semibold'
+                                : 'bg-neutral-800 text-white hover:bg-neutral-700'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(filteredFiles.length / filesPerPage)))}
+                    disabled={currentPage === Math.ceil(filteredFiles.length / filesPerPage)}
+                    className="px-3 py-2 bg-neutral-800 text-white rounded hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        ) : designItems.length > 0 ? (
+          <div className="text-center py-8">
+            <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-8 max-w-md mx-auto">
+              <div className="text-4xl mb-4">🔍</div>
+              <h3 className="text-lg font-semibold text-white mb-2">No files found</h3>
+              <p className="text-sm text-neutral-400 mb-4">
+                No files match your search criteria
+              </p>
+              <button
+                onClick={() => setSearchTerm('')}
+                className="px-4 py-2 bg-brand-yellow text-black rounded font-semibold hover:bg-yellow-500 transition-colors"
+              >
+                Clear Search
+              </button>
+            </div>
           </div>
         ) : (
           <div className="text-center py-8 sm:py-12 lg:py-16">
