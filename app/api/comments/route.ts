@@ -95,6 +95,7 @@ export async function POST(request: NextRequest) {
     // Send email notifications asynchronously (don't block response)
     let emailError = null
     let emailSentTo = null
+    let emailSuccess = false
     
     // Process email notifications in background with retry logic
     setImmediate(async () => {
@@ -127,7 +128,12 @@ export async function POST(request: NextRequest) {
               commentType: type || 'comment'
             }
             const emailResult = await processEmailNotification(notificationData, true) // true = admin notification
-            if (!emailResult.success) {
+            if (emailResult.success) {
+              emailSuccess = true
+              emailSentTo = 'admin'
+              console.log('✅ Admin notification sent successfully')
+            } else {
+              emailError = emailResult.error
               console.error('❌ Admin notification failed:', emailResult.error)
               console.error('❌ Error details:', emailResult.details)
             }
@@ -145,7 +151,12 @@ export async function POST(request: NextRequest) {
               commentType: type || 'comment'
             }
             const emailResult = await processEmailNotification(notificationData, false) // false = client notification
-            if (!emailResult.success) {
+            if (emailResult.success) {
+              emailSuccess = true
+              emailSentTo = recipientEmail
+              console.log('✅ Client notification sent successfully')
+            } else {
+              emailError = emailResult.error
               console.error('❌ Client notification failed:', emailResult.error)
               console.error('❌ Error details:', emailResult.details)
             }
@@ -160,10 +171,12 @@ export async function POST(request: NextRequest) {
       ...comment,
       emailError: emailError,
       emailSentTo: emailSentTo,
+      emailSuccess: emailSuccess,
       emailDetails: {
-        success: !emailError,
+        success: emailSuccess,
         error: emailError,
-        sentTo: emailSentTo
+        sentTo: emailSentTo,
+        message: emailSuccess ? 'Email sent successfully' : (emailError || 'Email not sent')
       }
     })
   } catch (error) {
