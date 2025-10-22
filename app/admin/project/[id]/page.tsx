@@ -47,6 +47,7 @@ export default function ProjectDetailsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isUploading, setIsUploading] = useState(false)
   const [deletingFileId, setDeletingFileId] = useState<number | null>(null)
+  const [isDragOver, setIsDragOver] = useState(false)
 
   useEffect(() => {
     loadProjectData()
@@ -88,32 +89,88 @@ export default function ProjectDetailsPage() {
   }
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
+    const files = event.target.files
+    if (!files || files.length === 0) return
 
     setIsUploading(true)
+    let successCount = 0
+    let errorCount = 0
+
     try {
-      const formData = new FormData()
-      formData.append('file', file)
+      // Upload files one by one
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        const formData = new FormData()
+        formData.append('file', file)
 
-      const response = await fetch(`/api/projects/${projectId}/files`, {
-        method: 'POST',
-        body: formData,
-      })
+        try {
+          const response = await fetch(`/api/projects/${projectId}/files`, {
+            method: 'POST',
+            body: formData,
+          })
 
-      if (response.ok) {
-        toast.success('File uploaded successfully!')
-        await loadFiles() // Reload files
-        await loadProjectData() // Reload project data including reviews to show share link
-      } else {
-        toast.error('Failed to upload file')
+          if (response.ok) {
+            successCount++
+          } else {
+            errorCount++
+            console.error(`Failed to upload ${file.name}`)
+          }
+        } catch (error) {
+          errorCount++
+          console.error(`Error uploading ${file.name}:`, error)
+        }
       }
+
+      // Show results
+      if (successCount > 0 && errorCount === 0) {
+        toast.success(`${successCount} file(s) uploaded successfully!`)
+      } else if (successCount > 0 && errorCount > 0) {
+        toast.success(`${successCount} file(s) uploaded, ${errorCount} failed`)
+      } else {
+        toast.error('Failed to upload files')
+      }
+
+      // Reload files and project data
+      await loadFiles()
+      await loadProjectData()
     } catch (error) {
-      console.error('Error uploading file:', error)
-      toast.error('Failed to upload file')
+      console.error('Error uploading files:', error)
+      toast.error('Failed to upload files')
     } finally {
       setIsUploading(false)
+      // Reset file input
+      if (event.target) {
+        event.target.value = ''
+      }
     }
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+    
+    const files = Array.from(e.dataTransfer.files)
+    if (files.length === 0) return
+
+    // Create a fake event to reuse the upload handler
+    const fakeEvent = {
+      target: {
+        files: files,
+        value: ''
+      }
+    } as unknown as React.ChangeEvent<HTMLInputElement>
+
+    handleFileUpload(fakeEvent)
   }
 
   const handleDeleteFile = async (fileId: number) => {
@@ -233,27 +290,48 @@ export default function ProjectDetailsPage() {
         </div>
 
         {/* Upload Section */}
-        <div className="bg-[#1a1d26] rounded-lg border-2 border-dashed border-neutral-700 p-6 sm:p-8 lg:p-12 mb-6 sm:mb-8">
+        <div 
+          className={`bg-[#1a1d26] rounded-lg border-2 border-dashed p-6 sm:p-8 lg:p-12 mb-6 sm:mb-8 transition-colors ${
+            isDragOver 
+              ? 'border-[#fdb913] bg-[#fdb913]/10' 
+              : 'border-neutral-700'
+          }`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
           <div className="text-center">
-            <p className="text-neutral-400 mb-2 text-sm sm:text-base px-2">
-              <span className="font-semibold">Drag & drop</span> some files from your computer or hit the button below
-            </p>
-            <p className="text-neutral-500 text-xs mb-4">
-              Supported: JPG, PNG, GIF, PDF, PSD, AI, EPS
-            </p>
+            {isDragOver ? (
+              <div className="mb-4">
+                <div className="text-4xl mb-2">📁</div>
+                <p className="text-[#fdb913] font-semibold text-lg">Drop files here!</p>
+                <p className="text-neutral-400 text-sm">Release to upload multiple files</p>
+              </div>
+            ) : (
+              <>
+                <p className="text-neutral-400 mb-2 text-sm sm:text-base px-2">
+                  <span className="font-semibold">Drag & drop</span> multiple files from your computer or hit the button below
+                </p>
+                <p className="text-neutral-500 text-xs mb-4">
+                  Supported: JPG, PNG, GIF, PDF, PSD, AI, EPS
+                </p>
+              </>
+            )}
             <input
               type="file"
               id="file-upload"
               onChange={handleFileUpload}
               className="hidden"
               accept="image/*,application/pdf,.pdf,.psd,.ai,.eps"
+              multiple
             />
-            <label
-              htmlFor="file-upload"
-              className={`inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-2.5 sm:py-3 bg-[#fdb913] text-black font-bold rounded hover:bg-[#e5a711] transition-all uppercase tracking-wide cursor-pointer text-sm sm:text-base ${
-                isUploading ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
-            >
+            {!isDragOver && (
+              <label
+                htmlFor="file-upload"
+                className={`inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-2.5 sm:py-3 bg-[#fdb913] text-black font-bold rounded hover:bg-[#e5a711] transition-all uppercase tracking-wide cursor-pointer text-sm sm:text-base ${
+                  isUploading ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
               {isUploading ? (
                 <>
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black"></div>
@@ -262,10 +340,11 @@ export default function ProjectDetailsPage() {
               ) : (
                 <>
               <Upload className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span>Upload</span>
+              <span>Upload Files</span>
                 </>
               )}
-            </label>
+              </label>
+            )}
           </div>
         </div>
 
@@ -297,7 +376,7 @@ export default function ProjectDetailsPage() {
                     alt={item.fileName}
                     width={300}       
                     height={300}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                   />
                 )}
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-3 sm:p-4">
