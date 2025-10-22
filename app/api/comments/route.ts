@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     console.error('Error fetching comments:', error)
     return NextResponse.json({ error: "Failed to fetch comments" }, { status: 500 })
   }
-}
+}        
 
 // POST - Create a new comment
 export async function POST(request: NextRequest) {
