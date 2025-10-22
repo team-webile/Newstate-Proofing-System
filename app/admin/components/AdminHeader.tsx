@@ -9,7 +9,8 @@ import {
   Archive,
   Home, 
   LogOut,
-  
+  Menu,
+  X
 } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -25,6 +26,7 @@ export default function AdminHeader({ title, description, icon }: AdminHeaderPro
   const router = useRouter()
   const pathname = usePathname()
   const { logoUrl } = useLogo()
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   
   // Since we're in admin area, user is admin
   const isAdmin = true
@@ -42,6 +44,19 @@ export default function AdminHeader({ title, description, icon }: AdminHeaderPro
     }
   }
 
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen)
+  }
+
+  const closeMobileMenu = () => {
+    setIsMobileMenuOpen(false)
+  }
+
+  // Close mobile menu when route changes
+  useEffect(() => {
+    setIsMobileMenuOpen(false)
+  }, [pathname])
+
   const navigationItems = [
     { path: '/admin/projects', label: 'Projects', icon: Home },
     { path: '/admin/projects', label: 'All Projects', icon: FileText },
@@ -51,43 +66,118 @@ export default function AdminHeader({ title, description, icon }: AdminHeaderPro
 
   return (
     <header className="border-b border-neutral-800 bg-black">
-      <div className="container mx-auto px-4 sm:px-6 py-4">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-0">
+      <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
+        {/* Mobile Layout */}
+        <div className="sm:hidden">
+          {/* Mobile Header with Logo and Hamburger */}
+          <div className="flex items-center justify-between">
+            <Link href="/admin/projects" onClick={closeMobileMenu}>
+              <Image
+                src={logoUrl}
+                alt="Newstate Branding Co."
+                width={150}
+                height={40}
+                className="h-8 w-auto"
+              />
+            </Link>
+            
+            {/* Hamburger Menu Button */}
+            <button
+              onClick={toggleMobileMenu}
+              className="p-2 text-white hover:text-brand-yellow transition-colors"
+              aria-label="Toggle mobile menu"
+            >
+              {isMobileMenuOpen ? (
+                <X className="h-6 w-6" />
+              ) : (
+                <Menu className="h-6 w-6" />
+              )}
+            </button>
+          </div>
+          
+          {/* Mobile Navigation Menu */}
+          {isMobileMenuOpen && (
+            <div className="mt-4 space-y-2 animate-in slide-in-from-top-2 duration-200">
+              <Link 
+                href="/admin/projects" 
+                onClick={closeMobileMenu}
+                className="block text-white hover:text-brand-yellow transition-colors text-center py-3 px-4 bg-neutral-900 rounded-lg"
+              >
+                📊 Dashboard
+              </Link>
+              <Link 
+                href="/admin/new-project" 
+                onClick={closeMobileMenu}
+                className="block text-white hover:text-brand-yellow transition-colors text-center py-3 px-4 bg-neutral-900 rounded-lg"
+              >
+                ➕ New Project
+              </Link>
+              <Link 
+                href="/admin/archives" 
+                onClick={closeMobileMenu}
+                className="block text-neutral-400 hover:text-brand-yellow transition-colors text-center py-3 px-4 bg-neutral-900 rounded-lg"
+              >
+                📁 Archives
+              </Link>
+              <Link 
+                href="/admin/settings" 
+                onClick={closeMobileMenu}
+                className="block text-neutral-400 hover:text-brand-yellow transition-colors text-center py-3 px-4 bg-neutral-900 rounded-lg"
+              >
+                ⚙️ Settings
+              </Link>
+              {isAdmin && (
+                <button
+                  onClick={() => {
+                    closeMobileMenu()
+                    handleLogout()
+                  }}
+                  className="w-full text-neutral-400 hover:text-brand-yellow transition-colors cursor-pointer flex items-center justify-center gap-2 py-3 px-4 bg-neutral-900 rounded-lg"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Logout
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Desktop Layout */}
+        <div className="hidden sm:flex items-center justify-between">
           <Link href="/admin/projects">
             <Image
               src={logoUrl}
               alt="Newstate Branding Co."
               width={200}
               height={60}
-              className="h-8 sm:h-12 w-auto"
+              className="h-10 lg:h-12 w-auto"
             />
           </Link>
 
-          {/* Mobile Menu */}
-          <nav className="flex flex-wrap justify-center items-center gap-3 sm:gap-6 text-xs sm:text-sm">
+          <nav className="flex items-center gap-4 lg:gap-6 text-sm">
             <Link href="/admin/projects" className="text-white hover:text-brand-yellow transition-colors">
               Dashboard
             </Link>
-            <span className="hidden sm:block text-neutral-600">|</span>
+            <span className="text-neutral-600">|</span>
             <Link href="/admin/new-project" className="text-white hover:text-brand-yellow transition-colors">
-              ADD NEW PROJECT
+              New Project
             </Link>
-            <span className="hidden sm:block text-neutral-600">|</span>
+            <span className="text-neutral-600">|</span>
             <Link href="/admin/archives" className="text-neutral-400 hover:text-brand-yellow transition-colors">
-              ARCHIVES PROJECTS
+              Archives
             </Link>
-            <span className="hidden sm:block text-neutral-600">|</span>
+            <span className="text-neutral-600">|</span>
             <Link href="/admin/settings" className="text-neutral-400 hover:text-brand-yellow transition-colors">
-              SETTINGS
+              Settings
             </Link>
-            <span className="hidden sm:block text-neutral-600">|</span>
+            <span className="text-neutral-600">|</span>
             {isAdmin && (
               <button
                 onClick={handleLogout}
-                className="text-neutral-400 hover:text-brand-yellow transition-colors cursor-pointer flex items-center gap-1 sm:gap-2"
+                className="text-neutral-400 hover:text-brand-yellow transition-colors cursor-pointer flex items-center gap-2"
               >
-                <LogOut className="h-3 w-3 sm:h-4 sm:w-4" />
-                LOGOUT
+                <LogOut className="h-4 w-4" />
+                Logout
               </button>
             )}
           </nav>
