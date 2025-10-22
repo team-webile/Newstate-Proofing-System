@@ -1,19 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma, checkDatabaseConnection } from '@/lib/db'
+import { prisma } from '@/lib/db'
 import { sendClientMessageNotificationToAdmin, sendAdminReplyNotificationToClient } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 30 // 30 seconds max duration
+export const maxDuration = 15 // Reduced to 15 seconds
 
 // GET - Fetch comments for a specific file
 export async function GET(request: NextRequest) {
   try {
-    // Check database connection first
-    const isConnected = await checkDatabaseConnection()
-    if (!isConnected) {
-      return NextResponse.json({ error: "Database connection failed" }, { status: 503 })
-    }
-
     const { searchParams } = new URL(request.url)
     const designItemId = searchParams.get('designItemId')
 
@@ -26,27 +20,10 @@ export async function GET(request: NextRequest) {
       prisma.comment.findMany({
         where: { designItemId: parseInt(designItemId) },
         orderBy: { createdAt: 'asc' },
-        take: 50, // Reduced limit for faster response
-        select: {
-          id: true,
-          author: true,
-          authorEmail: true,
-          isAdmin: true,
-          content: true,
-          type: true,
-          drawingData: true,
-          canvasX: true,
-          canvasY: true,
-          canvasWidth: true,
-          canvasHeight: true,
-          imageWidth: true,
-          imageHeight: true,
-          pdfPage: true,
-          createdAt: true
-        }
+        take: 50 // Reduced limit for faster response
       }),
       new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Query timeout')), 10000) // Reduced timeout
+        setTimeout(() => reject(new Error('Query timeout')), 8000) // Reduced timeout
       )
     ]) as any[]
 
@@ -63,12 +40,6 @@ export async function GET(request: NextRequest) {
 // POST - Create a new comment
 export async function POST(request: NextRequest) {
   try {
-    // Check database connection first
-    const isConnected = await checkDatabaseConnection()
-    if (!isConnected) {
-      return NextResponse.json({ error: "Database connection failed" }, { status: 503 })
-    }
-
     const { 
       designItemId, 
       author, 
@@ -86,7 +57,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Design item ID, author, and content are required" }, { status: 400 })
     }
 
-    // Optimized comment creation with shorter timeout
+    // Optimized comment creation with reduced timeout
     const comment = await Promise.race([
       prisma.comment.create({
         data: {
@@ -104,28 +75,22 @@ export async function POST(request: NextRequest) {
           imageWidth: canvasPosition?.imageWidth || null,
           imageHeight: canvasPosition?.imageHeight || null,
           pdfPage: pdfPage || null
-        }
+        } as any
       }),
       new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Comment creation timeout')), 10000) // Reduced timeout
       )
     ]) as any
 
-    // Return comment immediately, send emails asynchronously
+    // Return comment immediately, handle email notifications asynchronously
     const response = NextResponse.json({
       ...comment,
-      emailSent: false, // Will be updated by async email process
-      emailError: null
+      emailStatus: 'processing' // Indicate email is being processed
     })
 
-    // Send email notifications asynchronously (don't block response)
+    // Handle email notifications asynchronously (non-blocking)
     setImmediate(async () => {
-      let emailSent = false
-      let emailError = null
-      
       try {
-        console.log('📧 Starting async email notification process...')
-        
         // Get design item with review and project info
         const designItem = await prisma.designItem.findUnique({
           where: { id: parseInt(designItemId) },
@@ -143,7 +108,6 @@ export async function POST(request: NextRequest) {
           
           // If client sent message, notify admin
           if (!isAdmin && authorEmail) {
-            console.log('📧 Sending admin notification for client message...')
             const notificationData = {
               clientName: author,
               clientEmail: authorEmail,
@@ -154,18 +118,10 @@ export async function POST(request: NextRequest) {
               designFileName: designItem.fileName,
               commentType: type || 'comment'
             }
-            const emailResult = await sendClientMessageNotificationToAdmin(notificationData)
-            if (emailResult.success) {
-              emailSent = true
-              console.log('✅ Admin notification sent successfully to:', emailResult.emailSentTo)
-            } else {
-              emailError = 'Failed to send admin notification'
-              console.error('❌ Admin notification failed')
-            }
+            await sendClientMessageNotificationToAdmin(notificationData)
           } 
           // If admin sent message, notify client
           else if (isAdmin && recipientEmail) {
-            console.log('📧 Sending client notification for admin reply...')
             const notificationData = {
               clientName: author,
               clientEmail: recipientEmail,
@@ -176,27 +132,12 @@ export async function POST(request: NextRequest) {
               designFileName: designItem.fileName,
               commentType: type || 'comment'
             }
-            const emailResult = await sendAdminReplyNotificationToClient(notificationData)
-            if (emailResult.success) {
-              emailSent = true
-              console.log('✅ Client notification sent successfully to:', emailResult.emailSentTo)
-            } else {
-              emailError = 'Failed to send client notification'
-              console.error('❌ Client notification failed')
-            }
+            await sendAdminReplyNotificationToClient(notificationData)
           }
-        } else {
-          console.warn('⚠️ Design item not found for email notification')
         }
       } catch (emailError) {
-        console.error('❌ Error in async email notification:', emailError)
-      }
-      
-      // Log final email status
-      if (emailSent) {
-        console.log('✅ Email notification process completed successfully')
-      } else {
-        console.log('⚠️ Email notification process completed with issues:', emailError)
+        console.error('Error sending email notification:', emailError)
+        // Email errors are logged but don't affect the response
       }
     })
 
