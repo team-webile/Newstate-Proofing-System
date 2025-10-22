@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     const comments = await prisma.comment.findMany({
       where: { designItemId: parseInt(designItemId) },
       orderBy: { createdAt: 'asc' }
-    })
+    })           
 
     return NextResponse.json(comments)
   } catch (error) {
@@ -115,3 +115,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Failed to create comment" }, { status: 500 })
   }
 }
+ 
