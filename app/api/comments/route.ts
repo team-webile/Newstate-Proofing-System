@@ -120,7 +120,12 @@ export async function POST(request: NextRequest) {
 
     // Send email notifications asynchronously (don't block response)
     setImmediate(async () => {
+      let emailSent = false
+      let emailError = null
+      
       try {
+        console.log('📧 Starting async email notification process...')
+        
         // Get design item with review and project info
         const designItem = await prisma.designItem.findUnique({
           where: { id: parseInt(designItemId) },
@@ -138,6 +143,7 @@ export async function POST(request: NextRequest) {
           
           // If client sent message, notify admin
           if (!isAdmin && authorEmail) {
+            console.log('📧 Sending admin notification for client message...')
             const notificationData = {
               clientName: author,
               clientEmail: authorEmail,
@@ -148,10 +154,18 @@ export async function POST(request: NextRequest) {
               designFileName: designItem.fileName,
               commentType: type || 'comment'
             }
-            await sendClientMessageNotificationToAdmin(notificationData)
+            const emailResult = await sendClientMessageNotificationToAdmin(notificationData)
+            if (emailResult.success) {
+              emailSent = true
+              console.log('✅ Admin notification sent successfully to:', emailResult.emailSentTo)
+            } else {
+              emailError = 'Failed to send admin notification'
+              console.error('❌ Admin notification failed')
+            }
           } 
           // If admin sent message, notify client
           else if (isAdmin && recipientEmail) {
+            console.log('📧 Sending client notification for admin reply...')
             const notificationData = {
               clientName: author,
               clientEmail: recipientEmail,
@@ -162,11 +176,27 @@ export async function POST(request: NextRequest) {
               designFileName: designItem.fileName,
               commentType: type || 'comment'
             }
-            await sendAdminReplyNotificationToClient(notificationData)
+            const emailResult = await sendAdminReplyNotificationToClient(notificationData)
+            if (emailResult.success) {
+              emailSent = true
+              console.log('✅ Client notification sent successfully to:', emailResult.emailSentTo)
+            } else {
+              emailError = 'Failed to send client notification'
+              console.error('❌ Client notification failed')
+            }
           }
+        } else {
+          console.warn('⚠️ Design item not found for email notification')
         }
       } catch (emailError) {
-        console.error('Error sending email notification:', emailError)
+        console.error('❌ Error in async email notification:', emailError)
+      }
+      
+      // Log final email status
+      if (emailSent) {
+        console.log('✅ Email notification process completed successfully')
+      } else {
+        console.log('⚠️ Email notification process completed with issues:', emailError)
       }
     })
 
