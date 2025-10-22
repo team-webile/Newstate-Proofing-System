@@ -7,14 +7,7 @@ const server = http.createServer();
 // Get allowed origins from environment variable or use defaults
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
   ? process.env.ALLOWED_ORIGINS.split(',')
-  : [
-      "http://localhost:3000",
-      "https://devnstage.xyz",
-      "https://www.devnstage.xyz",
-      "https://review.newstatebranding.com",
-      "https://www.review.newstatebranding.com",
-      "https://vps.newstatebranding.com"
-    ];
+  : ["http://localhost:3000", "https://devnstage.xyz", "https://www.devnstage.xyz"];
 
 // Create Socket.IO server
 const io = new Server(server, {
