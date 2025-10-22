@@ -40,6 +40,7 @@ interface CommentNotificationData {
   projectNumber: string
   reviewLink: string
   designFileName: string
+  commentType?: 'comment' | 'annotation'
 }
 
 /**
@@ -56,7 +57,7 @@ export async function sendClientMessageNotificationToAdmin(
     const mailOptions = {
       from: fromEmail,
       to: adminEmail,
-      subject: `New Client Message - ${data.projectName} (${data.projectNumber})`,
+      subject: `Client ${data.commentType === 'annotation' ? 'Added Annotation' : 'Left Comment'} - ${data.projectName} (${data.projectNumber})`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -78,11 +79,11 @@ export async function sendClientMessageNotificationToAdmin(
         <body>
           <div class="container">
             <div class="header">
-              <h1 style="margin: 0; font-size: 24px;">📬 New Client Message</h1>
+              <h1 style="margin: 0; font-size: 24px;">${data.commentType === 'annotation' ? '📝 Client Added Annotation' : '💬 Client Left Comment'}</h1>
             </div>
             
             <div class="content">
-              <p style="font-size: 16px; margin-top: 0;">You have received a new message from a client:</p>
+              <p style="font-size: 16px; margin-top: 0;">A client has ${data.commentType === 'annotation' ? 'added an annotation to' : 'left a comment on'} your project:</p>
               
               <div class="info-row">
                 <span class="label">Client Name:</span>
@@ -129,7 +130,7 @@ export async function sendClientMessageNotificationToAdmin(
         </html>
       `,
       text: `
-New Client Message
+Client Left Comment
 
 Client Name: ${data.clientName}
 ${data.clientEmail ? `Client Email: ${data.clientEmail}\n` : ''}
@@ -174,7 +175,7 @@ export async function sendAdminReplyNotificationToClient(
     const mailOptions = {
       from: fromEmail,
       to: data.clientEmail,
-      subject: `New Reply on Your Project - ${data.projectName}`,
+      subject: `Design Team Replied - ${data.projectName} (${data.projectNumber})`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -196,7 +197,7 @@ export async function sendAdminReplyNotificationToClient(
         <body>
           <div class="container">
             <div class="header">
-              <h1 style="margin: 0; font-size: 24px;">💬 New Reply from Your Design Team</h1>
+              <h1 style="margin: 0; font-size: 24px;">💬 Design Team Replied</h1>
             </div>
             
             <div class="content">
@@ -237,7 +238,7 @@ export async function sendAdminReplyNotificationToClient(
         </html>
       `,
       text: `
-New Reply from Your Design Team
+Design Team Replied
 
 Hello ${data.clientName},
 

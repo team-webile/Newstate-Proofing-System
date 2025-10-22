@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db'
 import { sendClientMessageNotificationToAdmin, sendAdminReplyNotificationToClient } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
+// Force TypeScript refresh
 
 // GET - Fetch comments for a specific file
 export async function GET(request: NextRequest) {
@@ -91,7 +92,8 @@ export async function POST(request: NextRequest) {
               projectName: designItem.review.project.name,
               projectNumber: designItem.review.project.projectNumber,
               reviewLink: reviewLink,
-              designFileName: designItem.fileName
+              designFileName: designItem.fileName,
+              commentType: type || 'comment'
             }
             await sendClientMessageNotificationToAdmin(notificationData)
           } 
@@ -104,7 +106,8 @@ export async function POST(request: NextRequest) {
               projectName: designItem.review.project.name,
               projectNumber: designItem.review.project.projectNumber,
               reviewLink: reviewLink,
-              designFileName: designItem.fileName
+              designFileName: designItem.fileName,
+              commentType: type || 'comment'
             }
             await sendAdminReplyNotificationToClient(notificationData)
           }
