@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { prisma, checkDatabaseConnection } from '@/lib/db'
 import { sendClientMessageNotificationToAdmin, sendAdminReplyNotificationToClient } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 15 // Reduced to 15 seconds
+export const maxDuration = 30 // 30 seconds max duration
 
 // GET - Fetch comments for a specific file
 export async function GET(request: NextRequest) {
   try {
+    // Check database connection first
+    const isConnected = await checkDatabaseConnection()
+    if (!isConnected) {
+      return NextResponse.json({ error: "Database connection failed" }, { status: 503 })
+    }
+
     const { searchParams } = new URL(request.url)
     const designItemId = searchParams.get('designItemId')
 
@@ -15,15 +21,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Design item ID is required" }, { status: 400 })
     }
 
-    // Optimized query with timeout
+    // Add timeout wrapper
     const comments = await Promise.race([
       prisma.comment.findMany({
         where: { designItemId: parseInt(designItemId) },
         orderBy: { createdAt: 'asc' },
-        take: 50 // Reduced limit for faster response
+        take: 100 // Limit results to prevent large queries
       }),
       new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Query timeout')), 8000) // Reduced timeout
+        setTimeout(() => reject(new Error('Query timeout')), 15000)
       )
     ]) as any[]
 
@@ -40,6 +46,12 @@ export async function GET(request: NextRequest) {
 // POST - Create a new comment
 export async function POST(request: NextRequest) {
   try {
+    // Check database connection first
+    const isConnected = await checkDatabaseConnection()
+    if (!isConnected) {
+      return NextResponse.json({ error: "Database connection failed" }, { status: 503 })
+    }
+
     const { 
       designItemId, 
       author, 
@@ -57,7 +69,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Design item ID, author, and content are required" }, { status: 400 })
     }
 
-    // Optimized comment creation with reduced timeout
+    // Add timeout wrapper for comment creation
     const comment = await Promise.race([
       prisma.comment.create({
         data: {
@@ -75,73 +87,81 @@ export async function POST(request: NextRequest) {
           imageWidth: canvasPosition?.imageWidth || null,
           imageHeight: canvasPosition?.imageHeight || null,
           pdfPage: pdfPage || null
-        } as any
+        }
       }),
       new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Comment creation timeout')), 10000) // Reduced timeout
+        setTimeout(() => reject(new Error('Comment creation timeout')), 20000)
       )
     ]) as any
 
-    // Return comment immediately, handle email notifications asynchronously
-    const response = NextResponse.json({
-      ...comment,
-      emailStatus: 'processing' // Indicate email is being processed
-    })
-
-    // Handle email notifications asynchronously (non-blocking)
-    setImmediate(async () => {
-      try {
-        // Get design item with review and project info
-        const designItem = await prisma.designItem.findUnique({
-          where: { id: parseInt(designItemId) },
-          include: {
-            review: {
-              include: {
-                project: true
-              }
+    // Send email notifications and handle errors
+    let emailError = null
+    let emailSentTo = null
+    try {
+      // Get design item with review and project info
+      const designItem = await prisma.designItem.findUnique({
+        where: { id: parseInt(designItemId) },
+        include: {
+          review: {
+            include: {
+              project: true
             }
-          }
-        })
-
-        if (designItem) {
-          const reviewLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://review.newstatebranding.com'}/review/${designItem.review.shareLink}`
-          
-          // If client sent message, notify admin
-          if (!isAdmin && authorEmail) {
-            const notificationData = {
-              clientName: author,
-              clientEmail: authorEmail,
-              commentContent: content,
-              projectName: designItem.review.project.name,
-              projectNumber: designItem.review.project.projectNumber,
-              reviewLink: reviewLink,
-              designFileName: designItem.fileName,
-              commentType: type || 'comment'
-            }
-            await sendClientMessageNotificationToAdmin(notificationData)
-          } 
-          // If admin sent message, notify client
-          else if (isAdmin && recipientEmail) {
-            const notificationData = {
-              clientName: author,
-              clientEmail: recipientEmail,
-              commentContent: content,
-              projectName: designItem.review.project.name,
-              projectNumber: designItem.review.project.projectNumber,
-              reviewLink: reviewLink,
-              designFileName: designItem.fileName,
-              commentType: type || 'comment'
-            }
-            await sendAdminReplyNotificationToClient(notificationData)
           }
         }
-      } catch (emailError) {
-        console.error('Error sending email notification:', emailError)
-        // Email errors are logged but don't affect the response
-      }
-    })
+      })
 
-    return response
+      if (designItem) {
+        const reviewLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://review.newstatebranding.com'}/review/${designItem.review.shareLink}`
+        
+        // If client sent message, notify admin
+        if (!isAdmin && authorEmail) {
+          const notificationData = {
+            clientName: author,
+            clientEmail: authorEmail, // Client's email for admin to see
+            commentContent: content,
+            projectName: designItem.review.project.name,
+            projectNumber: designItem.review.project.projectNumber,
+            reviewLink: reviewLink,
+            designFileName: designItem.fileName,
+            commentType: type || 'comment'
+          }
+          const emailResult = await sendClientMessageNotificationToAdmin(notificationData)
+          if (emailResult.success) {
+            emailSentTo = emailResult.emailSentTo
+          } else {
+            emailError = 'Failed to send admin notification email'
+          }
+        } 
+        // If admin sent message, notify client
+        else if (isAdmin && recipientEmail) {
+          const notificationData = {
+            clientName: author, // Admin's name
+            clientEmail: recipientEmail, // Client's email to send notification to
+            commentContent: content,
+            projectName: designItem.review.project.name,
+            projectNumber: designItem.review.project.projectNumber,
+            reviewLink: reviewLink,
+            designFileName: designItem.fileName,
+            commentType: type || 'comment'
+          }
+          const emailResult = await sendAdminReplyNotificationToClient(notificationData)
+          if (emailResult.success) {
+            emailSentTo = emailResult.emailSentTo
+          } else {
+            emailError = 'Failed to send client notification email'
+          }
+        }
+      }
+    } catch (emailError) {
+      console.error('Error sending email notification:', emailError)
+      emailError = `Email notification error: ${emailError instanceof Error ? emailError.message : 'Unknown error'}`
+    }
+
+    return NextResponse.json({
+      ...comment,
+      emailError: emailError,
+      emailSentTo: emailSentTo
+    })
   } catch (error) {
     console.error('Error creating comment:', error)
     if (error instanceof Error && error.message === 'Comment creation timeout') {

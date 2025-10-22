@@ -340,4 +340,3 @@ export async function verifyEmailConfig(): Promise<boolean> {
     return false
   }
 }
-
