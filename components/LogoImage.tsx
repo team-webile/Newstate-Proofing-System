@@ -22,11 +22,12 @@ export default function LogoImage({
 
   const logoElement = (
     <Image
-      src={logoUrl}
+      src='https://newstatebranding.b-cdn.net/nsb-logo.png'
       alt={alt}
       width={width}
       height={height}
       className={className}
+      priority={true}
     />
   )
 

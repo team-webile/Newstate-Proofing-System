@@ -24,7 +24,7 @@ interface LogoProviderProps {
 }
 
 export const LogoProvider: React.FC<LogoProviderProps> = ({ children }) => {
-  const [logoUrl, setLogoUrl] = useState('/images/nsb-logo.png')
+  const [logoUrl, setLogoUrl] = useState('https://newstatebranding.b-cdn.net/nsb-logo.png')
   const [isLoading, setIsLoading] = useState(false)
 
   // Load logo from settings API on mount
@@ -34,7 +34,7 @@ export const LogoProvider: React.FC<LogoProviderProps> = ({ children }) => {
         const response = await fetch('/api/settings')
         if (response.ok) {
           const settings = await response.json()
-          setLogoUrl(settings.logoUrl || '/images/nsb-logo.png')
+          setLogoUrl('https://newstatebranding.b-cdn.net/nsb-logo.png')
         } else {
           console.error('Failed to load settings from API')
         }

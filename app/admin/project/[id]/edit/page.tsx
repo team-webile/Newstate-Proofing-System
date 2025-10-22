@@ -73,7 +73,7 @@ export default function EditProjectPage() {
 
       if (response.ok) {
         toast.success('Project updated successfully!')
-        router.push(`/admin/projects`)
+        router.push(`/admin/project/${projectId}`)
       } else {
         const errorData = await response.json()
         setError(errorData.error || "Failed to update project")

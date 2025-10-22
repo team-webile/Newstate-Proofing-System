@@ -269,7 +269,7 @@ export default function AllProjectsPage() {
                     className="flex-1 border-neutral-600 text-neutral-300 hover:bg-brand-yellow hover:text-black hover:border-brand-yellow transition-colors bg-neutral-900"
                   >
                     <Eye className="h-4 w-4 mr-2" />
-                    View
+                    Preview
                   </Button>
                   <Button 
                     variant="outline" 

@@ -40,7 +40,7 @@ export default function NewProjectPage() {
       if (response.ok) {
         const project = await response.json()
         toast.success('Project created successfully!')
-        router.push(`/admin/projects`)
+        router.push(`/admin/project/${project.id}`)
       } else {
         const errorData = await response.json()
         setError(errorData.error || "Failed to create project")
