@@ -40,7 +40,7 @@ interface Review {
 export default function ProjectDetailsPage() {
   const params = useParams()
   const projectId = params.id as string
-  
+
   const [project, setProject] = useState<Project | null>(null)
   const [reviews, setReviews] = useState<Review[]>([])
   const [designItems, setDesignItems] = useState<DesignItem[]>([])
@@ -48,10 +48,11 @@ export default function ProjectDetailsPage() {
   const [isUploading, setIsUploading] = useState(false)
   const [deletingFileId, setDeletingFileId] = useState<number | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
-  
+  const [isLoadingFiles, setIsLoadingFiles] = useState(true)
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
-  const [filesPerPage] = useState(12) // Show 12 files per page
+  const [filesPerPage] = useState(8) // Show 8 files per page for better performance
   const [searchTerm, setSearchTerm] = useState('')
   const [filteredFiles, setFilteredFiles] = useState<DesignItem[]>([])
 
@@ -65,7 +66,7 @@ export default function ProjectDetailsPage() {
     if (searchTerm.trim() === '') {
       setFilteredFiles(designItems)
     } else {
-      const filtered = designItems.filter(item => 
+      const filtered = designItems.filter(item =>
         item.fileName.toLowerCase().includes(searchTerm.toLowerCase())
       )
       setFilteredFiles(filtered)
@@ -79,7 +80,7 @@ export default function ProjectDetailsPage() {
       if (response.ok) {
         const data = await response.json()
         setProject(data)
-        
+
         // Load reviews
         const reviewsResponse = await fetch(`/api/reviews?projectId=${projectId}`)
         if (reviewsResponse.ok) {
@@ -96,6 +97,7 @@ export default function ProjectDetailsPage() {
   }
 
   const loadFiles = async () => {
+    setIsLoadingFiles(true)
     try {
       const response = await fetch(`/api/projects/${projectId}/files`)
       if (response.ok) {
@@ -104,6 +106,8 @@ export default function ProjectDetailsPage() {
       }
     } catch (error) {
       console.error('Error loading files:', error)
+    } finally {
+      setIsLoadingFiles(false)
     }
   }
 
@@ -177,7 +181,7 @@ export default function ProjectDetailsPage() {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragOver(false)
-    
+
     const files = Array.from(e.dataTransfer.files)
     if (files.length === 0) return
 
@@ -214,7 +218,7 @@ export default function ProjectDetailsPage() {
   }
 
   if (isLoading) {
-  return (
+    return (
       <AdminLayout title="Project Details" description="View project details and files" icon={<Save className="h-8 w-8 text-brand-yellow" />}>
         <div className="min-h-screen flex items-center justify-center px-4">
           <div className="text-center">
@@ -238,7 +242,8 @@ export default function ProjectDetailsPage() {
 
   return (
     <AdminLayout title="Edit Project" description="Update project details" icon={<Save className="h-8 w-8 text-brand-yellow" />}>
-            <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-8 max-w-7xl">
+      <div className="min-h-screen bg-black">
+        <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-8 max-w-7xl">
         {/* Back Button */}
         <div className="mb-4 sm:mb-6">
           <Link
@@ -275,7 +280,7 @@ export default function ProjectDetailsPage() {
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 lg:gap-4">
               {project.downloadEnabled && designItems.length > 0 && (
-                <button 
+                <button
                   onClick={() => {
                     // Download all files
                     designItems.forEach((item, index) => {
@@ -309,12 +314,11 @@ export default function ProjectDetailsPage() {
         </div>
 
         {/* Upload Section */}
-        <div 
-          className={`bg-[#1a1d26] rounded-lg border-2 border-dashed p-6 sm:p-8 lg:p-12 mb-6 sm:mb-8 transition-colors ${
-            isDragOver 
-              ? 'border-[#fdb913] bg-[#fdb913]/10' 
+        <div
+          className={`bg-[#1a1d26] rounded-lg border-2 border-dashed p-6 sm:p-8 lg:p-12 mb-6 sm:mb-8 transition-colors ${isDragOver
+              ? 'border-[#fdb913] bg-[#fdb913]/10'
               : 'border-neutral-700'
-          }`}
+            } ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
@@ -347,103 +351,125 @@ export default function ProjectDetailsPage() {
             {!isDragOver && (
               <label
                 htmlFor="file-upload"
-                className={`inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-2.5 sm:py-3 bg-[#fdb913] text-black font-bold rounded hover:bg-[#e5a711] transition-all uppercase tracking-wide cursor-pointer text-sm sm:text-base ${
-                  isUploading ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
+                className={`inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-2.5 sm:py-3 bg-[#fdb913] text-black font-bold rounded hover:bg-[#e5a711] transition-all uppercase tracking-wide cursor-pointer text-sm sm:text-base ${isUploading ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
               >
-              {isUploading ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black"></div>
-                  <span>Uploading...</span>
-                </>
-              ) : (
-                <>
-              <Upload className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span>Upload Files</span>
-                </>
-              )}
+                {isUploading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black"></div>
+                    <span>Uploading...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span>Upload Files</span>
+                  </>
+                )}
               </label>
             )}
           </div>
         </div>
- 
+
+        {/* Search and Filter Skeleton */}
+        {isLoadingFiles && (
+          <div className="mb-6">
+            <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+              <div className="flex-1 max-w-md">
+                <div className="w-full h-10 bg-neutral-800 rounded-lg animate-pulse"></div>
+              </div>
+              <div className="w-32 h-4 bg-neutral-700 rounded animate-pulse"></div>
+            </div>
+          </div>
+        )}
+
         {/* Files Grid */}
-        {filteredFiles.length > 0 ? (
+        {isLoadingFiles ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 mb-8">
+            {Array.from({ length: 8 }).map((_, index) => (
+              <div
+                key={index}
+                className="aspect-square bg-neutral-900 rounded-lg border border-neutral-800 animate-pulse"
+              >
+                <div className="w-full h-full flex flex-col items-center justify-center">
+                  <div className="w-16 h-16 bg-neutral-700 rounded-lg mb-4"></div>
+                  <div className="w-20 h-4 bg-neutral-700 rounded mb-2"></div>
+                  <div className="w-16 h-3 bg-neutral-700 rounded"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : filteredFiles.length > 0 ? (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 mb-8">
               {filteredFiles
                 .slice((currentPage - 1) * filesPerPage, currentPage * filesPerPage)
                 .map((item) => {
-              const isPdf = item.fileName?.toLowerCase().endsWith('.pdf') || 
-                           item.fileType?.toLowerCase().includes('pdf') ||
-                           item.url?.toLowerCase().endsWith('.pdf');
-              
-              return (
+                  const isPdf = item.fileName?.toLowerCase().endsWith('.pdf') ||
+                    item.fileType?.toLowerCase().includes('pdf') ||
+                    item.url?.toLowerCase().endsWith('.pdf');
+
+                  return (
               <div
                 key={item.id}
-                className="aspect-square bg-neutral-900 rounded-lg overflow-hidden border border-neutral-800 hover:border-brand-yellow transition-all group relative"
+                className="aspect-square bg-neutral-900 rounded-lg overflow-hidden border border-neutral-800 hover:border-brand-yellow transition-all group relative cursor-pointer"
               >
-                {isPdf ? (
-                  // PDF Thumbnail
-                  <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-red-900/20 to-red-700/10">
-                    <div className="text-6xl sm:text-7xl mb-2">📄</div>
-                    <div className="px-4 py-2 bg-red-600/20 border border-red-500/30 rounded-lg">
-                      <span className="text-red-400 font-bold text-sm uppercase tracking-wider">PDF</span>
-                    </div>
-                  </div>
-                ) : (
-                  // Image Thumbnail
-                  <Image
-                    src={item.url || "/placeholder.svg"}
-                    alt={item.fileName}
-                    width={300}       
-                    height={300}
-                    className="w-full h-full object-contain"
-                    loading="lazy"
-                    placeholder="blur"
-                    blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
-                  />
-                )}
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-3 sm:p-4">
-                  <p className="text-white text-xs sm:text-sm font-semibold truncate">
-                    {item.fileName}
-                  </p>
-                  {isPdf && (
-                    <p className="text-red-400 text-xs mt-1">PDF Document</p>
-                  )}
-                </div>
+                      {isPdf ? (
+                        // PDF Thumbnail
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-red-900/20 to-red-700/10">
+                          <div className="text-6xl sm:text-7xl mb-2">📄</div>
+                          <div className="px-4 py-2 bg-red-600/20 border border-red-500/30 rounded-lg">
+                            <span className="text-red-400 font-bold text-sm uppercase tracking-wider">PDF</span>
+                          </div>
+                        </div>
+                      ) : (
+                        // Image Thumbnail
+                        <img
+                          src={item.url || "/placeholder.svg"}
+                          alt={item.fileName}
+                          className="w-full h-full object-contain"
+                        />
+                      )}
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-3 sm:p-4">
+                        <p className="text-white text-xs sm:text-sm font-semibold truncate">
+                          {item.fileName}
+                        </p>
+                        {isPdf && (
+                          <p className="text-red-400 text-xs mt-1">PDF Document</p>
+                        )}
+                      </div>
                 {/* Mobile: Always visible buttons, Desktop: Show on hover */}
-                <div className="absolute top-2 right-2 sm:inset-0 sm:bg-black/50 sm:opacity-0 sm:group-hover:opacity-100 sm:transition-opacity flex flex-row sm:flex-row items-start sm:items-center justify-end sm:justify-center gap-2 p-2 sm:p-3">
-                  {reviews.length > 0 && (
-                    <Link 
-                      href={`/admin/review/${reviews[0].shareLink}`} 
-                      className="px-2 py-1.5 sm:px-3 sm:py-2 bg-[#fdb913] text-black rounded font-semibold hover:bg-[#e5a711] transition-colors text-xs sm:text-sm sm:w-full text-center"
-                      title="View client feedback"
-                    >
-                    <span className="hidden md:inline">Feedback</span>
-                    <span className="md:hidden">👁️</span>
-                  </Link>
-                  )}
-                  <button
-                    onClick={() => handleDeleteFile(item.id)}
-                    disabled={deletingFileId === item.id}
-                    className={`px-2 py-1.5 sm:px-3 sm:py-2 bg-red-600 text-white rounded font-semibold hover:bg-red-700 transition-colors sm:w-full flex items-center justify-center gap-1 ${
-                      deletingFileId === item.id ? 'opacity-50 cursor-not-allowed' : ''
-                    }`}
-                    title="Delete file"
-                  >
-                    {deletingFileId === item.id ? (
-                      <div className="animate-spin rounded-full h-3.5 w-3.5 sm:h-4 sm:w-4 border-2 border-white border-t-transparent"></div>
-                    ) : (
-                      <Trash className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    )}
-                   </button>
-                </div>
-              </div>
-              );
-            })}
+                <div className="absolute top-2 right-2 sm:inset-0 sm:bg-black/60 sm:opacity-0 sm:group-hover:opacity-100 sm:transition-all duration-200 flex flex-row sm:flex-col items-start sm:items-center justify-end sm:justify-center gap-2 p-2 sm:p-3 z-10">
+                        <div className="flex flex-row gap-2">
+                          {reviews.length > 0 && (
+                            <Link
+                              href={`/admin/review/${reviews[0].shareLink}`}
+                              className="px-2 py-1.5 sm:px-3 sm:py-2 bg-[#fdb913] text-black rounded font-semibold hover:bg-[#e5a711] transition-colors text-xs sm:text-sm text-center shadow-lg"
+                              title="View client feedback"
+                            >
+                              <span className="hidden md:inline">Feedback</span>
+                              <span className="md:hidden">👁️</span>
+                            </Link>
+                          )}
+                          <button
+                            onClick={() => handleDeleteFile(item.id)}
+                            disabled={deletingFileId === item.id}
+                            className={`px-2 py-1.5 sm:px-3 sm:py-2 bg-red-600 text-white rounded font-semibold hover:bg-red-700 transition-colors flex items-center justify-center gap-1 shadow-lg ${deletingFileId === item.id ? 'opacity-50 cursor-not-allowed' : ''
+                              }`}
+                            title="Delete file"
+                          >
+                            {deletingFileId === item.id ? (
+                              <div className="animate-spin rounded-full h-3.5 w-3.5 sm:h-4 sm:w-4 border-2 border-white border-t-transparent"></div>
+                            ) : (
+                              <Trash className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
-            
+
             {/* Pagination Controls */}
             {filteredFiles.length > filesPerPage && (
               <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -469,11 +495,10 @@ export default function ProjectDetailsPage() {
                           {index > 0 && array[index - 1] !== page - 1 && <span className="px-2 text-neutral-500">...</span>}
                           <button
                             onClick={() => setCurrentPage(page)}
-                            className={`px-3 py-2 rounded transition-colors ${
-                              currentPage === page
+                            className={`px-3 py-2 rounded transition-colors ${currentPage === page
                                 ? 'bg-brand-yellow text-black font-semibold'
                                 : 'bg-neutral-800 text-white hover:bg-neutral-700'
-                            }`}
+                              }`}
                           >
                             {page}
                           </button>
@@ -518,7 +543,8 @@ export default function ProjectDetailsPage() {
             </div>
           </div>
         )}
-    </div>
+        </div>
+      </div>
      </AdminLayout>
   )
 }
