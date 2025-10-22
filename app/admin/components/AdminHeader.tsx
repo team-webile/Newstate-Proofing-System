@@ -31,7 +31,10 @@ export default function AdminHeader({ title, description, icon }: AdminHeaderPro
 
   const handleLogout = async () => {
     try {
-      document.cookie = 'admin-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
+      // Call logout endpoint to properly clear httpOnly cookie
+      await fetch('/api/admin/logout', { method: 'POST' })
+      
+      // Redirect to login page
       router.push('/admin/login')
       router.refresh()
     } catch (error) {
@@ -72,6 +75,10 @@ export default function AdminHeader({ title, description, icon }: AdminHeaderPro
             <span className="hidden sm:block text-neutral-600">|</span>
             <Link href="/admin/archives" className="text-neutral-400 hover:text-brand-yellow transition-colors">
               ARCHIVES PROJECTS
+            </Link>
+            <span className="hidden sm:block text-neutral-600">|</span>
+            <Link href="/admin/settings" className="text-neutral-400 hover:text-brand-yellow transition-colors">
+              SETTINGS
             </Link>
             <span className="hidden sm:block text-neutral-600">|</span>
             {isAdmin && (

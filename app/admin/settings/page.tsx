@@ -16,7 +16,11 @@ import {
   Globe,
   Upload,
   Image,
-  X
+  X,
+  Lock,
+  Mail,
+  User,
+  Shield
 } from 'lucide-react'
 import { useLogo } from '@/contexts/LogoContext'
 import toast from 'react-hot-toast'
@@ -24,8 +28,11 @@ import toast from 'react-hot-toast'
 export default function SettingsPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
+  const [emailChanged, setEmailChanged] = useState(false)
+  const [passwordChanged, setPasswordChanged] = useState(false)
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
   const { logoUrl, updateLogo, isLoading: logoLoading } = useLogo()
+  
   const [settings, setSettings] = useState({
     // General Settings
     siteName: 'Proofing System',
@@ -34,26 +41,49 @@ export default function SettingsPage() {
     logoUrl: logoUrl,
   })
 
-  // Load settings from database on mount
+  // Profile update state
+  const [profile, setProfile] = useState({
+    email: '',
+    firstName: '',
+    lastName: '',
+  })
+
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  })
+
+  const [emailForm, setEmailForm] = useState({
+    newEmail: '',
+    currentPassword: '',
+  })
+
+ 
+
+  // Load admin profile
   useEffect(() => {
-    const loadSettings = async () => {
+    const loadProfile = async () => {
+      setIsLoading(true)
       try {
-        const response = await fetch('/api/settings')
+        const response = await fetch('/api/admin/profile')
         if (response.ok) {
           const data = await response.json()
-          setSettings({
-            siteName: data.siteName || 'Proofing System',
-            siteDescription: data.siteDescription || 'Professional design proofing and client feedback system',
-            adminEmail: data.adminEmail || 'admin@proofing-system.com',
-            logoUrl: data.logoUrl || '/images/nsb-logo.png',
+          setProfile({
+            email: data.email,
+            firstName: data.firstName,
+            lastName: data.lastName,
           })
+          setEmailForm(prev => ({ ...prev, newEmail: data.email }))
         }
       } catch (error) {
-        console.error('Error loading settings:', error)
+        console.error('Error loading profile:', error)
+      } finally {
+        setIsLoading(false)
       }
     }
 
-    loadSettings()
+    loadProfile()
   }, [])
 
   // Update settings when logoUrl changes
@@ -61,42 +91,7 @@ export default function SettingsPage() {
     setSettings(prev => ({ ...prev, logoUrl }))
   }, [logoUrl])
 
-  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file) {
-      // Create preview URL for immediate display
-      const previewUrl = URL.createObjectURL(file)
-      setLogoPreview(previewUrl)
-      
-      // Upload file to server
-      try {
-        const formData = new FormData()
-        formData.append('file', file)
-        
-        const response = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
-        })
-        
-        if (response.ok) {
-          const result = await response.json()
-          // Update logo with the server URL
-          updateLogo(result.fileUrl)
-          toast.success('Logo uploaded successfully!')
-        } else {
-          toast.error('Failed to upload logo')
-        }
-      } catch (error) {
-        console.error('Error uploading logo:', error)
-        toast.error('Failed to upload logo')
-      }
-    }
-  }
-
-  const removeLogo = () => {
-    setLogoPreview(null)
-    updateLogo('/images/nsb-logo.png')
-  }
+ 
 
   const handleInputChange = (field: string, value: any) => {
     setSettings(prev => ({
@@ -105,28 +100,129 @@ export default function SettingsPage() {
     }))
   }
 
-  const handleSave = async () => {
-    setIsLoading(true)
+  
+
+  const handleUpdateEmail = async () => {
+    if (!emailForm.currentPassword) {
+      toast.error('Please enter your current password')
+      return
+    }
+
+    if (!emailForm.newEmail) {
+      toast.error('Please enter a new email address')
+      return
+    }
+
+    if (emailForm.newEmail === profile.email) {
+      toast.error('New email is the same as current email')
+      return
+    }
+
+    setEmailChanged(true)
     try {
-      const response = await fetch('/api/settings', {
+      const response = await fetch('/api/admin/profile', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(settings),
+        body: JSON.stringify({
+          email: emailForm.newEmail,
+          currentPassword: emailForm.currentPassword,
+        }),
       })
 
+      const data = await response.json()
+
       if (response.ok) {
-        toast.success('Settings saved successfully!')
+        toast.success('Email updated successfully! Logging out...')
+        
+        // Call logout endpoint to properly clear httpOnly cookie
+        await fetch('/api/admin/logout', { method: 'POST' })
+        
+        // Redirect to login
+        setTimeout(() => {
+          router.push('/admin/login?message=Email updated successfully. Please log in with your new email.')
+        }, 1500)
       } else {
-        toast.error('Failed to save settings')
+        toast.error(data.error || 'Failed to update email')
       }
     } catch (error) {
-      console.error('Error saving settings:', error)
-      toast.error('Failed to save settings')
+      console.error('Error updating email:', error)
+      toast.error('Failed to update email')
     } finally {
-      setIsLoading(false)
+      setEmailChanged(false)
     }
+  }
+
+  const handleUpdatePassword = async () => {
+    if (!passwordForm.currentPassword) {
+      toast.error('Please enter your current password')
+      return
+    }
+
+    if (!passwordForm.newPassword) {
+      toast.error('Please enter a new password')
+      return
+    }
+
+    if (passwordForm.newPassword.length < 8) {
+      toast.error('New password must be at least 8 characters')
+      return
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast.error('New passwords do not match')
+      return
+    }
+
+    setPasswordChanged(true)
+    try {
+      const response = await fetch('/api/admin/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword,
+          confirmPassword: passwordForm.confirmPassword,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        toast.success('Password updated successfully! Logging out...')
+        
+        // Call logout endpoint to properly clear httpOnly cookie
+        await fetch('/api/admin/logout', { method: 'POST' })
+        
+        // Redirect to login
+        setTimeout(() => {
+          router.push('/admin/login?message=Password updated successfully. Please log in with your new password.')
+        }, 1500)
+      } else {
+        toast.error(data.error || 'Failed to update password')
+      }
+    } catch (error) {
+      console.error('Error updating password:', error)
+      toast.error('Failed to update password')
+    } finally {
+      setPasswordChanged(false)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <AdminLayout title="Project Details" description="View project details and files" icon={<Save className="h-8 w-8 text-brand-yellow" />}>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-brand-yellow border-t-transparent mx-auto"></div>
+          <p className="mt-4 text-xl text-gray-300">Loading Profile...</p>
+        </div>
+      </div>
+    </AdminLayout>
+    )
   }
 
   return (
@@ -139,123 +235,147 @@ export default function SettingsPage() {
         </div>
 
         <div className="space-y-8">
-          {/* General Settings */}
+       
+
+          {/* Update Email */}
           <Card className="bg-neutral-900 border-neutral-800 hover:border-brand-yellow/30 transition-colors">
             <CardHeader>
               <CardTitle className="text-white text-xl flex items-center gap-2">
-                <Globe className="h-5 w-5 text-brand-yellow" />
-                General Settings
+                <Mail className="h-5 w-5 text-brand-yellow" />
+                Change Email Address
               </CardTitle>
               <CardDescription className="text-neutral-400">
-                Basic system configuration and branding
+                Update your login email address. You'll need to log in again after changing.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Logo Upload Section */}
-              <div className="space-y-4">
-                <Label className="text-neutral-300">Site Logo</Label>
-                <div className="flex items-center gap-4">
-                  <div className="relative">
-                    <div className="w-32 h-20 bg-neutral-800 border border-neutral-700 rounded-lg flex items-center justify-center overflow-hidden">
-                      {logoPreview || logoUrl ? (
-                        <img 
-                          src={logoPreview || logoUrl} 
-                          alt="Site Logo" 
-                          className="max-w-full max-h-full object-contain"
-                        />
-                      ) : (
-                        <Image className="h-8 w-8 text-neutral-500" />
-                      )}
-                    </div>
-                    {logoPreview && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={removeLogo}
-                        className="absolute -top-2 -right-2 h-6 w-6 p-0 bg-red-600 border-red-600 text-white hover:bg-red-700"
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    )}
-                  </div>
-                  
-                  <div className="flex-1">
-                    <input
-                      type="file"
-                      id="logoUpload"
-                      accept="image/*"
-                      onChange={handleLogoUpload}
-                      className="hidden"
-                    />
-                    <Button
-                      variant="outline"
-                      onClick={() => document.getElementById('logoUpload')?.click()}
-                      className="border-neutral-600 text-neutral-300 hover:bg-neutral-800 hover:text-brand-yellow bg-neutral-900"
-                    >
-                      <Upload className="h-4 w-4 mr-2" />
-                      Upload Logo
-                    </Button>
-                    <p className="text-xs text-neutral-400 mt-2">Recommended: 200x60px, PNG or JPG format</p>
-                  </div>
-                </div>
-              </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="siteName" className="text-neutral-300">Site Name</Label>
+                  <Label htmlFor="newEmail" className="text-neutral-300">New Email Address</Label>
                   <Input
-                    id="siteName"
-                    value={settings.siteName}
-                    onChange={(e) => handleInputChange('siteName', e.target.value)}
+                    id="newEmail"
+                    type="email"
+                    value={emailForm.newEmail}
+                    onChange={(e) => setEmailForm(prev => ({ ...prev, newEmail: e.target.value }))}
+                    placeholder="newemail@example.com"
                     className="bg-neutral-800 border-neutral-700 text-white placeholder-neutral-400 focus:border-brand-yellow focus:ring-brand-yellow/20"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="adminEmail" className="text-neutral-300">Admin Email</Label>
+                  <Label htmlFor="emailPassword" className="text-neutral-300">Current Password</Label>
                   <Input
-                    id="adminEmail"
-                    type="email"
-                    value={settings.adminEmail}
-                    onChange={(e) => handleInputChange('adminEmail', e.target.value)}
+                    id="emailPassword"
+                    type="password"
+                    value={emailForm.currentPassword}
+                    onChange={(e) => setEmailForm(prev => ({ ...prev, currentPassword: e.target.value }))}
+                    placeholder="Enter your current password"
                     className="bg-neutral-800 border-neutral-700 text-white placeholder-neutral-400 focus:border-brand-yellow focus:ring-brand-yellow/20"
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="siteDescription" className="text-neutral-300">Site Description</Label>
-                <Textarea
-                  id="siteDescription"
-                  value={settings.siteDescription}
-                  onChange={(e) => handleInputChange('siteDescription', e.target.value)}
-                  rows={3}
-                  className="bg-neutral-800 border-neutral-700 text-white placeholder-neutral-400 focus:border-brand-yellow focus:ring-brand-yellow/20 resize-none"
-                />
+              <div className="flex justify-end">
+                <Button
+                  onClick={handleUpdateEmail}
+                  disabled={emailChanged || !emailForm.newEmail || !emailForm.currentPassword}
+                  className="bg-brand-yellow hover:bg-brand-yellow/90 text-black font-semibold px-6"
+                >
+                  {emailChanged ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2"></div>
+                      Updating...
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="h-4 w-4 mr-2" />
+                      Update Email
+                    </>
+                  )}
+                </Button>
               </div>
             </CardContent>
           </Card>
 
-          {/* Save Button */}
-          <div className="flex justify-end pt-6">
-            <Button
-              onClick={handleSave}
-              disabled={isLoading}
-              className="bg-brand-yellow hover:bg-brand-yellow/90 text-black font-semibold px-8"
-            >
-              {isLoading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2"></div>
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Settings
-                </>
-              )}
-            </Button>
-          </div>
+          {/* Update Password */}
+          <Card className="bg-neutral-900 border-neutral-800 hover:border-brand-yellow/30 transition-colors">
+            <CardHeader>
+              <CardTitle className="text-white text-xl flex items-center gap-2">
+                <Lock className="h-5 w-5 text-brand-yellow" />
+                Change Password
+              </CardTitle>
+              <CardDescription className="text-neutral-400">
+                Update your account password. Must be at least 8 characters.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="currentPassword" className="text-neutral-300">Current Password</Label>
+                  <Input
+                    id="currentPassword"
+                    type="password"
+                    value={passwordForm.currentPassword}
+                    onChange={(e) => setPasswordForm(prev => ({ ...prev, currentPassword: e.target.value }))}
+                    placeholder="Enter your current password"
+                    className="bg-neutral-800 border-neutral-700 text-white placeholder-neutral-400 focus:border-brand-yellow focus:ring-brand-yellow/20"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="newPassword" className="text-neutral-300">New Password</Label>
+                    <Input
+                      id="newPassword"
+                      type="password"
+                      value={passwordForm.newPassword}
+                      onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
+                      placeholder="Enter new password (min 8 chars)"
+                      className="bg-neutral-800 border-neutral-700 text-white placeholder-neutral-400 focus:border-brand-yellow focus:ring-brand-yellow/20"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword" className="text-neutral-300">Confirm New Password</Label>
+                    <Input
+                      id="confirmPassword"
+                      type="password"
+                      value={passwordForm.confirmPassword}
+                      onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                      placeholder="Confirm new password"
+                      className="bg-neutral-800 border-neutral-700 text-white placeholder-neutral-400 focus:border-brand-yellow focus:ring-brand-yellow/20"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button
+                  onClick={handleUpdatePassword}
+                  disabled={passwordChanged || !passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword}
+                  className="bg-brand-yellow hover:bg-brand-yellow/90 text-black font-semibold px-6"
+                >
+                  {passwordChanged ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2"></div>
+                      Updating...
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="h-4 w-4 mr-2" />
+                      Update Password
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+         
+
+        
+
+      
         </div>
       </div>
     </AdminLayout>
