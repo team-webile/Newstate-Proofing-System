@@ -165,7 +165,7 @@ function LoginForm() {
                 )}
               </Button>
             </form>
-            <div className="text-center mt-6">
+            {/* <div className="text-center mt-6">
           <p className="text-sm text-gray-300">
             Default admin credentials:
           </p>
@@ -173,7 +173,7 @@ function LoginForm() {
             Email: admin@proofing-system.com<br />
             Password: AdminPass123!
           </p>
-        </div>
+        </div> */}
           </CardContent>
         </Card>
 
