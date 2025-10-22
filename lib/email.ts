@@ -20,8 +20,7 @@ const getEmailTransporter = async () => {
     host: smtpConfig.host,
     port: smtpConfig.port,
     secure: smtpConfig.secure,
-    user: smtpConfig.auth.user,
-    environment: process.env.NODE_ENV || 'development'
+    user: smtpConfig.auth.user
   })
 
   return nodemailer.createTransport(smtpConfig)
@@ -84,7 +83,7 @@ interface CommentNotificationData {
  */
 export async function sendClientMessageNotificationToAdmin(
   data: CommentNotificationData
-): Promise<{ success: boolean; emailSentTo?: string; error?: string; details?: any }> {
+): Promise<{ success: boolean; emailSentTo?: string }> {
   try {
     console.log('📧 Starting admin notification process...')
     const transporter = await getEmailTransporter()
@@ -198,28 +197,13 @@ Notification sent at ${new Date().toLocaleString()}
     console.log(`📧 Email sent to: ${adminEmail}`)
     return { success: true, emailSentTo: adminEmail }
   } catch (error) {
-    const errorDetails = {
-      message: error instanceof Error ? error.message : String(error),
-      code: (error as any)?.code,
-      command: (error as any)?.command,
-      response: (error as any)?.response,
-      stack: error instanceof Error ? error.stack : undefined
-    }
-    
     console.error('❌ Error sending admin notification:', error)
-    console.error('❌ Error details:', errorDetails)
     console.error('❌ Email configuration:', {
-      host: process.env.SMTP_HOST || 'smtp.ionos.com',
-      port: process.env.SMTP_PORT || '465',
-      user: process.env.SMTP_USER || 'art@newstatebranding.com',
-      environment: process.env.NODE_ENV
+      host: 'smtp.ionos.com',
+      port: 465,
+      user: 'art@newstatebranding.com'
     })
-    
-    return { 
-      success: false, 
-      error: `Email sending failed: ${errorDetails.message}`,
-      details: errorDetails
-    }
+    return { success: false }
   }
 }
 
@@ -228,7 +212,7 @@ Notification sent at ${new Date().toLocaleString()}
  */
 export async function sendAdminReplyNotificationToClient(
   data: CommentNotificationData
-): Promise<{ success: boolean; emailSentTo?: string; error?: string; details?: any }> {
+): Promise<{ success: boolean; emailSentTo?: string }> {
   try {
     if (!data.clientEmail) {
       console.log('⚠️ No client email provided, skipping notification')
@@ -332,28 +316,13 @@ Sent at ${new Date().toLocaleString()}
     console.log(`✅ Client notification sent to ${data.clientEmail}`)
     return { success: true, emailSentTo: data.clientEmail }
   } catch (error) {
-    const errorDetails = {
-      message: error instanceof Error ? error.message : String(error),
-      code: (error as any)?.code,
-      command: (error as any)?.command,
-      response: (error as any)?.response,
-      stack: error instanceof Error ? error.stack : undefined
-    }
-    
     console.error('❌ Error sending client notification:', error)
-    console.error('❌ Error details:', errorDetails)
     console.error('❌ Email configuration:', {
-      host: process.env.SMTP_HOST || 'smtp.ionos.com',
-      port: process.env.SMTP_PORT || '465',
-      user: process.env.SMTP_USER || 'art@newstatebranding.com',
-      environment: process.env.NODE_ENV
+      host: 'smtp.ionos.com',
+      port: 465,
+      user: 'art@newstatebranding.com'
     })
-    
-    return { 
-      success: false, 
-      error: `Email sending failed: ${errorDetails.message}`,
-      details: errorDetails
-    }
+    return { success: false }
   }
 }
 
@@ -369,55 +338,5 @@ export async function verifyEmailConfig(): Promise<boolean> {
   } catch (error) {
     console.error('❌ Email configuration error:', error)
     return false
-  }
-}
-
-/**
- * Process email notification in background with retry logic
- */
-export async function processEmailNotification(
-  notificationData: CommentNotificationData,
-  isAdminNotification: boolean = true
-): Promise<{ success: boolean; error?: string; details?: any }> {
-  const maxRetries = 3
-  let retryCount = 0
-  let lastError: any = null
-
-  while (retryCount < maxRetries) {
-    try {
-      let result
-      if (isAdminNotification) {
-        result = await sendClientMessageNotificationToAdmin(notificationData)
-      } else {
-        result = await sendAdminReplyNotificationToClient(notificationData)
-      }
-
-      if (result.success) {
-        console.log(`✅ Email notification sent successfully (attempt ${retryCount + 1})`)
-        return { success: true }
-      } else {
-        lastError = result.error || result.details || 'Email sending failed'
-        throw new Error(lastError)
-      }
-    } catch (error) {
-      retryCount++
-      lastError = error
-      console.error(`❌ Email notification attempt ${retryCount} failed:`, error)
-      
-      if (retryCount < maxRetries) {
-        // Wait before retry (exponential backoff)
-        const delay = Math.pow(2, retryCount) * 1000
-        console.log(`⏳ Retrying email notification in ${delay}ms...`)
-        await new Promise(resolve => setTimeout(resolve, delay))
-      } else {
-        console.error(`❌ Email notification failed after ${maxRetries} attempts`)
-      }
-    }
-  }
-
-  return { 
-    success: false, 
-    error: lastError instanceof Error ? lastError.message : String(lastError),
-    details: lastError
   }
 }

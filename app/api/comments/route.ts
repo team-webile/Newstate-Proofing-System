@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma, checkDatabaseConnection } from '@/lib/db'
-import { processEmailNotification } from '@/lib/email'
+import { sendClientMessageNotificationToAdmin, sendAdminReplyNotificationToClient } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30 // 30 seconds max duration
@@ -69,12 +69,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Design item ID, author, and content are required" }, { status: 400 })
     }
 
-    // Create comment with reduced timeout
+    // Add timeout wrapper for comment creation
     const comment = await Promise.race([
       prisma.comment.create({
         data: {
           designItemId: parseInt(designItemId),
           author: author,
+          authorEmail: authorEmail || null,
+          isAdmin: isAdmin,
           content: content,
           type: type || 'comment',
           drawingData: drawingData || null,
@@ -88,96 +90,77 @@ export async function POST(request: NextRequest) {
         }
       }),
       new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Comment creation timeout')), 10000) // Reduced from 20s to 10s
+        setTimeout(() => reject(new Error('Comment creation timeout')), 20000)
       )
     ]) as any
 
-    // Send email notifications asynchronously (don't block response)
+    // Send email notifications and handle errors
     let emailError = null
     let emailSentTo = null
-    let emailSuccess = false
-    
-    // Process email notifications in background with retry logic
-    setImmediate(async () => {
-      try {
-        // Get design item with review and project info
-        const designItem = await prisma.designItem.findUnique({
-          where: { id: parseInt(designItemId) },
-          include: {
-            review: {
-              include: {
-                project: true
-              }
-            }
-          }
-        })
-
-        if (designItem) {
-          const reviewLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://review.newstatebranding.com'}/review/${designItem.review.shareLink}`
-          
-          // If client sent message, notify admin
-          if (!isAdmin) {
-            const notificationData = {
-              clientName: author,
-              clientEmail: authorEmail || 'No email provided', // Client's email for admin to see
-              commentContent: content,
-              projectName: designItem.review.project.name,
-              projectNumber: designItem.review.project.projectNumber,
-              reviewLink: reviewLink,
-              designFileName: designItem.fileName,
-              commentType: type || 'comment'
-            }
-            const emailResult = await processEmailNotification(notificationData, true) // true = admin notification
-            if (emailResult.success) {
-              emailSuccess = true
-              emailSentTo = 'admin'
-              console.log('✅ Admin notification sent successfully')
-            } else {
-              emailError = emailResult.error
-              console.error('❌ Admin notification failed:', emailResult.error)
-              console.error('❌ Error details:', emailResult.details)
-            }
-          } 
-          // If admin sent message, notify client
-          else if (isAdmin && recipientEmail) {
-            const notificationData = {
-              clientName: author, // Admin's name
-              clientEmail: recipientEmail, // Client's email to send notification to
-              commentContent: content,
-              projectName: designItem.review.project.name,
-              projectNumber: designItem.review.project.projectNumber,
-              reviewLink: reviewLink,
-              designFileName: designItem.fileName,
-              commentType: type || 'comment'
-            }
-            const emailResult = await processEmailNotification(notificationData, false) // false = client notification
-            if (emailResult.success) {
-              emailSuccess = true
-              emailSentTo = recipientEmail
-              console.log('✅ Client notification sent successfully')
-            } else {
-              emailError = emailResult.error
-              console.error('❌ Client notification failed:', emailResult.error)
-              console.error('❌ Error details:', emailResult.details)
+    try {
+      // Get design item with review and project info
+      const designItem = await prisma.designItem.findUnique({
+        where: { id: parseInt(designItemId) },
+        include: {
+          review: {
+            include: {
+              project: true
             }
           }
         }
-      } catch (emailError) {
-        console.error('Error processing email notification:', emailError)
+      })
+
+      if (designItem) {
+        const reviewLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://review.newstatebranding.com'}/review/${designItem.review.shareLink}`
+        
+        // If client sent message, notify admin
+        if (!isAdmin && authorEmail) {
+          const notificationData = {
+            clientName: author,
+            clientEmail: authorEmail, // Client's email for admin to see
+            commentContent: content,
+            projectName: designItem.review.project.name,
+            projectNumber: designItem.review.project.projectNumber,
+            reviewLink: reviewLink,
+            designFileName: designItem.fileName,
+            commentType: type || 'comment'
+          }
+          const emailResult = await sendClientMessageNotificationToAdmin(notificationData)
+          if (emailResult.success) {
+            emailSentTo = emailResult.emailSentTo
+          } else {
+            emailError = 'Failed to send admin notification email'
+          }
+        } 
+        // If admin sent message, notify client
+        else if (isAdmin && recipientEmail) {
+          const notificationData = {
+            clientName: author, // Admin's name
+            clientEmail: recipientEmail, // Client's email to send notification to
+            commentContent: content,
+            projectName: designItem.review.project.name,
+            projectNumber: designItem.review.project.projectNumber,
+            reviewLink: reviewLink,
+            designFileName: designItem.fileName,
+            commentType: type || 'comment'
+          }
+          const emailResult = await sendAdminReplyNotificationToClient(notificationData)
+          if (emailResult.success) {
+            emailSentTo = emailResult.emailSentTo
+          } else {
+            emailError = 'Failed to send client notification email'
+          }
+        }
       }
-    })
+    } catch (emailError) {
+      console.error('Error sending email notification:', emailError)
+      emailError = `Email notification error: ${emailError instanceof Error ? emailError.message : 'Unknown error'}`
+    }
 
     return NextResponse.json({
       ...comment,
       emailError: emailError,
-      emailSentTo: emailSentTo,
-      emailSuccess: emailSuccess,
-      emailDetails: {
-        success: emailSuccess,
-        error: emailError,
-        sentTo: emailSentTo,
-        message: emailSuccess ? 'Email sent successfully' : (emailError || 'Email not sent')
-      }
+      emailSentTo: emailSentTo
     })
   } catch (error) {
     console.error('Error creating comment:', error)
