@@ -1,4 +1,4 @@
-import * as nodemailer from 'nodemailer'
+const nodemailer = require('nodemailer')
 import { prisma } from './db'
 
 // Email configuration from environment variables
