@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import nodemailer from 'nodemailer'
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,33 +16,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate environment variables
-    const smtpUser = process.env.SMTP_USER
-    const smtpPassword = process.env.SMTP_PASSWORD
-    const smtpHost = process.env.SMTP_HOST || 'smtp.ionos.com'
-    const smtpPort = parseInt(process.env.SMTP_PORT || '465')
-
-    if (!smtpUser || !smtpPassword) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'SMTP configuration is missing. Please set SMTP_USER and SMTP_PASSWORD environment variables.',
-        },
-        { status: 500 }
-      )
-    }
-
-    // Import nodemailer dynamically
-    const nodemailer = (await import('nodemailer')).default
-
-    // Create transporter using SMTP settings from environment variables
+    // Create transporter using IONOS SMTP settings
     const transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: smtpPort === 465, // true for 465, false for other ports
+      host: 'smtp.ionos.com',
+      port: 465,
+      secure: true, // true for 465, false for other ports
       auth: {
-        user: smtpUser,
-        pass: smtpPassword,
+        user: 'art@newstatebranding.com',
+        pass: 'Suspect3*_*',
       },
     })
 
@@ -50,7 +32,7 @@ export async function POST(request: NextRequest) {
 
     // Email options
     const mailOptions = {
-      from: smtpUser,
+      from: 'art@newstatebranding.com',
       to: to,
       subject: subject,
       html: `
@@ -96,44 +78,24 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET method to send a test email
+// GET method to send a test email to art@newstatebranding.com
 export async function GET() {
   try {
-    // Validate environment variables
-    const smtpUser = process.env.SMTP_USER
-    const smtpPassword = process.env.SMTP_PASSWORD
-    const smtpHost = process.env.SMTP_HOST || 'smtp.ionos.com'
-    const smtpPort = parseInt(process.env.SMTP_PORT || '465')
-    const adminEmail = process.env.ADMIN_EMAIL || smtpUser
-
-    if (!smtpUser || !smtpPassword) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'SMTP configuration is missing. Please set SMTP_USER and SMTP_PASSWORD environment variables.',
-        },
-        { status: 500 }
-      )
-    }
-
-    // Import nodemailer dynamically
-    const nodemailer = (await import('nodemailer')).default
-
-    const transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: smtpPort === 465,
+    const transporter = nodemailer.createTransporter({
+      host: 'smtp.ionos.com',
+      port: 465,
+      secure: true,
       auth: {
-        user: smtpUser,
-        pass: smtpPassword,
+        user: 'art@newstatebranding.com',
+        pass: 'Suspect3*_*',
       },
     })
 
     await transporter.verify()
 
     const mailOptions = {
-      from: smtpUser,
-      to: adminEmail,
+      from: 'art@newstatebranding.com',
+      to: 'art@newstatebranding.com',
       subject: 'Test Email from Newstate Proofing System',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -160,9 +122,9 @@ export async function GET() {
     return NextResponse.json(
       {
         success: true,
-        message: `Test email sent successfully to ${adminEmail}`,
+        message: 'Test email sent successfully to art@newstatebranding.com',
         messageId: info.messageId,
-        recipient: adminEmail,
+        recipient: 'art@newstatebranding.com',
         timestamp: new Date().toISOString(),
       },
       { status: 200 }
