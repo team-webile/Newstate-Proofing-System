@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-const nodemailer = require('nodemailer')
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,6 +30,9 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       )
     }
+
+    // Import nodemailer dynamically
+    const nodemailer = (await import('nodemailer')).default
 
     // Create transporter using SMTP settings from environment variables
     const transporter = nodemailer.createTransport({
@@ -114,7 +116,10 @@ export async function GET() {
       )
     }
 
-    const transporter = nodemailer.createTransporter({
+    // Import nodemailer dynamically
+    const nodemailer = (await import('nodemailer')).default
+
+    const transporter = nodemailer.createTransport({
       host: smtpHost,
       port: smtpPort,
       secure: smtpPort === 465,

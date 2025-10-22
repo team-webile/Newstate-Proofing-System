@@ -1,8 +1,7 @@
-const nodemailer = require('nodemailer')
 import { prisma } from './db'
 
 // Email configuration from environment variables
-const getEmailTransporter = () => {
+const getEmailTransporter = async () => {
   const smtpHost = process.env.SMTP_HOST || 'smtp.ionos.com'
   const smtpPort = parseInt(process.env.SMTP_PORT || '465')
   const smtpUser = process.env.SMTP_USER
@@ -11,6 +10,9 @@ const getEmailTransporter = () => {
   if (!smtpUser || !smtpPass) {
     throw new Error('SMTP_USER and SMTP_PASSWORD environment variables are required')
   }
+
+  // Import nodemailer dynamically
+  const nodemailer = (await import('nodemailer')).default
 
   return nodemailer.createTransport({
     host: smtpHost,
@@ -56,7 +58,7 @@ export async function sendClientMessageNotificationToAdmin(
   data: CommentNotificationData
 ): Promise<boolean> {
   try {
-    const transporter = getEmailTransporter()
+    const transporter = await getEmailTransporter()
     const adminEmail = await getAdminEmail()
     const fromEmail = getSenderEmail()
 
@@ -175,7 +177,7 @@ export async function sendAdminReplyNotificationToClient(
       return false
     }
 
-    const transporter = getEmailTransporter()
+    const transporter = await getEmailTransporter()
     const fromEmail = getSenderEmail()
 
     const mailOptions = {
@@ -278,7 +280,7 @@ Sent at ${new Date().toLocaleString()}
  */
 export async function verifyEmailConfig(): Promise<boolean> {
   try {
-    const transporter = getEmailTransporter()
+    const transporter = await getEmailTransporter()
     await transporter.verify()
     console.log('✅ Email configuration verified')
     return true
