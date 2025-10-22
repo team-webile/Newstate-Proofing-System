@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
       author, 
       authorEmail,
       isAdmin = false,
+      recipientEmail, // Email of the person to notify
       content, 
       type, 
       drawingData, 
@@ -82,22 +83,30 @@ export async function POST(request: NextRequest) {
         if (designItem) {
           const reviewLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://review.newstatebranding.com'}/review/${designItem.review.shareLink}`
           
-          const notificationData = {
-            clientName: author,
-            clientEmail: authorEmail,
-            commentContent: content,
-            projectName: designItem.review.project.name,
-            projectNumber: designItem.review.project.projectNumber,
-            reviewLink: reviewLink,
-            designFileName: designItem.fileName
-          }
-
           // If client sent message, notify admin
-          if (!isAdmin) {
+          if (!isAdmin && authorEmail) {
+            const notificationData = {
+              clientName: author,
+              clientEmail: authorEmail, // Client's email for admin to see
+              commentContent: content,
+              projectName: designItem.review.project.name,
+              projectNumber: designItem.review.project.projectNumber,
+              reviewLink: reviewLink,
+              designFileName: designItem.fileName
+            }
             await sendClientMessageNotificationToAdmin(notificationData)
           } 
           // If admin sent message, notify client
-          else if (isAdmin && authorEmail) {
+          else if (isAdmin && recipientEmail) {
+            const notificationData = {
+              clientName: author, // Admin's name
+              clientEmail: recipientEmail, // Client's email to send notification to
+              commentContent: content,
+              projectName: designItem.review.project.name,
+              projectNumber: designItem.review.project.projectNumber,
+              reviewLink: reviewLink,
+              designFileName: designItem.fileName
+            }
             await sendAdminReplyNotificationToClient(notificationData)
           }
         }

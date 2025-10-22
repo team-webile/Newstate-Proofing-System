@@ -474,8 +474,9 @@ export function DesignViewer({
         body: JSON.stringify({
           designItemId: selectedItem.id,
           author: authorName,
-          authorEmail: isAdminView ? clientEmail : authorEmail,
+          authorEmail: authorEmail, // Always use the logged-in user's email
           isAdmin: isAdminView,
+          recipientEmail: isAdminView ? clientEmail : undefined, // Client email for admin->client notifications
           content: newCommentText,
           type: isAddingAnnotation ? "annotation" : "comment",
           drawingData: drawingData || null,
