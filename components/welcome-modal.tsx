@@ -1,21 +1,22 @@
 "use client"
 
 import { useState } from "react"
-import { User } from "lucide-react"
+import { User, Mail } from "lucide-react"
 import Image from "next/image"
 
 interface WelcomeModalProps {
-  onSubmit: (name: string) => void
+  onSubmit: (name: string, email: string) => void
   projectName: string
 }
 
 export function WelcomeModal({ onSubmit, projectName }: WelcomeModalProps) {
   const [name, setName] = useState("")
+  const [email, setEmail] = useState("")
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (name.trim()) {
-      onSubmit(name.trim())
+    if (name.trim() && email.trim()) {
+      onSubmit(name.trim(), email.trim())
     }
   }
 
@@ -35,9 +36,9 @@ export function WelcomeModal({ onSubmit, projectName }: WelcomeModalProps) {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6">
-          <div className="mb-6">
+          <div className="mb-4">
             <label className="block text-neutral-300 text-sm font-semibold mb-3">
-              Please enter your name to continue:
+              Please enter your name:
             </label>
             <div className="flex items-center gap-3 px-4 py-3 bg-neutral-900 rounded-lg border-2 border-neutral-800 focus-within:border-[#fdb913] transition-colors">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center flex-shrink-0">
@@ -55,16 +56,35 @@ export function WelcomeModal({ onSubmit, projectName }: WelcomeModalProps) {
             </div>
           </div>
 
+          <div className="mb-6">
+            <label className="block text-neutral-300 text-sm font-semibold mb-3">
+              Please enter your email:
+            </label>
+            <div className="flex items-center gap-3 px-4 py-3 bg-neutral-900 rounded-lg border-2 border-neutral-800 focus-within:border-[#fdb913] transition-colors">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0">
+                <Mail className="w-6 h-6 text-white" />
+              </div>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email..."
+                className="flex-1 bg-transparent text-white text-lg outline-none placeholder:text-neutral-600"
+                required
+              />
+            </div>
+          </div>
+
           <button
             type="submit"
-            disabled={!name.trim()}
+            disabled={!name.trim() || !email.trim()}
             className="w-full px-6 py-4 bg-[#fdb913] text-black font-bold rounded-lg hover:bg-[#e5a711] transition-all uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-lg"
           >
             Start Reviewing
           </button>
 
           <p className="text-xs text-neutral-500 text-center mt-4">
-            Your name will be used to identify your comments and feedback
+            Your name and email will be used to identify your comments and receive notifications
           </p>
         </form>
       </div>

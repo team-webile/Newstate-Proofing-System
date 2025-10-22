@@ -54,6 +54,8 @@ interface DesignViewerProps {
   projectName: string;
   hideApprovalButtons?: boolean; // Add this new prop
   initialStatus?: string; // Add initial status prop
+  clientEmail?: string; // Client email for admin notifications
+  isAdminView?: boolean; // Is this the admin view
 }
 
 interface Comment {
@@ -92,12 +94,15 @@ export function DesignViewer({
   projectName,
   hideApprovalButtons = false,
   initialStatus = 'PENDING',
+  clientEmail,
+  isAdminView = false,
 }: DesignViewerProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [comments, setComments] = useState<Record<number, Comment[]>>({});
   const [annotations, setAnnotations] = useState<Record<number, Annotation[]>>({});
   const [newCommentText, setNewCommentText] = useState("");
   const [authorName, setAuthorName] = useState("");
+  const [authorEmail, setAuthorEmail] = useState("");
   const [isAddingAnnotation, setIsAddingAnnotation] = useState(false);
   const [selectedComment, setSelectedComment] = useState<number | null>(null);
   const [annotationDrawings, setAnnotationDrawings] = useState<
@@ -333,15 +338,17 @@ export function DesignViewer({
     setIsAddingAnnotation(false);
   }, [selectedIndex, selectedItem.id]);
 
-  // Check for author name and show welcome modal if needed
+  // Check for author name and email, show welcome modal if needed
   useEffect(() => {
     if (typeof window !== "undefined") {
       const savedName = localStorage.getItem("client_proofing_author_name");
-      if (savedName) {
+      const savedEmail = localStorage.getItem("client_proofing_author_email");
+      if (savedName && savedEmail) {
         setAuthorName(savedName);
+        setAuthorEmail(savedEmail);
         setShowWelcomeModal(false);
       } else {
-        // No name found, show welcome modal
+        // No name or email found, show welcome modal
         setShowWelcomeModal(true);
       }
     }
@@ -377,17 +384,22 @@ export function DesignViewer({
     };
   }, [selectedItem.id]);
 
-  const handleWelcomeSubmit = (name: string) => {
+  const handleWelcomeSubmit = (name: string, email: string) => {
     setAuthorName(name);
+    setAuthorEmail(email);
     localStorage.setItem("client_proofing_author_name", name);
+    localStorage.setItem("client_proofing_author_email", email);
     setShowWelcomeModal(false);
   };
 
   const handleChangeName = () => {
     const newName = prompt("Enter your new name:", authorName);
-    if (newName && newName.trim()) {
+    const newEmail = prompt("Enter your new email:", authorEmail);
+    if (newName && newName.trim() && newEmail && newEmail.trim()) {
       setAuthorName(newName.trim());
+      setAuthorEmail(newEmail.trim());
       localStorage.setItem("client_proofing_author_name", newName.trim());
+      localStorage.setItem("client_proofing_author_email", newEmail.trim());
     }
   };
 
@@ -462,6 +474,8 @@ export function DesignViewer({
         body: JSON.stringify({
           designItemId: selectedItem.id,
           author: authorName,
+          authorEmail: isAdminView ? clientEmail : authorEmail,
+          isAdmin: isAdminView,
           content: newCommentText,
           type: isAddingAnnotation ? "annotation" : "comment",
           drawingData: drawingData || null,

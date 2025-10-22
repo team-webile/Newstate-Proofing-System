@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { sendClientMessageNotificationToAdmin, sendAdminReplyNotificationToClient } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,6 +32,8 @@ export async function POST(request: NextRequest) {
     const { 
       designItemId, 
       author, 
+      authorEmail,
+      isAdmin = false,
       content, 
       type, 
       drawingData, 
@@ -46,6 +49,8 @@ export async function POST(request: NextRequest) {
       data: {
         designItemId: parseInt(designItemId),
         author: author,
+        authorEmail: authorEmail || null,
+        isAdmin: isAdmin,
         content: content,
         type: type || 'comment',
         drawingData: drawingData || null,
@@ -58,6 +63,47 @@ export async function POST(request: NextRequest) {
         pdfPage: pdfPage || null
       }
     })
+
+    // Send email notifications
+    try {
+      // Get design item with review and project info
+      const designItem = await prisma.designItem.findUnique({
+        where: { id: parseInt(designItemId) },
+        include: {
+          review: {
+            include: {
+              project: true
+            }
+          }
+        }
+      })
+
+      if (designItem) {
+        const reviewLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://devnstage.xyz'}/review/${designItem.review.shareLink}`
+        
+        const notificationData = {
+          clientName: author,
+          clientEmail: authorEmail,
+          commentContent: content,
+          projectName: designItem.review.project.name,
+          projectNumber: designItem.review.project.projectNumber,
+          reviewLink: reviewLink,
+          designFileName: designItem.fileName
+        }
+
+        // If client sent message, notify admin
+        if (!isAdmin) {
+          await sendClientMessageNotificationToAdmin(notificationData)
+        } 
+        // If admin sent message, notify client
+        else if (isAdmin && authorEmail) {
+          await sendAdminReplyNotificationToClient(notificationData)
+        }
+      }
+    } catch (emailError) {
+      // Log email error but don't fail the comment creation
+      console.error('Error sending email notification:', emailError)
+    }
 
     return NextResponse.json(comment)
   } catch (error) {

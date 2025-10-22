@@ -73,6 +73,8 @@ model Comment {
   content         String
   createdAt       DateTime   @default(now()) @map("created_at")
   author          String
+  authorEmail     String?    @map("author_email")
+  isAdmin         Boolean    @default(false) @map("is_admin")
   drawingData     String?    @map("drawing_data")
   type            String     @default("comment")
   canvasHeight    Float?     @map("canvas_height")
