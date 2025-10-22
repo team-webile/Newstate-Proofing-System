@@ -64,45 +64,49 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Send email notifications
-    try {
-      // Get design item with review and project info
-      const designItem = await prisma.designItem.findUnique({
-        where: { id: parseInt(designItemId) },
-        include: {
-          review: {
-            include: {
-              project: true
+    // Send email notifications (only if SMTP is configured)
+    if (process.env.SMTP_USER && process.env.SMTP_PASSWORD) {
+      try {
+        // Get design item with review and project info
+        const designItem = await prisma.designItem.findUnique({
+          where: { id: parseInt(designItemId) },
+          include: {
+            review: {
+              include: {
+                project: true
+              }
             }
           }
-        }
-      })
+        })
 
-      if (designItem) {
-        const reviewLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://devnstage.xyz'}/review/${designItem.review.shareLink}`
-        
-        const notificationData = {
-          clientName: author,
-          clientEmail: authorEmail,
-          commentContent: content,
-          projectName: designItem.review.project.name,
-          projectNumber: designItem.review.project.projectNumber,
-          reviewLink: reviewLink,
-          designFileName: designItem.fileName
-        }
+        if (designItem) {
+          const reviewLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://review.newstatebranding.com'}/review/${designItem.review.shareLink}`
+          
+          const notificationData = {
+            clientName: author,
+            clientEmail: authorEmail,
+            commentContent: content,
+            projectName: designItem.review.project.name,
+            projectNumber: designItem.review.project.projectNumber,
+            reviewLink: reviewLink,
+            designFileName: designItem.fileName
+          }
 
-        // If client sent message, notify admin
-        if (!isAdmin) {
-          await sendClientMessageNotificationToAdmin(notificationData)
-        } 
-        // If admin sent message, notify client
-        else if (isAdmin && authorEmail) {
-          await sendAdminReplyNotificationToClient(notificationData)
+          // If client sent message, notify admin
+          if (!isAdmin) {
+            await sendClientMessageNotificationToAdmin(notificationData)
+          } 
+          // If admin sent message, notify client
+          else if (isAdmin && authorEmail) {
+            await sendAdminReplyNotificationToClient(notificationData)
+          }
         }
+      } catch (emailError) {
+        // Log email error but don't fail the comment creation
+        console.error('Error sending email notification:', emailError)
       }
-    } catch (emailError) {
-      // Log email error but don't fail the comment creation
-      console.error('Error sending email notification:', emailError)
+    } else {
+      console.log('⚠️ SMTP not configured, skipping email notifications')
     }
 
     return NextResponse.json(comment)
