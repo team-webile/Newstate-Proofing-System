@@ -16,14 +16,39 @@ const getEmailTransporter = async () => {
   })
 }
 
-// Get admin email from settings
+// Get admin email directly from database
 async function getAdminEmail(): Promise<string> {
   try {
+    console.log('🔍 Searching for admin user in database...')
+    
+    // First try to get admin email from user table
+    const adminUser = await prisma.user.findFirst({
+      where: { role: 'ADMIN' },
+      select: { email: true, firstName: true, lastName: true }
+    })
+    
+    console.log('👤 Admin user query result:', adminUser)
+    
+    if (adminUser?.email) {
+      console.log('✅ Admin email fetched from user table:', adminUser.email)
+      return adminUser.email
+    }
+    
+    console.log('⚠️ No admin user found, trying settings...')
+    
+    // Fallback to settings
     const settings = await prisma.settings.findFirst()
-    return settings?.adminEmail || process.env.ADMIN_EMAIL || 'admin@newstatebranding.com'
+    console.log('⚙️ Settings query result:', settings)
+    
+    const settingsEmail = settings?.adminEmail || process.env.ADMIN_EMAIL || 'admin@newstatebranding.com'
+    console.log('📧 Using admin email from settings:', settingsEmail)
+    return settingsEmail
   } catch (error) {
-    console.error('Error fetching admin email:', error)
-    return process.env.ADMIN_EMAIL || 'admin@newstatebranding.com'
+    console.error('❌ Error fetching admin email from database:', error)
+    // Final fallback
+    const finalFallback = process.env.ADMIN_EMAIL || 'admin@newstatebranding.com'
+    console.log('📧 Using final fallback admin email:', finalFallback)
+    return finalFallback
   }
 }
 
@@ -48,11 +73,17 @@ interface CommentNotificationData {
  */
 export async function sendClientMessageNotificationToAdmin(
   data: CommentNotificationData
-): Promise<boolean> {
+): Promise<{ success: boolean; emailSentTo?: string }> {
   try {
+    console.log('📧 Starting admin notification process...')
     const transporter = await getEmailTransporter()
+    console.log('📧 Email transporter created')
+    
     const adminEmail = await getAdminEmail()
+    console.log('📧 Admin email retrieved:', adminEmail)
+    
     const fromEmail = getSenderEmail()
+    console.log('📧 From email:', fromEmail)
 
     const mailOptions = {
       from: fromEmail,
@@ -150,7 +181,8 @@ Notification sent at ${new Date().toLocaleString()}
 
     await transporter.sendMail(mailOptions)
     console.log(`✅ Admin notification sent for client message from ${data.clientName}`)
-    return true
+    console.log(`📧 Email sent to: ${adminEmail}`)
+    return { success: true, emailSentTo: adminEmail }
   } catch (error) {
     console.error('❌ Error sending admin notification:', error)
     console.error('❌ Email configuration:', {
@@ -158,7 +190,7 @@ Notification sent at ${new Date().toLocaleString()}
       port: 465,
       user: 'art@newstatebranding.com'
     })
-    return false
+    return { success: false }
   }
 }
 
@@ -167,11 +199,11 @@ Notification sent at ${new Date().toLocaleString()}
  */
 export async function sendAdminReplyNotificationToClient(
   data: CommentNotificationData
-): Promise<boolean> {
+): Promise<{ success: boolean; emailSentTo?: string }> {
   try {
     if (!data.clientEmail) {
       console.log('⚠️ No client email provided, skipping notification')
-      return false
+      return { success: false }
     }
 
     const transporter = await getEmailTransporter()
@@ -206,7 +238,8 @@ export async function sendAdminReplyNotificationToClient(
             </div>
             
             <div class="content">
-              <p style="font-size: 16px; margin-top: 0;">Hello ${data.clientName},</p>
+              <p style="font-size: 16px; margin-top: 0;">Dear ${data.clientEmail},</p>
+
               <p>Your design team has replied to your message regarding your project:</p>
               
               <div class="info-row">
@@ -265,7 +298,7 @@ Sent at ${new Date().toLocaleString()}
 
     await transporter.sendMail(mailOptions)
     console.log(`✅ Client notification sent to ${data.clientEmail}`)
-    return true
+    return { success: true, emailSentTo: data.clientEmail }
   } catch (error) {
     console.error('❌ Error sending client notification:', error)
     console.error('❌ Email configuration:', {
@@ -273,7 +306,7 @@ Sent at ${new Date().toLocaleString()}
       port: 465,
       user: 'art@newstatebranding.com'
     })
-    return false
+    return { success: false }
   }
 }
 

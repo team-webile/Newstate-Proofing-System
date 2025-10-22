@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
 
     // Send email notifications and handle errors
     let emailError = null
+    let emailSentTo = null
     try {
       // Get design item with review and project info
       const designItem = await prisma.designItem.findUnique({
@@ -124,8 +125,10 @@ export async function POST(request: NextRequest) {
             designFileName: designItem.fileName,
             commentType: type || 'comment'
           }
-          const emailSent = await sendClientMessageNotificationToAdmin(notificationData)
-          if (!emailSent) {
+          const emailResult = await sendClientMessageNotificationToAdmin(notificationData)
+          if (emailResult.success) {
+            emailSentTo = emailResult.emailSentTo
+          } else {
             emailError = 'Failed to send admin notification email'
           }
         } 
@@ -141,8 +144,10 @@ export async function POST(request: NextRequest) {
             designFileName: designItem.fileName,
             commentType: type || 'comment'
           }
-          const emailSent = await sendAdminReplyNotificationToClient(notificationData)
-          if (!emailSent) {
+          const emailResult = await sendAdminReplyNotificationToClient(notificationData)
+          if (emailResult.success) {
+            emailSentTo = emailResult.emailSentTo
+          } else {
             emailError = 'Failed to send client notification email'
           }
         }
@@ -154,7 +159,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ...comment,
-      emailError: emailError
+      emailError: emailError,
+      emailSentTo: emailSentTo
     })
   } catch (error) {
     console.error('Error creating comment:', error)

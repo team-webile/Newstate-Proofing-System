@@ -61,7 +61,7 @@ export function WelcomeModal({ onSubmit, projectName, clientEmail }: WelcomeModa
       onSubmit(name.trim(), email.trim())
     }
   }
-
+console.log(profile,'profile');
   return (
     <div className="fixed inset-0 bg-black/95 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-[#1a1a1a] rounded-xl max-w-md w-full border-2 border-[#fdb913] shadow-2xl">
