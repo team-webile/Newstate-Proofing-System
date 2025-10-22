@@ -5,83 +5,69 @@ export async function POST(request: NextRequest) {
   try {
     const { to, subject, message } = await request.json()
 
-    // Validate required fields
     if (!to || !subject || !message) {
       return NextResponse.json(
-        {
-          success: false,
-          message: 'Missing required fields: to, subject, message',
-        },
+        { success: false, message: 'Missing required fields: to, subject, message' },
         { status: 400 }
       )
     }
 
-    // Create transporter using IONOS SMTP settings
+    // ✅ Create transporter (IONOS SMTP)
     const transporter = nodemailer.createTransport({
       host: 'smtp.ionos.com',
       port: 465,
-      secure: true, // true for 465, false for other ports
+      secure: true,
       auth: {
         user: 'art@newstatebranding.com',
         pass: 'Suspect3*_*',
       },
     })
 
-    // Verify connection configuration
+    // ✅ Verify connection
     await transporter.verify()
 
-    // Email options
+    // ✅ Email options
     const mailOptions = {
       from: 'art@newstatebranding.com',
-      to: to,
-      subject: subject,
+      to,
+      subject,
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333;">Test Email from Newstate Proofing System</h2>
-          <p style="color: #666; line-height: 1.6;">${message}</p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-          <p style="color: #999; font-size: 12px;">
-            This is a test email sent from the Newstate Proofing System API.
-            <br>
-            Sent at: ${new Date().toLocaleString()}
-          </p>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto;">
+          <h2 style="color: #333;">📧 Newstate Proofing System Test</h2>
+          <p>${message}</p>
+          <hr>
+          <small style="color: #999;">Sent at: ${new Date().toLocaleString()}</small>
         </div>
       `,
-      text: `${message}\n\nThis is a test email sent from the Newstate Proofing System API.\nSent at: ${new Date().toLocaleString()}`,
     }
 
-    // Send email
+    // ✅ Send email
     const info = await transporter.sendMail(mailOptions)
 
-    return NextResponse.json(
-      {
-        success: true,
-        message: 'Test email sent successfully',
-        messageId: info.messageId,
-        recipient: to,
-        timestamp: new Date().toISOString(),
-      },
-      { status: 200 }
-    )
+    return NextResponse.json({
+      success: true,
+      message: 'Email sent successfully!',
+      messageId: info.messageId,
+      recipient: to,
+      timestamp: new Date().toISOString(),
+    })
   } catch (error) {
     console.error('Email sending error:', error)
-    
     return NextResponse.json(
       {
         success: false,
-        message: 'Failed to send test email',
-        error: error instanceof Error ? error.message : 'Unknown error',
-        timestamp: new Date().toISOString(),
+        message: 'Failed to send email',
+        error: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     )
   }
 }
 
-// GET method to send a test email to art@newstatebranding.com
+// ✅ GET method for simple test email
 export async function GET() {
   try {
-    const transporter = nodemailer.createTransporter({
+    const transporter = nodemailer.createTransport({
       host: 'smtp.ionos.com',
       port: 465,
       secure: true,
@@ -96,48 +82,32 @@ export async function GET() {
     const mailOptions = {
       from: 'art@newstatebranding.com',
       to: 'art@newstatebranding.com',
-      subject: 'Test Email from Newstate Proofing System',
+      subject: '✅ Test Email from Newstate Proofing System',
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333;">Test Email from Newstate Proofing System</h2>
-          <p style="color: #666; line-height: 1.6;">
-            This is a test email to verify that the email sending functionality is working correctly.
-          </p>
-          <p style="color: #666; line-height: 1.6;">
-            If you receive this email, it means the SMTP configuration is properly set up and emails can be sent from the system.
-          </p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-          <p style="color: #999; font-size: 12px;">
-            This is an automated test email sent from the Newstate Proofing System API.
-            <br>
-            Sent at: ${new Date().toLocaleString()}
-          </p>
+        <div style="font-family: Arial, sans-serif;">
+          <h2>SMTP Test Successful 🎉</h2>
+          <p>This email confirms your IONOS SMTP setup is working.</p>
+          <small style="color: gray;">Sent at: ${new Date().toLocaleString()}</small>
         </div>
       `,
-      text: `This is a test email to verify that the email sending functionality is working correctly.\n\nIf you receive this email, it means the SMTP configuration is properly set up and emails can be sent from the system.\n\nThis is an automated test email sent from the Newstate Proofing System API.\nSent at: ${new Date().toLocaleString()}`,
     }
 
     const info = await transporter.sendMail(mailOptions)
 
-    return NextResponse.json(
-      {
-        success: true,
-        message: 'Test email sent successfully to art@newstatebranding.com',
-        messageId: info.messageId,
-        recipient: 'art@newstatebranding.com',
-        timestamp: new Date().toISOString(),
-      },
-      { status: 200 }
-    )
+    return NextResponse.json({
+      success: true,
+      message: 'Test email sent successfully!',
+      messageId: info.messageId,
+      recipient: 'art@newstatebranding.com',
+      timestamp: new Date().toISOString(),
+    })
   } catch (error) {
     console.error('Email sending error:', error)
-    
     return NextResponse.json(
       {
         success: false,
         message: 'Failed to send test email',
-        error: error instanceof Error ? error.message : 'Unknown error',
-        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     )
