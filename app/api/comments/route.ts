@@ -75,8 +75,6 @@ export async function POST(request: NextRequest) {
         data: {
           designItemId: parseInt(designItemId),
           author: author,
-          authorEmail: authorEmail || null,
-          isAdmin: isAdmin,
           content: content,
           type: type || 'comment',
           drawingData: drawingData || null,
