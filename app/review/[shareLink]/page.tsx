@@ -180,6 +180,7 @@ export default function ClientReviewPage() {
             reviewId={review.id} 
             projectName={`${review.project.projectNumber} - ${review.project.name.toUpperCase()}`}
             initialStatus={review.status}
+            clientEmail={review.project.clientEmail}
           />
         )}
       </main>

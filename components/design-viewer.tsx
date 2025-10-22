@@ -1397,12 +1397,13 @@ export function DesignViewer({
       </div>
 
       {/* Welcome Modal */}
-      {showWelcomeModal && (
-        <WelcomeModal
-          onSubmit={handleWelcomeSubmit}
-          projectName={projectName}
-        />
-      )}
+        {showWelcomeModal && (
+          <WelcomeModal 
+            onSubmit={handleWelcomeSubmit} 
+            projectName={projectName}
+            clientEmail={clientEmail}
+          />
+        )}
     </div>
   );
 }

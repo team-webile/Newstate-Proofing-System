@@ -52,6 +52,7 @@ function LoginForm() {
       console.log(data, 'data')
       if (data.success) {
         toast.success('Login successful!')
+        localStorage.setItem('NewStateBrandingAdminRole', data.user.role as string)
         // Login successful, redirect to intended page or default dashboard
         router.push(redirectTo)
         router.refresh()

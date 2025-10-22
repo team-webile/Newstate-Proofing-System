@@ -153,6 +153,11 @@ Notification sent at ${new Date().toLocaleString()}
     return true
   } catch (error) {
     console.error('❌ Error sending admin notification:', error)
+    console.error('❌ Email configuration:', {
+      host: 'smtp.ionos.com',
+      port: 465,
+      user: 'art@newstatebranding.com'
+    })
     return false
   }
 }
@@ -263,6 +268,11 @@ Sent at ${new Date().toLocaleString()}
     return true
   } catch (error) {
     console.error('❌ Error sending client notification:', error)
+    console.error('❌ Email configuration:', {
+      host: 'smtp.ionos.com',
+      port: 465,
+      user: 'art@newstatebranding.com'
+    })
     return false
   }
 }

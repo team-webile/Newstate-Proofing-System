@@ -1,18 +1,60 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { User, Mail } from "lucide-react"
 import Image from "next/image"
 
 interface WelcomeModalProps {
   onSubmit: (name: string, email: string) => void
   projectName: string
+  clientEmail?: string
 }
 
-export function WelcomeModal({ onSubmit, projectName }: WelcomeModalProps) {
+export function WelcomeModal({ onSubmit, projectName, clientEmail }: WelcomeModalProps) {
   const [name, setName] = useState("")
-  const [email, setEmail] = useState("")
+  const [email, setEmail] = useState(clientEmail || "")
+  const [isLoading, setIsLoading] = useState(true)
+  const [profile, setProfile] = useState({
+    email: '',
+    firstName: '',
+    lastName: '',
+    role: '',
+  })
+  useEffect(() => {
+    const loadProfile = async () => {
+      setIsLoading(true)
+      try {
+        const response = await fetch('/api/admin/profile')
+        if (response.ok) {
+          const data = await response.json()
+          setProfile({
+            email: data.email,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            role: data.role,
+          })
+          
+          // Check if user is admin and set email from profile
+          const adminRole = localStorage.getItem('NewStateBrandingAdminRole')
+          if (adminRole === 'ADMIN' && data.email) {
+            setEmail(data.email)
+            setName(`${data.firstName} ${data.lastName}`.trim() || 'Admin User')
+          }
+        }
+      } catch (error) {
+        console.error('Error loading profile:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
 
+    // Only load profile if user is admin
+    if(localStorage.getItem('NewStateBrandingAdminRole') === 'ADMIN'){
+      loadProfile()
+    } else {
+      setIsLoading(false)
+    }
+  }, [])
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (name.trim() && email.trim()) {
@@ -56,24 +98,85 @@ export function WelcomeModal({ onSubmit, projectName }: WelcomeModalProps) {
             </div>
           </div>
 
-          <div className="mb-6">
-            <label className="block text-neutral-300 text-sm font-semibold mb-3">
-              Please enter your email:
-            </label>
-            <div className="flex items-center gap-3 px-4 py-3 bg-neutral-900 rounded-lg border-2 border-neutral-800 focus-within:border-[#fdb913] transition-colors">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0">
-                <Mail className="w-6 h-6 text-white" />
+          {/* Client Email Field */}
+          {(localStorage.getItem('NewStateBrandingAdminRole') !== 'ADMIN') && (
+            <div className="mb-6">
+              <label className="block text-neutral-300 text-sm font-semibold mb-3">
+                Client Email (Pre-filled):
+              </label>
+              <div className="flex items-center gap-3 px-4 py-3 bg-neutral-900 rounded-lg border-2 border-green-500/50 transition-colors">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center flex-shrink-0">
+                  <Mail className="w-6 h-6 text-white" />
+                </div>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Client email address"
+                  className="flex-1 bg-transparent text-white text-lg outline-none placeholder:text-neutral-600"
+                  disabled={true}
+                  required
+                />
+                <div className="text-green-400 text-sm font-medium">
+                  ✓ Client
+                </div>
               </div>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email..."
-                className="flex-1 bg-transparent text-white text-lg outline-none placeholder:text-neutral-600"
-                required
-              />
+              <p className="text-green-400 text-sm mt-2">
+                📧 Your client email has been automatically filled from the project settings
+              </p>
             </div>
-          </div>
+          )}
+
+          {/* Admin Email Field */}
+          {profile.email && localStorage.getItem('NewStateBrandingAdminRole') === 'ADMIN' && (
+            <div className="mb-6">
+              <label className="block text-neutral-300 text-sm font-semibold mb-3">
+                Admin Email (Pre-filled):
+              </label>
+              <div className="flex items-center gap-3 px-4 py-3 bg-neutral-900 rounded-lg border-2 border-blue-500/50 transition-colors">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center flex-shrink-0">
+                  <Mail className="w-6 h-6 text-white" />
+                </div>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Admin email address"
+                  className="flex-1 bg-transparent text-white text-lg outline-none placeholder:text-neutral-600"
+                  disabled={true}
+                  required
+                />
+                <div className="text-blue-400 text-sm font-medium">
+                  ✓ 
+                </div>
+              </div>
+              <p className="text-blue-400 text-sm mt-2">
+                👤 Your admin email has been automatically filled from your profile
+              </p>
+            </div>
+          )}
+
+          {/* Manual Email Field */}
+          {!clientEmail && !profile.email && (
+            <div className="mb-6">
+              <label className="block text-neutral-300 text-sm font-semibold mb-3">
+                Please enter your email:
+              </label>
+              <div className="flex items-center gap-3 px-4 py-3 bg-neutral-900 rounded-lg border-2 border-neutral-800 focus-within:border-[#fdb913] transition-colors">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0">
+                  <Mail className="w-6 h-6 text-white" />
+                </div>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email..."
+                  className="flex-1 bg-transparent text-white text-lg outline-none placeholder:text-neutral-600"
+                  required
+                />
+              </div>
+            </div>
+          )}
 
           <button
             type="submit"
