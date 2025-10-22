@@ -81,7 +81,7 @@ export async function GET() {
 
     const mailOptions = {
       from: 'art@newstatebranding.com',
-      to: 'art@newstatebranding.com',
+      to: 'ladinawan4@gmail.com',
       subject: '✅ Test Email from Newstate Proofing System',
       html: `
         <div style="font-family: Arial, sans-serif;">
