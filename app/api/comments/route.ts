@@ -65,9 +65,8 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Send email notifications (only if SMTP is configured)
-    if (process.env.SMTP_USER && process.env.SMTP_PASSWORD) {
-      try {
+    // Send email notifications
+    try {
         // Get design item with review and project info
         const designItem = await prisma.designItem.findUnique({
           where: { id: parseInt(designItemId) },
@@ -110,12 +109,9 @@ export async function POST(request: NextRequest) {
             await sendAdminReplyNotificationToClient(notificationData)
           }
         }
-      } catch (emailError) {
-        // Log email error but don't fail the comment creation
-        console.error('Error sending email notification:', emailError)
-      }
-    } else {
-      console.log('⚠️ SMTP not configured, skipping email notifications')
+    } catch (emailError) {
+      // Log email error but don't fail the comment creation
+      console.error('Error sending email notification:', emailError)
     }
 
     return NextResponse.json(comment)

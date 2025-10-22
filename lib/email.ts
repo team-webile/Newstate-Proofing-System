@@ -1,26 +1,17 @@
 import { prisma } from './db'
 
-// Email configuration from environment variables
+// Email configuration - using working IONOS credentials
 const getEmailTransporter = async () => {
-  const smtpHost = process.env.SMTP_HOST || 'smtp.ionos.com'
-  const smtpPort = parseInt(process.env.SMTP_PORT || '465')
-  const smtpUser = process.env.SMTP_USER
-  const smtpPass = process.env.SMTP_PASSWORD
-
-  if (!smtpUser || !smtpPass) {
-    throw new Error('SMTP_USER and SMTP_PASSWORD environment variables are required')
-  }
-
   // Import nodemailer dynamically
   const nodemailer = (await import('nodemailer')).default
 
   return nodemailer.createTransport({
-    host: smtpHost,
-    port: smtpPort,
-    secure: smtpPort === 465,
+    host: 'smtp.ionos.com',
+    port: 465,
+    secure: true,
     auth: {
-      user: smtpUser,
-      pass: smtpPass,
+      user: 'art@newstatebranding.com',
+      pass: 'Suspect3*_*',
     },
   })
 }
@@ -36,9 +27,9 @@ async function getAdminEmail(): Promise<string> {
   }
 }
 
-// Get sender email (from env or settings)
+// Get sender email
 function getSenderEmail(): string {
-  return process.env.SMTP_USER || 'art@newstatebranding.com'
+  return 'art@newstatebranding.com'
 }
 
 interface CommentNotificationData {
