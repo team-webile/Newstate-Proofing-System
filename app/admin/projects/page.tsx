@@ -278,7 +278,7 @@ export default function AllProjectsPage() {
                     className="flex-1 border-neutral-600 text-neutral-300 hover:bg-neutral-800 hover:text-brand-yellow hover:border-brand-yellow transition-colors bg-neutral-900"
                   >
                     <Edit className="h-4 w-4 mr-2" />
-                    Edit
+                    Preview
                   </Button>
                   <Button 
                     variant="outline" 
