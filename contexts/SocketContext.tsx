@@ -26,12 +26,15 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   const [isConnected, setIsConnected] = useState(false)
 
   useEffect(() => {
-    // Get socket URL from environment variable or use default localhost
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'https://socket.devnstage.xyz'
+    // Get socket URL from environment variable or use production default
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'https://vps.newstatebranding.com'
     
     // Create socket connection
     const newSocket = io(socketUrl, {
-      transports: ['websocket', 'polling']
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 5
     })
 
     newSocket.on('connect', () => {
