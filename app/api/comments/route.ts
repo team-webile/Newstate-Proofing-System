@@ -116,10 +116,10 @@ export async function POST(request: NextRequest) {
           const reviewLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://review.newstatebranding.com'}/review/${designItem.review.shareLink}`
           
           // If client sent message, notify admin
-          if (!isAdmin && authorEmail) {
+          if (!isAdmin) {
             const notificationData = {
               clientName: author,
-              clientEmail: authorEmail, // Client's email for admin to see
+              clientEmail: authorEmail || 'No email provided', // Client's email for admin to see
               commentContent: content,
               projectName: designItem.review.project.name,
               projectNumber: designItem.review.project.projectNumber,
