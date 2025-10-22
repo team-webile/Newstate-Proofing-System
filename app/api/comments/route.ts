@@ -126,7 +126,11 @@ export async function POST(request: NextRequest) {
               designFileName: designItem.fileName,
               commentType: type || 'comment'
             }
-            await processEmailNotification(notificationData, true) // true = admin notification
+            const emailResult = await processEmailNotification(notificationData, true) // true = admin notification
+            if (!emailResult.success) {
+              console.error('❌ Admin notification failed:', emailResult.error)
+              console.error('❌ Error details:', emailResult.details)
+            }
           } 
           // If admin sent message, notify client
           else if (isAdmin && recipientEmail) {
@@ -140,7 +144,11 @@ export async function POST(request: NextRequest) {
               designFileName: designItem.fileName,
               commentType: type || 'comment'
             }
-            await processEmailNotification(notificationData, false) // false = client notification
+            const emailResult = await processEmailNotification(notificationData, false) // false = client notification
+            if (!emailResult.success) {
+              console.error('❌ Client notification failed:', emailResult.error)
+              console.error('❌ Error details:', emailResult.details)
+            }
           }
         }
       } catch (emailError) {
@@ -151,7 +159,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       ...comment,
       emailError: emailError,
-      emailSentTo: emailSentTo
+      emailSentTo: emailSentTo,
+      emailDetails: {
+        success: !emailError,
+        error: emailError,
+        sentTo: emailSentTo
+      }
     })
   } catch (error) {
     console.error('Error creating comment:', error)
