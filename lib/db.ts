@@ -1,13 +1,38 @@
 import { PrismaClient } from '@prisma/client'
 
-// Global Prisma client instance
+// Global Prisma client instance with optimized configuration
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-export const prisma = globalForPrisma.prisma ?? new PrismaClient()
+export const prisma = globalForPrisma.prisma ?? new PrismaClient({
+  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL,
+    },
+  },
+  // Connection pool optimization
+  __internal: {
+    engine: {
+      connectTimeout: 10000, // 10 seconds
+      queryTimeout: 30000,   // 30 seconds
+    },
+  },
+})
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+
+// Add connection health check
+export async function checkDatabaseConnection() {
+  try {
+    await prisma.$queryRaw`SELECT 1`
+    return true
+  } catch (error) {
+    console.error('Database connection failed:', error)
+    return false
+  }
+}
 
 // Database query helpers using Prisma
 export async function getProjects(archived = false) {

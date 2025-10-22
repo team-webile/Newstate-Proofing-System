@@ -9,6 +9,14 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  // Performance optimizations
+  experimental: {
+    serverComponentsExternalPackages: ['@prisma/client'],
+  },
+  // Timeout configurations
+  serverRuntimeConfig: {
+    maxDuration: 30,
+  },
   async headers() {
     return [
       {
@@ -25,6 +33,15 @@ const nextConfig = {
           {
             key: 'Access-Control-Allow-Headers',
             value: 'Content-Type',
+          },
+        ],
+      },
+      {
+        source: '/api/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-store, max-age=0',
           },
         ],
       },

@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { prisma, checkDatabaseConnection } from '@/lib/db'
 import { sendClientMessageNotificationToAdmin, sendAdminReplyNotificationToClient } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
-// Force TypeScript refresh
+export const maxDuration = 30 // 30 seconds max duration
 
 // GET - Fetch comments for a specific file
 export async function GET(request: NextRequest) {
   try {
+    // Check database connection first
+    const isConnected = await checkDatabaseConnection()
+    if (!isConnected) {
+      return NextResponse.json({ error: "Database connection failed" }, { status: 503 })
+    }
+
     const { searchParams } = new URL(request.url)
     const designItemId = searchParams.get('designItemId')
 
@@ -15,14 +21,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Design item ID is required" }, { status: 400 })
     }
 
-    const comments = await prisma.comment.findMany({
-      where: { designItemId: parseInt(designItemId) },
-      orderBy: { createdAt: 'asc' }
-    })           
+    // Add timeout wrapper
+    const comments = await Promise.race([
+      prisma.comment.findMany({
+        where: { designItemId: parseInt(designItemId) },
+        orderBy: { createdAt: 'asc' },
+        take: 100 // Limit results to prevent large queries
+      }),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Query timeout')), 15000)
+      )
+    ]) as any[]
 
     return NextResponse.json(comments)
   } catch (error) {
     console.error('Error fetching comments:', error)
+    if (error instanceof Error && error.message === 'Query timeout') {
+      return NextResponse.json({ error: "Request timeout - please try again" }, { status: 408 })
+    }
     return NextResponse.json({ error: "Failed to fetch comments" }, { status: 500 })
   }
 }        
@@ -30,6 +46,12 @@ export async function GET(request: NextRequest) {
 // POST - Create a new comment
 export async function POST(request: NextRequest) {
   try {
+    // Check database connection first
+    const isConnected = await checkDatabaseConnection()
+    if (!isConnected) {
+      return NextResponse.json({ error: "Database connection failed" }, { status: 503 })
+    }
+
     const { 
       designItemId, 
       author, 
@@ -47,27 +69,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Design item ID, author, and content are required" }, { status: 400 })
     }
 
-    const comment = await prisma.comment.create({
-      data: {
-        designItemId: parseInt(designItemId),
-        author: author,
-        authorEmail: authorEmail || null,
-        isAdmin: isAdmin,
-        content: content,
-        type: type || 'comment',
-        drawingData: drawingData || null,
-        canvasX: canvasPosition?.x || null,
-        canvasY: canvasPosition?.y || null,
-        canvasWidth: canvasPosition?.width || null,
-        canvasHeight: canvasPosition?.height || null,
-        imageWidth: canvasPosition?.imageWidth || null,
-        imageHeight: canvasPosition?.imageHeight || null,
-        pdfPage: pdfPage || null
-      }
-    })
+    // Add timeout wrapper for comment creation
+    const comment = await Promise.race([
+      prisma.comment.create({
+        data: {
+          designItemId: parseInt(designItemId),
+          author: author,
+          authorEmail: authorEmail || null,
+          isAdmin: isAdmin,
+          content: content,
+          type: type || 'comment',
+          drawingData: drawingData || null,
+          canvasX: canvasPosition?.x || null,
+          canvasY: canvasPosition?.y || null,
+          canvasWidth: canvasPosition?.width || null,
+          canvasHeight: canvasPosition?.height || null,
+          imageWidth: canvasPosition?.imageWidth || null,
+          imageHeight: canvasPosition?.imageHeight || null,
+          pdfPage: pdfPage || null
+        }
+      }),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Comment creation timeout')), 20000)
+      )
+    ]) as any
 
-    // Send email notifications
-    try {
+    // Send email notifications asynchronously (don't wait for it)
+    setImmediate(async () => {
+      try {
         // Get design item with review and project info
         const designItem = await prisma.designItem.findUnique({
           where: { id: parseInt(designItemId) },
@@ -112,14 +141,18 @@ export async function POST(request: NextRequest) {
             await sendAdminReplyNotificationToClient(notificationData)
           }
         }
-    } catch (emailError) {
-      // Log email error but don't fail the comment creation
-      console.error('Error sending email notification:', emailError)
-    }
+      } catch (emailError) {
+        // Log email error but don't fail the comment creation
+        console.error('Error sending email notification:', emailError)
+      }
+    })
 
     return NextResponse.json(comment)
   } catch (error) {
     console.error('Error creating comment:', error)
+    if (error instanceof Error && error.message === 'Comment creation timeout') {
+      return NextResponse.json({ error: "Request timeout - please try again" }, { status: 408 })
+    }
     return NextResponse.json({ error: "Failed to create comment" }, { status: 500 })
   }
 }
