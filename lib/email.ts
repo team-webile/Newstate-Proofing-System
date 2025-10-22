@@ -340,3 +340,44 @@ export async function verifyEmailConfig(): Promise<boolean> {
     return false
   }
 }
+
+/**
+ * Process email notification in background with retry logic
+ */
+export async function processEmailNotification(
+  notificationData: CommentNotificationData,
+  isAdminNotification: boolean = true
+): Promise<void> {
+  const maxRetries = 3
+  let retryCount = 0
+
+  while (retryCount < maxRetries) {
+    try {
+      let result
+      if (isAdminNotification) {
+        result = await sendClientMessageNotificationToAdmin(notificationData)
+      } else {
+        result = await sendAdminReplyNotificationToClient(notificationData)
+      }
+
+      if (result.success) {
+        console.log(`✅ Email notification sent successfully (attempt ${retryCount + 1})`)
+        return
+      } else {
+        throw new Error('Email sending failed')
+      }
+    } catch (error) {
+      retryCount++
+      console.error(`❌ Email notification attempt ${retryCount} failed:`, error)
+      
+      if (retryCount < maxRetries) {
+        // Wait before retry (exponential backoff)
+        const delay = Math.pow(2, retryCount) * 1000
+        console.log(`⏳ Retrying email notification in ${delay}ms...`)
+        await new Promise(resolve => setTimeout(resolve, delay))
+      } else {
+        console.error(`❌ Email notification failed after ${maxRetries} attempts`)
+      }
+    }
+  }
+}
