@@ -85,6 +85,9 @@ export async function sendClientMessageNotificationToAdmin(
     const fromEmail = getSenderEmail()
     console.log('📧 From email:', fromEmail)
 
+    // Create admin review link (for admin to view)
+    const adminReviewLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://review.newstatebranding.com'}/admin/review/${data.reviewLink.split('/review/')[1] || data.reviewLink}`
+    
     const mailOptions = {
       from: fromEmail,
       to: adminEmail,
@@ -106,7 +109,7 @@ export async function sendClientMessageNotificationToAdmin(
             .button { display: inline-block; background: #f59e0b; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; }
             .footer { background: #2d2d2d; color: #999; padding: 20px; text-align: center; font-size: 12px; border-radius: 0 0 8px 8px; }
           </style>
-        </head>
+        </head> 
         <body>
           <div class="container">
             <div class="header">
@@ -143,9 +146,9 @@ export async function sendClientMessageNotificationToAdmin(
                 <p style="white-space: pre-wrap; margin: 0;">${data.commentContent}</p>
               </div>
               
-              <div style="text-align: center;">
-                <a href="${data.reviewLink}" class="button">View Review & Reply</a>
-              </div>
+               <div style="text-align: center;">
+                 <a href="${adminReviewLink}" class="button">View Review & Reply</a>
+               </div>
               
               <p style="color: #666; font-size: 14px; margin-top: 20px;">
                 Click the button above to view the full review and respond to the client's message.
@@ -171,7 +174,7 @@ Design File: ${data.designFileName}
 Message:
 ${data.commentContent}
 
-View and reply to this message: ${data.reviewLink}
+View and reply to this message: ${adminReviewLink}
 
 ---
 Newstate Branding Co. - Proofing System
@@ -209,6 +212,9 @@ export async function sendAdminReplyNotificationToClient(
     const transporter = await getEmailTransporter()
     const fromEmail = getSenderEmail()
 
+    // Create client review link (for client to view)
+    const clientReviewLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://review.newstatebranding.com'}/review/${data.reviewLink.split('/review/')[1] || data.reviewLink}`
+    
     const mailOptions = {
       from: fromEmail,
       to: data.clientEmail,
@@ -257,9 +263,9 @@ export async function sendAdminReplyNotificationToClient(
                 <p style="white-space: pre-wrap; margin: 0;">${data.commentContent}</p>
               </div>
               
-              <div style="text-align: center;">
-                <a href="${data.reviewLink}" class="button">View Review & Continue Conversation</a>
-              </div>
+               <div style="text-align: center;">
+                 <a href="${clientReviewLink}" class="button">View Review & Continue Conversation</a>
+               </div>
               
               <p style="color: #666; font-size: 14px; margin-top: 20px;">
                 Click the button above to view the full conversation and continue discussing your project.
@@ -288,7 +294,7 @@ Design File: ${data.designFileName}
 Reply:
 ${data.commentContent}
 
-View the full conversation: ${data.reviewLink}
+View the full conversation: ${clientReviewLink}
 
 ---
 Newstate Branding Co. - Proofing System
