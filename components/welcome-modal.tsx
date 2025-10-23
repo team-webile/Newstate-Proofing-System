@@ -201,7 +201,7 @@ export function WelcomeModal({ onSubmit, projectName, clientEmail, projectId }: 
                     disabled={isUpdatingEmail || !email.trim()}
                     className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-neutral-700 disabled:cursor-not-allowed text-white text-xs font-medium rounded transition-colors"
                   >
-                    {isUpdatingEmail ? 'Updating...' : 'Update'}
+                    {isUpdatingEmail ? 'Updating..' : 'Update'}
                   </button>
                 )}
               </div>
