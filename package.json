@@ -10,6 +10,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "npx prisma migrate reset --force && npm run db:seed",
     "socket": "node socket-server.js",
+    "email:processor": "node scripts/email-processor.js",
+    "email:process": "tsx -e \"import { processEmailsNow } from './lib/email-processor'; processEmailsNow().then(console.log)\"",
     "postinstall": "prisma generate"
   },
   "prisma": {

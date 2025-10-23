@@ -142,6 +142,28 @@ model Settings {
   @@map("settings")
 }
 
+model EmailQueue {
+  id          Int           @id @default(autoincrement())
+  to          String
+  subject     String
+  htmlContent String        @map("html_content")
+  textContent String?       @map("text_content")
+  from        String        @default("art@newstatebranding.com")
+  status      EmailStatus   @default(PENDING)
+  priority    Int           @default(0)
+  attempts    Int           @default(0)
+  maxAttempts Int           @default(3) @map("max_attempts")
+  lastAttempt DateTime?     @map("last_attempt")
+  nextAttempt DateTime?     @map("next_attempt")
+  errorMessage String?      @map("error_message")
+  metadata   Json?        // Store additional data like project info, user info, etc.
+  createdAt  DateTime      @default(now()) @map("created_at")
+  updatedAt  DateTime      @updatedAt @map("updated_at")
+  sentAt     DateTime?     @map("sent_at")
+
+  @@map("email_queue")
+}
+
 enum Role {
   ADMIN
   CLIENT
@@ -156,4 +178,12 @@ enum Status {
 enum Decision {
   APPROVED
   REVISION_REQUESTED
+}
+
+enum EmailStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+  CANCELLED
 }

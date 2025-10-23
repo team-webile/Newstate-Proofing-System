@@ -128,8 +128,9 @@ export async function POST(request: NextRequest) {
           const emailResult = await sendClientMessageNotificationToAdmin(notificationData)
           if (emailResult.success) {
             emailSentTo = emailResult.emailSentTo
+            console.log(`📧 Admin notification queued for client message from ${author}`)
           } else {
-            emailError = 'Failed to send admin notification email'
+            emailError = 'Failed to queue admin notification email'
           }
         } 
         // If admin sent message, notify client
@@ -147,8 +148,9 @@ export async function POST(request: NextRequest) {
           const emailResult = await sendAdminReplyNotificationToClient(notificationData)
           if (emailResult.success) {
             emailSentTo = emailResult.emailSentTo
+            console.log(`📧 Client notification queued for admin reply to ${recipientEmail}`)
           } else {
-            emailError = 'Failed to send client notification email'
+            emailError = 'Failed to queue client notification email'
           }
         }
       }
@@ -160,7 +162,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       ...comment,
       emailError: emailError,
-      emailSentTo: emailSentTo
+      emailSentTo: emailSentTo,
+      emailStatus: emailSentTo ? 'queued' : emailError ? 'failed' : 'none'
     })
   } catch (error) {
     console.error('Error creating comment:', error)

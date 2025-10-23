@@ -1,4 +1,5 @@
 import { prisma } from './db'
+import { addToEmailQueue } from './email-queue'
 
 // Email configuration - using environment variables for better server compatibility
 const getEmailTransporter = async () => {
@@ -85,9 +86,7 @@ export async function sendClientMessageNotificationToAdmin(
   data: CommentNotificationData
 ): Promise<{ success: boolean; emailSentTo?: string }> {
   try {
-    console.log('📧 Starting admin notification process...')
-    const transporter = await getEmailTransporter()
-    console.log('📧 Email transporter created')
+    console.log('📧 Queuing admin notification...')
     
     const adminEmail = await getAdminEmail()
     console.log('📧 Admin email retrieved:', adminEmail)
@@ -98,82 +97,79 @@ export async function sendClientMessageNotificationToAdmin(
     // Create admin review link (for admin to view)
     const adminReviewLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://review.newstatebranding.com'}/admin/review/${data.reviewLink.split('/review/')[1] || data.reviewLink}`
     
-    const mailOptions = {
-      from: fromEmail,
-      to: adminEmail,
-      subject: `Client ${data.commentType === 'annotation' ? 'Added Annotation' : 'Left Comment'} - ${data.projectName} (${data.projectNumber})`,
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
-            .content { background: #f9f9f9; padding: 30px; border: 1px solid #e0e0e0; }
-            .message-box { background: white; border-left: 4px solid #f59e0b; padding: 20px; margin: 20px 0; border-radius: 4px; }
-            .info-row { margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #e0e0e0; }
-            .label { font-weight: bold; color: #555; }
-            .value { color: #333; }
-            .button { display: inline-block; background: #f59e0b; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; }
-            .footer { background: #2d2d2d; color: #999; padding: 20px; text-align: center; font-size: 12px; border-radius: 0 0 8px 8px; }
-          </style>
-        </head> 
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1 style="margin: 0; font-size: 24px;">${data.commentType === 'annotation' ? '📝 Client Added Annotation' : '💬 Client Left Comment'}</h1>
-            </div>
-            
-            <div class="content">
-              <p style="font-size: 16px; margin-top: 0;">A client has ${data.commentType === 'annotation' ? 'added an annotation to' : 'left a comment on'} your project:</p>
-              
-              <div class="info-row">
-                <span class="label">Client Name:</span>
-                <span class="value">${data.clientName}</span>
-              </div>
-              
-              ${data.clientEmail ? `
-              <div class="info-row">
-                <span class="label">Client Email:</span>
-                <span class="value">${data.clientEmail}</span>
-              </div>
-              ` : ''}
-              
-              <div class="info-row">
-                <span class="label">Project:</span>
-                <span class="value">${data.projectName} (${data.projectNumber})</span>
-              </div>
-              
-              <div class="info-row">
-                <span class="label">Design File:</span>
-                <span class="value">${data.designFileName}</span>
-              </div>
-              
-              <div class="message-box">
-                <h3 style="margin-top: 0; color: #f59e0b;">Message:</h3>
-                <p style="white-space: pre-wrap; margin: 0;">${data.commentContent}</p>
-              </div>
-              
-               <div style="text-align: center;">
-                 <a href="${adminReviewLink}" class="button">View Review & Reply</a>
-               </div>
-              
-              <p style="color: #666; font-size: 14px; margin-top: 20px;">
-                Click the button above to view the full review and respond to the client's message.
-              </p>
-            </div>
-            
-            <div class="footer">
-              <p style="margin: 5px 0;">Newstate Branding Co. - Proofing System</p>
-              <p style="margin: 5px 0;">Notification sent at ${new Date().toLocaleString()}</p>
-            </div>
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f9f9f9; padding: 30px; border: 1px solid #e0e0e0; }
+          .message-box { background: white; border-left: 4px solid #f59e0b; padding: 20px; margin: 20px 0; border-radius: 4px; }
+          .info-row { margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #e0e0e0; }
+          .label { font-weight: bold; color: #555; }
+          .value { color: #333; }
+          .button { display: inline-block; background: #f59e0b; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; }
+          .footer { background: #2d2d2d; color: #999; padding: 20px; text-align: center; font-size: 12px; border-radius: 0 0 8px 8px; }
+        </style>
+      </head> 
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1 style="margin: 0; font-size: 24px;">${data.commentType === 'annotation' ? '📝 Client Added Annotation' : '💬 Client Left Comment'}</h1>
           </div>
-        </body>
-        </html>
-      `,
-      text: `
+          
+          <div class="content">
+            <p style="font-size: 16px; margin-top: 0;">A client has ${data.commentType === 'annotation' ? 'added an annotation to' : 'left a comment on'} your project:</p>
+            
+            <div class="info-row">
+              <span class="label">Client Name:</span>
+              <span class="value">${data.clientName}</span>
+            </div>
+            
+            ${data.clientEmail ? `
+            <div class="info-row">
+              <span class="label">Client Email:</span>
+              <span class="value">${data.clientEmail}</span>
+            </div>
+            ` : ''}
+            
+            <div class="info-row">
+              <span class="label">Project:</span>
+              <span class="value">${data.projectName} (${data.projectNumber})</span>
+            </div>
+            
+            <div class="info-row">
+              <span class="label">Design File:</span>
+              <span class="value">${data.designFileName}</span>
+            </div>
+            
+            <div class="message-box">
+              <h3 style="margin-top: 0; color: #f59e0b;">Message:</h3>
+              <p style="white-space: pre-wrap; margin: 0;">${data.commentContent}</p>
+            </div>
+            
+             <div style="text-align: center;">
+               <a href="${adminReviewLink}" class="button">View Review & Reply</a>
+             </div>
+            
+            <p style="color: #666; font-size: 14px; margin-top: 20px;">
+              Click the button above to view the full review and respond to the client's message.
+            </p>
+          </div>
+          
+          <div class="footer">
+            <p style="margin: 5px 0;">Newstate Branding Co. - Proofing System</p>
+            <p style="margin: 5px 0;">Notification sent at ${new Date().toLocaleString()}</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+
+    const textContent = `
 Client Left Comment
 
 Client Name: ${data.clientName}
@@ -189,20 +185,35 @@ View and reply to this message: ${adminReviewLink}
 ---
 Newstate Branding Co. - Proofing System
 Notification sent at ${new Date().toLocaleString()}
-      `.trim(),
-    }
+    `.trim()
 
-    await transporter.sendMail(mailOptions)
-    console.log(`✅ Admin notification sent for client message from ${data.clientName}`)
-    console.log(`📧 Email sent to: ${adminEmail}`)
-    return { success: true, emailSentTo: adminEmail }
-  } catch (error) {
-    console.error('❌ Error sending admin notification:', error)
-    console.error('❌ Email configuration:', {
-      host: 'smtp.ionos.com',
-      port: 465,
-      user: 'art@newstatebranding.com'
+    // Add to email queue
+    const result = await addToEmailQueue({
+      to: adminEmail,
+      subject: `Client ${data.commentType === 'annotation' ? 'Added Annotation' : 'Left Comment'} - ${data.projectName} (${data.projectNumber})`,
+      htmlContent,
+      textContent,
+      from: fromEmail,
+      priority: 1, // High priority for admin notifications
+      metadata: {
+        type: 'admin_notification',
+        projectName: data.projectName,
+        projectNumber: data.projectNumber,
+        clientName: data.clientName,
+        commentType: data.commentType
+      }
     })
+
+    if (result.success) {
+      console.log(`✅ Admin notification queued for client message from ${data.clientName}`)
+      console.log(`📧 Email queued for: ${adminEmail}`)
+      return { success: true, emailSentTo: adminEmail }
+    } else {
+      console.error('❌ Failed to queue admin notification:', result.error)
+      return { success: false }
+    }
+  } catch (error) {
+    console.error('❌ Error queuing admin notification:', error)
     return { success: false }
   }
 }
@@ -219,79 +230,76 @@ export async function sendAdminReplyNotificationToClient(
       return { success: false }
     }
 
-    const transporter = await getEmailTransporter()
+    console.log('📧 Queuing client notification...')
     const fromEmail = getSenderEmail()
 
     // Create client review link (for client to view)
     const clientReviewLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://review.newstatebranding.com'}/review/${data.reviewLink.split('/review/')[1] || data.reviewLink}`
     
-    const mailOptions = {
-      from: fromEmail,
-      to: data.clientEmail,
-      subject: `Design Team Replied - ${data.projectName} (${data.projectNumber})`,
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
-            .content { background: #f9f9f9; padding: 30px; border: 1px solid #e0e0e0; }
-            .message-box { background: white; border-left: 4px solid #10b981; padding: 20px; margin: 20px 0; border-radius: 4px; }
-            .info-row { margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #e0e0e0; }
-            .label { font-weight: bold; color: #555; }
-            .value { color: #333; }
-            .button { display: inline-block; background: #10b981; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; }
-            .footer { background: #2d2d2d; color: #999; padding: 20px; text-align: center; font-size: 12px; border-radius: 0 0 8px 8px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1 style="margin: 0; font-size: 24px;">💬 Design Team Replied</h1>
-            </div>
-            
-            <div class="content">
-              <p style="font-size: 16px; margin-top: 0;">Dear ${data.clientEmail},</p>
-
-              <p>Your design team has replied to your message regarding your project:</p>
-              
-              <div class="info-row">
-                <span class="label">Project:</span>
-                <span class="value">${data.projectName} (${data.projectNumber})</span>
-              </div>
-              
-              <div class="info-row">
-                <span class="label">Design File:</span>
-                <span class="value">${data.designFileName}</span>
-              </div>
-              
-              <div class="message-box">
-                <h3 style="margin-top: 0; color: #10b981;">Reply:</h3>
-                <p style="white-space: pre-wrap; margin: 0;">${data.commentContent}</p>
-              </div>
-              
-               <div style="text-align: center;">
-                 <a href="${clientReviewLink}" class="button">View Review & Continue Conversation</a>
-               </div>
-              
-              <p style="color: #666; font-size: 14px; margin-top: 20px;">
-                Click the button above to view the full conversation and continue discussing your project.
-              </p>
-            </div>
-            
-            <div class="footer">
-              <p style="margin: 5px 0;">Newstate Branding Co. - Proofing System</p>
-              <p style="margin: 5px 0;">This is an automated notification from your design team</p>
-              <p style="margin: 5px 0;">Sent at ${new Date().toLocaleString()}</p>
-            </div>
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f9f9f9; padding: 30px; border: 1px solid #e0e0e0; }
+          .message-box { background: white; border-left: 4px solid #10b981; padding: 20px; margin: 20px 0; border-radius: 4px; }
+          .info-row { margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #e0e0e0; }
+          .label { font-weight: bold; color: #555; }
+          .value { color: #333; }
+          .button { display: inline-block; background: #10b981; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; }
+          .footer { background: #2d2d2d; color: #999; padding: 20px; text-align: center; font-size: 12px; border-radius: 0 0 8px 8px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1 style="margin: 0; font-size: 24px;">💬 Design Team Replied</h1>
           </div>
-        </body>
-        </html>
-      `,
-      text: `
+          
+          <div class="content">
+            <p style="font-size: 16px; margin-top: 0;">Dear ${data.clientEmail},</p>
+
+            <p>Your design team has replied to your message regarding your project:</p>
+            
+            <div class="info-row">
+              <span class="label">Project:</span>
+              <span class="value">${data.projectName} (${data.projectNumber})</span>
+            </div>
+            
+            <div class="info-row">
+              <span class="label">Design File:</span>
+              <span class="value">${data.designFileName}</span>
+            </div>
+            
+            <div class="message-box">
+              <h3 style="margin-top: 0; color: #10b981;">Reply:</h3>
+              <p style="white-space: pre-wrap; margin: 0;">${data.commentContent}</p>
+            </div>
+            
+             <div style="text-align: center;">
+               <a href="${clientReviewLink}" class="button">View Review & Continue Conversation</a>
+             </div>
+            
+            <p style="color: #666; font-size: 14px; margin-top: 20px;">
+              Click the button above to view the full conversation and continue discussing your project.
+            </p>
+          </div>
+          
+          <div class="footer">
+            <p style="margin: 5px 0;">Newstate Branding Co. - Proofing System</p>
+            <p style="margin: 5px 0;">This is an automated notification from your design team</p>
+            <p style="margin: 5px 0;">Sent at ${new Date().toLocaleString()}</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+
+    const textContent = `
 Design Team Replied
 
 Hello ${data.clientName},
@@ -309,19 +317,33 @@ View the full conversation: ${clientReviewLink}
 ---
 Newstate Branding Co. - Proofing System
 Sent at ${new Date().toLocaleString()}
-      `.trim(),
-    }
+    `.trim()
 
-    await transporter.sendMail(mailOptions)
-    console.log(`✅ Client notification sent to ${data.clientEmail}`)
-    return { success: true, emailSentTo: data.clientEmail }
-  } catch (error) {
-    console.error('❌ Error sending client notification:', error)
-    console.error('❌ Email configuration:', {
-      host: 'smtp.ionos.com',
-      port: 465,
-      user: 'art@newstatebranding.com'
+    // Add to email queue
+    const result = await addToEmailQueue({
+      to: data.clientEmail,
+      subject: `Design Team Replied - ${data.projectName} (${data.projectNumber})`,
+      htmlContent,
+      textContent,
+      from: fromEmail,
+      priority: 1, // High priority for client notifications
+      metadata: {
+        type: 'client_notification',
+        projectName: data.projectName,
+        projectNumber: data.projectNumber,
+        clientName: data.clientName
+      }
     })
+
+    if (result.success) {
+      console.log(`✅ Client notification queued for ${data.clientEmail}`)
+      return { success: true, emailSentTo: data.clientEmail }
+    } else {
+      console.error('❌ Failed to queue client notification:', result.error)
+      return { success: false }
+    }
+  } catch (error) {
+    console.error('❌ Error queuing client notification:', error)
     return { success: false }
   }
 }
