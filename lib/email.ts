@@ -95,7 +95,7 @@ export async function sendClientMessageNotificationToAdmin(
     console.log('📧 From email:', fromEmail)
 
     // Create admin review link (for admin to view)
-    const adminReviewLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://review.newstatebranding.com'}/admin/review/${data.reviewLink.split('/review/')[1] || data.reviewLink}`
+    const adminReviewLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://preview.devnstage.xyz'}/admin/review/${data.reviewLink.split('/review/')[1] || data.reviewLink}`
     
     const htmlContent = `
       <!DOCTYPE html>
@@ -234,7 +234,7 @@ export async function sendAdminReplyNotificationToClient(
     const fromEmail = getSenderEmail()
 
     // Create client review link (for client to view)
-    const clientReviewLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://review.newstatebranding.com'}/review/${data.reviewLink.split('/review/')[1] || data.reviewLink}`
+    const clientReviewLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://preview.devnstage.xyz'}/review/${data.reviewLink.split('/review/')[1] || data.reviewLink}`
     
     const htmlContent = `
       <!DOCTYPE html>

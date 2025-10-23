@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
       })
 
       if (designItem) {
-        const reviewLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://review.newstatebranding.com'}/review/${designItem.review.shareLink}`
+        const reviewLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://preview.devnstage.xyz'}/review/${designItem.review.shareLink}`
         
         // If client sent message, notify admin
         if (!isAdmin && authorEmail) {
