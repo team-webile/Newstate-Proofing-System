@@ -62,8 +62,6 @@ export default function AdminReviewPage() {
 
       const handleEmailUpdate = (data: { projectId: number; newEmail: string; oldEmail: string }) => {
         console.log('📧 Admin review page received clientEmailUpdated event:', data);
-        console.log('📧 Current review project ID:', review.project.id);
-        console.log('📧 Event project ID:', data.projectId);
         
         if (data.projectId === review.project.id) {
           setCurrentClientEmail(data.newEmail);
@@ -74,8 +72,6 @@ export default function AdminReviewPage() {
             duration: 3000,
             icon: '📧'
           });
-        } else {
-          console.log('📧 Project ID mismatch - ignoring event');
         }
       };
 

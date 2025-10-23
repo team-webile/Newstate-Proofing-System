@@ -24,13 +24,13 @@ export const useSocket = () => {
 export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   const [socket, setSocket] = useState<Socket | null>(null)
   const [isConnected, setIsConnected] = useState(false)
- 
+
   useEffect(() => {
     // Get socket URL from environment variable or use default
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 
       (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
         ? 'http://localhost:3001' 
-        : 'https://preview.devnstage.xyz:3001')
+        : 'https://socket.devnstage.xyz')
     
     // Create socket connection
     const newSocket = io(socketUrl, {
@@ -49,7 +49,6 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
 
     newSocket.on('connect_error', (error) => {
       console.error('Socket.IO connection error:', error)
-      console.error('Socket URL attempted:', socketUrl)
       setIsConnected(false)
     })
 
