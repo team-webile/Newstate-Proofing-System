@@ -200,6 +200,7 @@ export default function AdminReviewPage() {
             initialStatus={review.status}
             clientEmail={review.project.clientEmail}
             isAdminView={true}
+            projectId={review.project.id}
           />
         )}
       </main>

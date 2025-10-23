@@ -30,6 +30,18 @@ io.on('connection', (socket) => {
     console.log(`Client ${socket.id} joined review room: ${reviewId}`);
   });
 
+  // Join project room for email updates
+  socket.on('join-project', (projectId) => {
+    socket.join(`project-${projectId}`);
+    console.log(`Client ${socket.id} joined project room: ${projectId}`);
+  });
+
+  // Leave project room
+  socket.on('leave-project', (projectId) => {
+    socket.leave(`project-${projectId}`);
+    console.log(`Client ${socket.id} left project room: ${projectId}`);
+  });
+
   // Handle new comment
   socket.on('new-comment', (data) => {
     console.log('New comment received:', data);
@@ -42,6 +54,46 @@ io.on('connection', (socket) => {
     console.log('Status update received:', data);
     // Broadcast status update to all clients in the review room
     socket.to(`review-${data.reviewId}`).emit('status-updated', data);
+  });
+
+  // Handle client email update
+  socket.on('client-email-updated', (data) => {
+    console.log('📧 Socket server received client-email-updated:', data);
+    console.log('📧 Broadcasting to project room: project-' + data.projectId);
+    
+    // Broadcast to all clients in the project room
+    const broadcastData = {
+      projectId: data.projectId,
+      newEmail: data.newEmail,
+      oldEmail: data.oldEmail,
+      updatedBy: data.updatedBy || 'Client'
+    };
+    
+    io.to(`project-${data.projectId}`).emit('clientEmailUpdated', broadcastData);
+    console.log('📧 Socket server broadcasted clientEmailUpdated:', broadcastData);
+  });
+
+  // Handle admin email sent notification
+  socket.on('admin-email-sent', (data) => {
+    console.log('Admin email sent:', data);
+    // Broadcast to all clients in the project room
+    io.to(`project-${data.projectId}`).emit('adminEmailSent', {
+      projectId: data.projectId,
+      emailSentTo: data.emailSentTo,
+      message: data.message || 'Email sent to updated client address'
+    });
+  });
+
+  // Handle client activity updates (comments, annotations, etc.)
+  socket.on('client-activity', (data) => {
+    console.log('Client activity:', data);
+    // Broadcast to all clients in the project room
+    io.to(`project-${data.projectId}`).emit('clientActivity', {
+      projectId: data.projectId,
+      activityType: data.activityType,
+      message: data.message,
+      timestamp: new Date().toISOString()
+    });
   });
 
   // Handle disconnect

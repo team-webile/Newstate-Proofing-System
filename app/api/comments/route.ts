@@ -135,9 +135,18 @@ export async function POST(request: NextRequest) {
         } 
         // If admin sent message, notify client
         else if (isAdmin && recipientEmail) {
+          // Get the current client email from database to ensure we use the latest one
+          const currentProject = await prisma.project.findUnique({
+            where: { id: designItem.review.projectId },
+            select: { clientEmail: true }
+          })
+          
+          // Use the updated client email from database, fallback to recipientEmail
+          const currentClientEmail = currentProject?.clientEmail || recipientEmail
+          
           const notificationData = {
             clientName: author, // Admin's name
-            clientEmail: recipientEmail, // Client's email to send notification to
+            clientEmail: currentClientEmail, // Use current client email from database
             commentContent: content,
             projectName: designItem.review.project.name,
             projectNumber: designItem.review.project.projectNumber,
@@ -148,7 +157,22 @@ export async function POST(request: NextRequest) {
           const emailResult = await sendAdminReplyNotificationToClient(notificationData)
           if (emailResult.success) {
             emailSentTo = emailResult.emailSentTo
-            console.log(`📧 Client notification queued for admin reply to ${recipientEmail}`)
+            console.log(`📧 Client notification queued for admin reply to ${currentClientEmail}`)
+            
+            // Emit socket event to notify admin that email was sent to updated address
+            try {
+              const { io } = require('../../../socket-server.js')
+              if (io) {
+                io.emit('adminEmailSent', {
+                  projectId: designItem.review.projectId,
+                  emailSentTo: currentClientEmail,
+                  message: 'Email sent to updated client address'
+                })
+                console.log('📡 Socket event emitted for admin email sent')
+              }
+            } catch (socketError) {
+              console.error('Failed to emit socket event:', socketError)
+            }
           } else {
             emailError = 'Failed to queue client notification email'
           }

@@ -56,6 +56,7 @@ interface DesignViewerProps {
   initialStatus?: string; // Add initial status prop
   clientEmail?: string; // Client email for admin notifications
   isAdminView?: boolean; // Is this the admin view
+  projectId?: number; // Project ID for email updates
 }
 
 interface Comment {
@@ -96,6 +97,7 @@ export function DesignViewer({
   initialStatus = 'PENDING',
   clientEmail,
   isAdminView = false,
+  projectId,
 }: DesignViewerProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [comments, setComments] = useState<Record<number, Comment[]>>({});
@@ -118,9 +120,96 @@ export function DesignViewer({
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [currentPdfPage, setCurrentPdfPage] = useState(1); // Current page for PDF files
   const [isPdfFile, setIsPdfFile] = useState(false); // Track if current file is PDF
+  const [currentClientEmail, setCurrentClientEmail] = useState(clientEmail); // Track current client email
+  const [emailUpdateNotification, setEmailUpdateNotification] = useState(false); // Show email update notification
+  const [emailSentNotification, setEmailSentNotification] = useState(false); // Show email sent notification
+  const [clientActivityNotification, setClientActivityNotification] = useState(false); // Show client activity notification
+  const [clientActivityMessage, setClientActivityMessage] = useState(''); // Client activity message
+  const [displayClientEmail, setDisplayClientEmail] = useState(currentClientEmail); // Display email for admin
 
   const { socket, isConnected } = useSocket();
   const commentsContainerRef = useRef<HTMLDivElement>(null);
+
+  // Update client email when prop changes
+  useEffect(() => {
+    if (clientEmail && clientEmail !== currentClientEmail) {
+      setCurrentClientEmail(clientEmail);
+      setDisplayClientEmail(clientEmail);
+    }
+  }, [clientEmail, currentClientEmail]);
+
+
+  // Join project room and listen for socket events
+  useEffect(() => {
+    if (socket && isConnected && projectId) {
+      // Join project room for real-time updates
+      socket.emit('join-project', projectId);
+      console.log('📡 Joined project room:', projectId);
+
+      const handleEmailUpdate = (data: { projectId: number; newEmail: string; oldEmail: string }) => {
+        console.log('📧 Received clientEmailUpdated event:', data);
+        console.log('📧 Current projectId:', projectId);
+        console.log('📧 Event projectId:', data.projectId);
+        
+        if (data.projectId === projectId) {
+          setCurrentClientEmail(data.newEmail);
+          setDisplayClientEmail(data.newEmail); // Update display email
+          setEmailUpdateNotification(true);
+          console.log('📧 Client email updated via socket:', data.newEmail);
+          console.log('📧 recipientEmail automatically updated to:', data.newEmail);
+          console.log('📧 Display email updated to:', data.newEmail);
+          
+          // Hide notification after 3 seconds
+          setTimeout(() => {
+            setEmailUpdateNotification(false);
+          }, 3000);
+        } else {
+          console.log('📧 Project ID mismatch, ignoring event');
+        }
+      };
+
+      // Listen for admin email sent events
+      const handleEmailSent = (data: { projectId: number; emailSentTo: string; message: string }) => {
+        if (data.projectId === projectId) {
+          setEmailSentNotification(true);
+          console.log('📧 Admin email sent to:', data.emailSentTo);
+          
+          // Hide notification after 3 seconds
+          setTimeout(() => {
+            setEmailSentNotification(false);
+          }, 3000);
+        }
+      };
+
+      // Listen for client activity updates
+      const handleClientActivity = (data: { projectId: number; activityType: string; message: string; timestamp: string }) => {
+        if (data.projectId === projectId) {
+          console.log('📱 Client activity:', data);
+          setClientActivityMessage(data.message);
+          setClientActivityNotification(true);
+          
+          // Hide notification after 5 seconds
+          setTimeout(() => {
+            setClientActivityNotification(false);
+          }, 5000);
+        }
+      };
+
+      // Listen for socket events
+      socket.on('clientEmailUpdated', handleEmailUpdate);
+      socket.on('adminEmailSent', handleEmailSent);
+      socket.on('clientActivity', handleClientActivity);
+      
+      return () => {
+        socket.emit('leave-project', projectId);
+        socket.off('clientEmailUpdated', handleEmailUpdate);
+        socket.off('adminEmailSent', handleEmailSent);
+        socket.off('clientActivity', handleClientActivity);
+        console.log('📡 Left project room:', projectId);
+      };
+    }
+  }, [socket, isConnected, projectId]);
+
 
   // Annotation state
   const [annotationMode, setAnnotationMode] = useState(false);
@@ -393,14 +482,11 @@ export function DesignViewer({
   };
 
   const handleChangeName = () => {
-    const newName = prompt("Enter your new name:", authorName);
-    const newEmail = prompt("Enter your new email:", authorEmail);
-    if (newName && newName.trim() && newEmail && newEmail.trim()) {
-      setAuthorName(newName.trim());
-      setAuthorEmail(newEmail.trim());
-      localStorage.setItem("client_proofing_author_name", newName.trim());
-      localStorage.setItem("client_proofing_author_email", newEmail.trim());
-    }
+ 
+      localStorage.removeItem("client_proofing_author_name");
+      localStorage.removeItem("client_proofing_author_email");
+      window.location.reload();
+   
   };
 
   const handleSubmitAnnotation = async () => {
@@ -465,6 +551,11 @@ export function DesignViewer({
     }
 
     try {
+      // Log the recipientEmail being used for admin notifications
+      if (isAdminView && currentClientEmail) {
+        console.log('📧 Admin sending email to recipientEmail:', currentClientEmail);
+      }
+      
       // Save to database via API
       const response = await fetch('/api/comments', {
         method: 'POST',
@@ -476,7 +567,7 @@ export function DesignViewer({
           author: authorName,
           authorEmail: authorEmail, // Always use the logged-in user's email
           isAdmin: isAdminView,
-          recipientEmail: isAdminView ? clientEmail : undefined, // Client email for admin->client notifications
+          recipientEmail: isAdminView ? currentClientEmail : undefined, // Client email for admin->client notifications
           content: newCommentText,
           type: isAddingAnnotation ? "annotation" : "comment",
           drawingData: drawingData || null,
@@ -536,6 +627,16 @@ export function DesignViewer({
             canvasPosition: canvasPosition,
             pdfPage: savedComment.pdfPage || null
           });
+
+          // Emit client activity for admin notifications
+          if (projectId && !isAdminView) {
+            socket.emit('client-activity', {
+              projectId: projectId,
+              activityType: isAddingAnnotation ? 'annotation' : 'comment',
+              message: `${savedComment.author} ${isAddingAnnotation ? 'added an annotation' : 'left a comment'}`,
+              timestamp: new Date().toISOString()
+            });
+          }
         }
 
         if (hasDrawing) {
@@ -1173,6 +1274,45 @@ export function DesignViewer({
                   </div>
                 )}
 
+                {/* Email Update Notification for Admin */}
+                {isAdminView && emailUpdateNotification && (
+                  <div className="mb-3 p-2 bg-green-900/20 border border-green-500/50 rounded-lg">
+                    <p className="text-green-400 text-xs font-medium">
+                      ✅ Client email updated automatically
+                    </p>
+                    <p className="text-green-300 text-xs mt-1">
+                      📧 recipientEmail updated to: {displayClientEmail}
+                    </p>
+                  </div>
+                )}
+
+                {/* Email Sent Notification for Admin */}
+                {isAdminView && emailSentNotification && (
+                  <div className="mb-3 p-2 bg-blue-900/20 border border-blue-500/50 rounded-lg">
+                    <p className="text-blue-400 text-xs font-medium">
+                      📧 Email sent to updated client address
+                    </p>
+                  </div>
+                )}
+
+                {/* Current Recipient Email Display for Admin */}
+                {isAdminView && displayClientEmail && (
+                  <div className="mb-3 p-2 bg-neutral-800/50 border border-neutral-600 rounded-lg">
+                    <p className="text-neutral-300 text-xs font-medium">
+                      📧 Emails will be sent to: {displayClientEmail}
+                    </p>
+                  </div>
+                )}
+
+                {/* Client Activity Notification for Admin */}
+                {isAdminView && clientActivityNotification && (
+                  <div className="mb-3 p-2 bg-purple-900/20 border border-purple-500/50 rounded-lg">
+                    <p className="text-purple-400 text-xs font-medium">
+                      📱 {clientActivityMessage}
+                    </p>
+                  </div>
+                )}
+
                 {/* Name Display */}
                 <div className="flex items-center gap-2" style={{ overscrollBehavior: 'contain' }}>
                   <div className="flex-1 flex items-center gap-2 lg:gap-3 px-3 lg:px-4 py-2 lg:py-2.5 bg-neutral-900/50 rounded-lg border border-neutral-700" style={{ overscrollBehavior: 'contain' }}>
@@ -1188,8 +1328,9 @@ export function DesignViewer({
                     className="p-2 lg:p-2.5 bg-neutral-800 text-neutral-400 rounded hover:bg-neutral-700 hover:text-[#fdb913] transition-colors"
                     title="Change Name"
                   >
-                    <Edit2 className="w-3 h-3 lg:w-4 lg:h-4" />
+                    <Trash2 className="w-3 h-3 lg:w-4 lg:h-4" />
                   </button>
+                  
                 </div>
 
                 {/* Comment Input Box - WeTransfer Style */}
@@ -1402,6 +1543,7 @@ export function DesignViewer({
             onSubmit={handleWelcomeSubmit} 
             projectName={projectName}
             clientEmail={clientEmail}
+            projectId={projectId}
           />
         )}
     </div>
