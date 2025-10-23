@@ -136,11 +136,12 @@ export default function NewProjectPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="clientEmail" className="text-neutral-300">
-                  Client Email (Optional)
+                  Client Email
                 </Label>
                 <Input
                   id="clientEmail"
                   type="email"
+                  required
                   value={formData.clientEmail}
                   onChange={(e) => setFormData({ ...formData, clientEmail: e.target.value })}
                   placeholder="client@example.com"
