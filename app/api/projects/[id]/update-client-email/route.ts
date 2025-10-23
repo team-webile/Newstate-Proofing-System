@@ -72,36 +72,31 @@ export async function PUT(
 
       // Send email notification to the new email address
       try {
-        await addToEmailQueue({
+        await addToEmailQueue({ 
           to: clientEmail.trim(),
           subject: `Email Updated - Project ${updatedProject.projectNumber}`,
           htmlContent: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #fff;">
               <div style="background: linear-gradient(135deg, #fdb913, #e5a711); padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 20px;">
                 <h1 style="color: #000; margin: 0; font-size: 24px;">Email Updated Successfully!</h1>
               </div>
               
-              <div style="background: #1a1a1a; padding: 20px; border-radius: 10px; color: #fff;">
+              <div style="background: #2a2a2a; padding: 20px; border-radius: 10px;">
                 <h2 style="color: #fdb913; margin-top: 0;">Project: ${updatedProject.projectNumber} - ${updatedProject.name}</h2>
                 
                 <p>Your email address has been successfully updated for this project.</p>
                 
-                <div style="background: #2a2a2a; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                <div style="background: #333; padding: 15px; border-radius: 5px; margin: 15px 0;">
                   <p style="margin: 0;"><strong>New Email:</strong> ${clientEmail.trim()}</p>
                   <p style="margin: 5px 0 0 0;"><strong>Previous Email:</strong> ${currentProject.clientEmail}</p>
                 </div>
                 
                 <p>You will now receive all project notifications at your new email address.</p>
                 
-                <div style="text-align: center; margin-top: 20px;">
-                  <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}" 
-                     style="background: #fdb913; color: #000; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
-                    View Project
-                  </a>
-                </div>
+               
               </div>
               
-              <div style="text-align: center; margin-top: 20px; color: #666; font-size: 12px;">
+              <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
                 <p>This email was sent because your email address was updated for project ${updatedProject.projectNumber}.</p>
               </div>
             </div>
