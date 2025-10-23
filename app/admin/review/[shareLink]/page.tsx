@@ -7,6 +7,7 @@ import { ArrowLeft } from "lucide-react"
 import { DesignViewer } from "@/components/design-viewer"
 import LogoImage from "@/components/LogoImage"
 import toast from 'react-hot-toast'
+import { useSocket } from "@/contexts/SocketContext"
 
 interface Review {
   id: number
@@ -38,17 +39,52 @@ interface DesignItem {
 export default function AdminReviewPage() {
   const params = useParams()
   const shareLink = params.shareLink as string
+  const { socket, isConnected } = useSocket()
   
   const [review, setReview] = useState<Review | null>(null)
   const [designItems, setDesignItems] = useState<DesignItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [currentClientEmail, setCurrentClientEmail] = useState<string>('')
 
   useEffect(() => {
     if (shareLink) {
       loadReviewData()
     }
   }, [shareLink])
+
+  // Listen for client email updates via socket
+  useEffect(() => {
+    if (socket && isConnected && review?.project?.id) {
+      // Join project room for real-time updates
+      socket.emit('join-project', review.project.id);
+      console.log('📡 Admin review page joined project room:', review.project.id);
+
+      const handleEmailUpdate = (data: { projectId: number; newEmail: string; oldEmail: string }) => {
+        console.log('📧 Admin review page received clientEmailUpdated event:', data);
+        
+        if (data.projectId === review.project.id) {
+          setCurrentClientEmail(data.newEmail);
+          console.log('📧 Client email updated in admin review page:', data.newEmail);
+          
+          // Show notification
+          toast.success(`Client email updated to: ${data.newEmail}`, {
+            duration: 3000,
+            icon: '📧'
+          });
+        }
+      };
+
+      // Listen for client email updates
+      socket.on('clientEmailUpdated', handleEmailUpdate);
+      
+      return () => {
+        socket.emit('leave-project', review.project.id);
+        socket.off('clientEmailUpdated', handleEmailUpdate);
+        console.log('📡 Admin review page left project room:', review.project.id);
+      };
+    }
+  }, [socket, isConnected, review?.project?.id]);
 
   const loadReviewData = async () => {
     try {
@@ -68,6 +104,7 @@ export default function AdminReviewPage() {
 
       const reviewData = await reviewResponse.json()
       setReview(reviewData)
+      setCurrentClientEmail(reviewData.project.clientEmail)
 
       // Fetch design items
       const filesResponse = await fetch(`/api/projects/${reviewData.project.id}/files`)
@@ -198,7 +235,7 @@ export default function AdminReviewPage() {
             projectName={`${review.project.projectNumber} - ${review.project.name.toUpperCase()}`}
             hideApprovalButtons={true}
             initialStatus={review.status}
-            clientEmail={review.project.clientEmail}
+            clientEmail={currentClientEmail || review.project.clientEmail}
             isAdminView={true}
             projectId={review.project.id}
           />

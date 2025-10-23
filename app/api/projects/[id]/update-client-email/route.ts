@@ -134,22 +134,8 @@ export async function PUT(
       }
     }
 
-    // Emit socket event to notify clients about email update
-    try {
-      const { io } = require('../../../../socket-server.js')
-      if (io) {
-        io.emit('clientEmailUpdated', {
-          projectId: projectId,
-          newEmail: clientEmail.trim(),
-          oldEmail: currentProject.clientEmail,
-          updatedBy: 'Client'
-        })
-        console.log('📡 Socket event emitted for email update')
-      }
-    } catch (socketError) {
-      console.error('Failed to emit socket event:', socketError)
-      // Don't fail the request if socket emission fails
-    }
+    // Note: Socket event is emitted from the client side (welcome modal)
+    // This ensures real-time updates without server-side socket dependencies
 
     return NextResponse.json({
       success: true,
