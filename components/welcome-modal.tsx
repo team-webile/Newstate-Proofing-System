@@ -107,6 +107,12 @@ export function WelcomeModal({ onSubmit, projectName, clientEmail, projectId }: 
           console.log('📡 Socket ID:', socket.id);
         } else {
           console.log('❌ Socket not available:', { socket: !!socket, isConnected, projectId });
+          console.log('❌ Socket connection details:', {
+            socketExists: !!socket,
+            isConnected,
+            projectId,
+            socketUrl: process.env.NEXT_PUBLIC_SOCKET_URL || 'default'
+          });
         }
         
         // Show success notification

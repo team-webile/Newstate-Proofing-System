@@ -7,7 +7,7 @@ const server = http.createServer();
 // Get allowed origins from environment variable or use defaults
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
   ? process.env.ALLOWED_ORIGINS.split(',')
-  : ["http://localhost:3000", "https://devnstage.xyz", "https://www.devnstage.xyz"];
+  : ["http://localhost:3000", "https://devnstage.xyz", "https://www.devnstage.xyz", "https://preview.devnstage.xyz"];
 
 // Create Socket.IO server
 const io = new Server(server, {
@@ -23,6 +23,8 @@ const connectedClients = new Map();
 
 io.on('connection', (socket) => {
   console.log(`Client connected: ${socket.id}`);
+  console.log(`Client origin: ${socket.handshake.headers.origin}`);
+  console.log(`Client user-agent: ${socket.handshake.headers['user-agent']}`);
 
   // Join review room when client connects
   socket.on('join-review', (reviewId) => {
@@ -61,6 +63,12 @@ io.on('connection', (socket) => {
     console.log('📧 Socket server received client-email-updated:', data);
     console.log('📧 Broadcasting to project room: project-' + data.projectId);
     
+    // Validate data
+    if (!data.projectId || !data.newEmail) {
+      console.error('📧 Invalid email update data:', data);
+      return;
+    }
+    
     // Broadcast to all clients in the project room
     const broadcastData = {
       projectId: data.projectId,
@@ -69,7 +77,12 @@ io.on('connection', (socket) => {
       updatedBy: data.updatedBy || 'Client'
     };
     
-    io.to(`project-${data.projectId}`).emit('clientEmailUpdated', broadcastData);
+    // Get room info for debugging
+    const room = `project-${data.projectId}`;
+    const roomClients = io.sockets.adapter.rooms.get(room);
+    console.log(`📧 Room ${room} has ${roomClients ? roomClients.size : 0} clients`);
+    
+    io.to(room).emit('clientEmailUpdated', broadcastData);
     console.log('📧 Socket server broadcasted clientEmailUpdated:', broadcastData);
   });
 
