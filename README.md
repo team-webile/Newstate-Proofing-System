@@ -19,7 +19,6 @@ A comprehensive client proofing and approval system built with Next.js 14, featu
 ### 🔗 Client Sharing & Review
 - **Share Links**: Generate secure, unique links for client access
 - **Client Review Interface**: Clean, user-friendly interface for clients
-- **File Versioning**: Track multiple versions of design files
 - **Download Controls**: Enable/disable file downloads for clients
 
 ### ✏️ Annotation & Collaboration Tools
