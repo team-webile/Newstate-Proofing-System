@@ -30,36 +30,18 @@ const getEmailTransporter = async () => {
 // Get admin email directly from database
 async function getAdminEmail(): Promise<string> {
   try {
-    console.log('🔍 Searching for admin user in database...')
-    
-    // First try to get admin email from user table
-    const adminUser = await prisma.user.findFirst({
-      where: { role: 'ADMIN' },
-      select: { email: true, firstName: true, lastName: true }
-    })
-    
-    console.log('👤 Admin user query result:', adminUser)
-    
-    if (adminUser?.email) {
-      console.log('✅ Admin email fetched from user table:', adminUser.email)
-      return adminUser.email
-    }
-    
-    console.log('⚠️ No admin user found, trying settings...')
-    
-    // Fallback to settings
-    const settings = await prisma.settings.findFirst()
-    console.log('⚙️ Settings query result:', settings)
-    
-    const settingsEmail = settings?.adminEmail || process.env.ADMIN_EMAIL || 'admin@newstatebranding.com'
-    console.log('📧 Using admin email from settings:', settingsEmail)
-    return settingsEmail
+    console.log('🔍 Getting admin email for client notifications...')
+
+    // Always use art@newstatebranding.com for client notifications
+    const adminEmail = 'art@newstatebranding.com'
+    console.log('✅ Using admin email for client notifications:', adminEmail)
+    return adminEmail
+
   } catch (error) {
-    console.error('❌ Error fetching admin email from database:', error)
-    // Final fallback
-    const finalFallback = process.env.ADMIN_EMAIL || 'admin@newstatebranding.com'
-    console.log('📧 Using final fallback admin email:', finalFallback)
-    return finalFallback
+    console.error('❌ Error getting admin email:', error)
+    // Fallback to the specified email
+    console.log('📧 Using fallback admin email: art@newstatebranding.com')
+    return 'art@newstatebranding.com'
   }
 }
 
@@ -87,16 +69,16 @@ export async function sendClientMessageNotificationToAdmin(
 ): Promise<{ success: boolean; emailSentTo?: string }> {
   try {
     console.log('📧 Queuing admin notification...')
-    
+
     const adminEmail = await getAdminEmail()
     console.log('📧 Admin email retrieved:', adminEmail)
-    
+
     const fromEmail = getSenderEmail()
     console.log('📧 From email:', fromEmail)
 
     // Create admin review link (for admin to view)
     const adminReviewLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://preview.devnstage.xyz'}/admin/review/${data.reviewLink.split('/review/')[1] || data.reviewLink}`
-    
+
     const htmlContent = `
       <!DOCTYPE html>
       <html>
@@ -235,7 +217,7 @@ export async function sendAdminReplyNotificationToClient(
 
     // Create client review link (for client to view)
     const clientReviewLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://preview.devnstage.xyz'}/review/${data.reviewLink.split('/review/')[1] || data.reviewLink}`
-    
+
     const htmlContent = `
       <!DOCTYPE html>
       <html>

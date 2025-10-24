@@ -56,7 +56,7 @@ export function WelcomeModal({ onSubmit, projectName, clientEmail, projectId }: 
           // Check if user is admin and set email from profile
           const adminRole = localStorage.getItem('NewStateBrandingAdminRole')
           if (adminRole === 'ADMIN' && data.email) {
-            setEmail(data.email)
+            setEmail("art@newstatebranding.com")
             setName(`${data.firstName} ${data.lastName}`.trim() || 'Admin User')
           }
         }
