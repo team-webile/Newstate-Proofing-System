@@ -23,6 +23,8 @@ import {
 } from "lucide-react";
 // Removed localStorage imports - now using database APIs
 import { WelcomeModal } from "./welcome-modal";
+import { ApprovalModal } from "./approval-modal";
+import { ProductionNoticeModal } from "./production-notice-modal";
 import { useSocket } from "@/contexts/SocketContext";
 import toast from 'react-hot-toast';
 import { PDFViewer } from "./pdf-viewer";
@@ -126,6 +128,8 @@ export function DesignViewer({
   const [clientActivityNotification, setClientActivityNotification] = useState(false); // Show client activity notification
   const [clientActivityMessage, setClientActivityMessage] = useState(''); // Client activity message
   const [displayClientEmail, setDisplayClientEmail] = useState(currentClientEmail); // Display email for admin
+  const [showApprovalModal, setShowApprovalModal] = useState(false); // Show approval confirmation modal
+  const [showProductionNotice, setShowProductionNotice] = useState(false); // Show production notice modal
 
   const { socket, isConnected } = useSocket();
   const commentsContainerRef = useRef<HTMLDivElement>(null);
@@ -735,7 +739,7 @@ export function DesignViewer({
     }
   };
 
-  const updateReviewStatus = async (status: 'APPROVED' | 'REVISION_REQUESTED') => {
+  const updateReviewStatus = async (status: 'APPROVED' | 'REVISION_REQUESTED', clientName?: string) => {
     setIsUpdatingStatus(true);
     try {
       const response = await fetch(`/api/reviews/status?reviewId=${reviewId}`, {
@@ -743,7 +747,11 @@ export function DesignViewer({
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ 
+          status,
+          clientName: clientName || authorName,
+          clientEmail: currentClientEmail
+        }),
       });
 
       if (response.ok) {
@@ -781,6 +789,17 @@ export function DesignViewer({
     } finally {
       setIsUpdatingStatus(false);
     }
+  };
+
+  const handleApprovalConfirmation = async (clientName: string) => {
+    // Update the author name with the client's name for the approval
+    setAuthorName(clientName);
+    
+    // Call the existing update function with the client name
+    await updateReviewStatus('APPROVED', clientName);
+    
+    // Close the modal
+    setShowApprovalModal(false);
   };
 
   return (
@@ -829,7 +848,7 @@ export function DesignViewer({
             {/* Action Buttons */}
             <div className="flex flex-row lg:flex-col gap-3">
               <button
-                onClick={() => updateReviewStatus('APPROVED')}
+                onClick={() => setShowApprovalModal(true)}
                 disabled={isUpdatingStatus || reviewStatus === 'APPROVED'}
                 className="flex-1 lg:w-full px-4 lg:px-6 py-2.5 lg:py-3.5 bg-transparent border-2 border-green-500 text-green-500 font-bold rounded hover:bg-green-500 hover:text-black transition-all uppercase tracking-wide text-xs lg:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -1228,7 +1247,7 @@ export function DesignViewer({
           <div className="p-3 lg:p-4 border-t border-neutral-800 space-y-2 lg:space-y-3 flex-shrink-0 bg-black" style={{ overscrollBehavior: 'contain' }}>
             {/* Approved Status Message */}
             {reviewStatus === 'APPROVED' && (
-              <div className="bg-green-500/20 border border-green-500/50 rounded-lg p-4 text-center">
+              <div className="bg-green-500/20 border border-green-500/50 rounded-lg p-4 text-center space-y-3">
                 <div className="text-green-400 text-4xl mb-2">🎉</div>
                 <h3 className="text-green-400 font-bold text-lg mb-2">Project Approved!</h3>
                 <p className="text-green-300 text-sm mb-4">
@@ -1256,6 +1275,15 @@ export function DesignViewer({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                   Download All Files
+                </button>
+
+                {/* Production Notice Button */}
+                <button
+                  onClick={() => setShowProductionNotice(true)}
+                  className="w-full px-6 py-3 bg-brand-yellow text-black font-bold rounded-lg hover:bg-brand-yellow/90 transition-colors flex items-center justify-center gap-2"
+                >
+                  <FileText className="w-5 h-5" />
+                  View Production Notice
                 </button>
               </div>
             )}
@@ -1546,6 +1574,23 @@ export function DesignViewer({
             projectId={projectId}
           />
         )}
+
+      {/* Approval Confirmation Modal */}
+      <ApprovalModal
+        isOpen={showApprovalModal}
+        onClose={() => setShowApprovalModal(false)}
+        onConfirm={handleApprovalConfirmation}
+        projectName={projectName}
+        isApproving={isUpdatingStatus}
+        onShowProductionNotice={() => setShowProductionNotice(true)}
+      />
+
+      {/* Production Notice Modal */}
+      <ProductionNoticeModal
+        isOpen={showProductionNotice}
+        onClose={() => setShowProductionNotice(false)}
+        projectName={projectName}
+      />
     </div>
   );
 }

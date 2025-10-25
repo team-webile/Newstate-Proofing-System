@@ -331,6 +331,153 @@ Sent at ${new Date().toLocaleString()}
 }
 
 /**
+ * Send email notification to admin when client approves project
+ */
+export async function sendProjectApprovalNotificationToAdmin(
+  data: {
+    clientName: string
+    clientEmail?: string
+    projectName: string
+    projectNumber: string
+    reviewLink: string
+    approvedAt: string
+  }
+): Promise<{ success: boolean; emailSentTo?: string }> {
+  try {
+    console.log('📧 Queuing admin approval notification...')
+
+    const adminEmail = await getAdminEmail()
+    console.log('📧 Admin email retrieved:', adminEmail)
+
+    const fromEmail = getSenderEmail()
+    console.log('📧 From email:', fromEmail)
+
+    // Create admin review link (for admin to view)
+    const adminReviewLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://preview.devnstage.xyz'}/admin/review/${data.reviewLink.split('/review/')[1] || data.reviewLink}`
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f9f9f9; padding: 30px; border: 1px solid #e0e0e0; }
+          .approval-box { background: white; border-left: 4px solid #10b981; padding: 20px; margin: 20px 0; border-radius: 4px; }
+          .info-row { margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #e0e0e0; }
+          .label { font-weight: bold; color: #555; }
+          .value { color: #333; }
+          .button { display: inline-block; background: #10b981; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; }
+          .footer { background: #2d2d2d; color: #999; padding: 20px; text-align: center; font-size: 12px; border-radius: 0 0 8px 8px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1 style="margin: 0; font-size: 24px;">🎉 Project Approved!</h1>
+          </div>
+          
+          <div class="content">
+            <p style="font-size: 16px; margin-top: 0;">Great news! A client has approved their project:</p>
+            
+            <div class="info-row">
+              <span class="label">Client Name:</span>
+              <span class="value">${data.clientName}</span>
+            </div>
+            
+            ${data.clientEmail ? `
+            <div class="info-row">
+              <span class="label">Client Email:</span>
+              <span class="value">${data.clientEmail}</span>
+            </div>
+            ` : ''}
+            
+            <div class="info-row">
+              <span class="label">Project:</span>
+              <span class="value">${data.projectName} (${data.projectNumber})</span>
+            </div>
+            
+            <div class="info-row">
+              <span class="label">Approved At:</span>
+              <span class="value">${data.approvedAt}</span>
+            </div>
+            
+            <div class="approval-box">
+              <h3 style="margin-top: 0; color: #10b981;">✅ Project Approved</h3>
+              <p style="margin: 0;">The client has officially approved this project and is satisfied with the final design.</p>
+            </div>
+            
+             <div style="text-align: center;">
+               <a href="${adminReviewLink}" class="button">View Approved Project</a>
+             </div>
+            
+            <p style="color: #666; font-size: 14px; margin-top: 20px;">
+              Click the button above to view the approved project and proceed with final delivery.
+            </p>
+          </div>
+          
+          <div class="footer">
+            <p style="margin: 5px 0;">Newstate Branding Co. - Proofing System</p>
+            <p style="margin: 5px 0;">Project approval notification sent at ${new Date().toLocaleString()}</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+
+    const textContent = `
+Project Approved!
+
+Great news! A client has approved their project.
+
+Client Name: ${data.clientName}
+${data.clientEmail ? `Client Email: ${data.clientEmail}\n` : ''}
+Project: ${data.projectName} (${data.projectNumber})
+Approved At: ${data.approvedAt}
+
+The client has officially approved this project and is satisfied with the final design.
+
+View the approved project: ${adminReviewLink}
+
+---
+Newstate Branding Co. - Proofing System
+Project approval notification sent at ${new Date().toLocaleString()}
+    `.trim()
+
+    // Add to email queue
+    const result = await addToEmailQueue({
+      to: adminEmail,
+      subject: `🎉 Project Approved - ${data.projectName} (${data.projectNumber})`,
+      htmlContent,
+      textContent,
+      from: fromEmail,
+      priority: 1, // High priority for approval notifications
+      metadata: {
+        type: 'project_approval',
+        projectName: data.projectName,
+        projectNumber: data.projectNumber,
+        clientName: data.clientName,
+        clientEmail: data.clientEmail
+      }
+    })
+
+    if (result.success) {
+      console.log(`✅ Admin approval notification queued for project ${data.projectName}`)
+      console.log(`📧 Email queued for: ${adminEmail}`)
+      return { success: true, emailSentTo: adminEmail }
+    } else {
+      console.error('❌ Failed to queue admin approval notification:', result.error)
+      return { success: false }
+    }
+  } catch (error) {
+    console.error('❌ Error queuing admin approval notification:', error)
+    return { success: false }
+  }
+}
+
+/**
  * Verify email configuration
  */
 export async function verifyEmailConfig(): Promise<boolean> {
