@@ -15,30 +15,25 @@ export async function GET(
       )
     }
 
-    // First check if there's a stored preview image in project description
+    // First check if there's a stored preview image in preview metadata
     const project = await prisma.project.findUnique({
-      where: { id: projectId },
-      select: { description: true }
+      where: { id: projectId }
     })
 
     let designItem = null
 
-    // Check if there's a stored preview image
-    if (project?.description) {
-      try {
-        const metadata = JSON.parse(project.description)
-        if (metadata.previewFileId) {
-          designItem = await prisma.designItem.findUnique({
-            where: { id: metadata.previewFileId },
-            select: {
-              fileUrl: true,
-              fileName: true,
-              fileType: true
-            }
-          })
-        }
-      } catch (error) {
-        console.log('No stored preview metadata found')
+    // Check if there's a stored preview image in the new previewMetadata field
+    if (project && (project as any).previewMetadata) {
+      const metadata = (project as any).previewMetadata
+      if (metadata.previewFileId) {
+        designItem = await prisma.designItem.findUnique({
+          where: { id: metadata.previewFileId },
+          select: {
+            fileUrl: true,
+            fileName: true,
+            fileType: true
+          }
+        })
       }
     }
 

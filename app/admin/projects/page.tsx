@@ -212,10 +212,67 @@ export default function AllProjectsPage() {
   if (isLoading) {
     return (
       <AdminLayout title="All Projects" description="Manage and view all projects" icon={<FileText className="h-8 w-8 text-brand-yellow" />}>
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-brand-yellow border-t-transparent mx-auto"></div>
-            <p className="mt-4 text-xl text-gray-300">Loading projects...</p>
+        <div className="container mx-auto px-6 py-8">
+          <div className="mb-8">
+            <div className="h-8 bg-neutral-700 rounded animate-pulse w-64 mb-2"></div>
+            <div className="h-4 bg-neutral-800 rounded animate-pulse w-96"></div>
+          </div>
+          
+          <div className="mb-8 space-y-6">
+            <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-end">
+                <div className="h-10 bg-neutral-800 rounded animate-pulse w-64"></div>
+                <div className="h-10 bg-neutral-700 rounded animate-pulse w-40"></div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <Card key={`loading-${index}`} className="bg-neutral-900 border-neutral-800">
+                <CardHeader className='mb-0 py-3'>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="h-6 bg-neutral-700 rounded animate-pulse mb-2"></div>
+                      <div className="h-4 bg-neutral-800 rounded animate-pulse w-24"></div>
+                    </div>
+                  </div>
+                </CardHeader>
+                <div className="px-4 w-full border-t border-b border-neutral-700">
+                  <div className="w-full h-48 bg-neutral-800 rounded animate-pulse"></div>
+                </div>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="h-4 bg-neutral-700 rounded animate-pulse"></div>
+                    <div className="h-4 bg-neutral-700 rounded animate-pulse w-3/4"></div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <div className="h-4 w-4 bg-neutral-700 rounded animate-pulse"></div>
+                    <div className="h-4 bg-neutral-700 rounded animate-pulse w-32"></div>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <div className="h-4 w-4 bg-neutral-700 rounded animate-pulse"></div>
+                    <div className="h-4 bg-neutral-700 rounded animate-pulse w-24"></div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex space-x-2">
+                      <div className="h-6 bg-neutral-700 rounded animate-pulse w-16"></div>
+                      <div className="h-6 bg-neutral-700 rounded animate-pulse w-20"></div>
+                    </div>
+                  </div>
+
+                  <div className="flex space-x-2 pt-2">
+                    <div className="h-8 bg-neutral-700 rounded animate-pulse flex-1"></div>
+                    <div className="h-8 bg-neutral-700 rounded animate-pulse flex-1"></div>
+                    <div className="h-8 bg-neutral-700 rounded animate-pulse flex-1"></div>
+                    <div className="h-8 bg-neutral-700 rounded animate-pulse flex-1"></div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </div>
       </AdminLayout>
@@ -317,17 +374,20 @@ export default function AllProjectsPage() {
                 </div>
               </CardHeader>
                {isLoadingPreviews ? (
-                 <div className="px-4 w-full border-t border-b border-neutral-700">
+                 <div className="px-4 w-full border-t border-b border-neutral-700 relative">
                    <div className="w-full h-48 bg-neutral-800 rounded animate-pulse"></div>
+                   <div className="absolute inset-0 flex items-center justify-center">
+                     <div className="animate-spin rounded-full h-8 w-8 border-2 border-brand-yellow border-t-transparent"></div>
+                   </div>
                  </div>
                ) : project.previewImage ? (
                  <div className="px-4 w-full border-t border-b border-neutral-700">
                    <Image
                      src={project.previewImage}
                      alt={`${project.name} preview`}
-                     width={800}
-                     height={400}
-                     className="w-full hover:scale-105 transition-transform duration-300"
+                     width={600}
+                     height={800}
+                     className="w-full h-60 object-cover hover:scale-105 transition-transform duration-300"
                    />
                  </div>
                ) : (
@@ -335,9 +395,9 @@ export default function AllProjectsPage() {
                    <Image
                      src="/images/placeholder.png" 
                      alt="Project preview placeholder"
-                     width={800}
-                     height={400}
-                     className="w-full hover:scale-105 transition-transform duration-300 opacity-50"
+                     width={600}
+                     height={800}
+                     className="w-full h-60 object-cover hover:scale-105 transition-transform duration-300 opacity-50"
                    />
                  </div>
                )}

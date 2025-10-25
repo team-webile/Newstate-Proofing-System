@@ -57,20 +57,17 @@ export async function POST(
       )
     }
 
-    // Update the project's metadata to store the preview image
-    // We'll store this in the project's description or create a new field
-    // For now, we'll use a simple approach by updating the project
+    // Update the project's preview metadata
     await prisma.project.update({
       where: { id: projectId },
       data: {
-        // We can store the preview file ID in a custom field
-        // For now, we'll use the description field to store metadata
-        description: JSON.stringify({
+        previewMetadata: {
           previewFileId: fileId,
           previewUrl: designItem.fileUrl,
-          previewFileName: designItem.fileName
-        })
-      }
+          previewFileName: designItem.fileName,
+          previewFileType: designItem.fileType
+        }
+      } as any
     })
 
     return NextResponse.json({
