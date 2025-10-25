@@ -96,7 +96,7 @@ function ForgotPasswordForm() {
                     setEmail('')
                   }}
                   variant="outline"
-                  className="w-full border-gray-700 text-white hover:bg-gray-800"
+                  className="w-full border-gray-700 bg-gray-800 text-white hover:bg-gray-800 hover:text-white cursor-pointer"
                 >
                   Try Another Email
                 </Button>
