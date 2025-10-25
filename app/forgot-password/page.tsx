@@ -96,7 +96,7 @@ function ForgotPasswordForm() {
                     setEmail('')
                   }}
                   variant="outline"
-                  className="w-full border-gray-700 text-gray-300 hover:bg-gray-800"
+                  className="w-full border-gray-700 text-white hover:bg-gray-800"
                 >
                   Try Another Email
                 </Button>
@@ -106,7 +106,7 @@ function ForgotPasswordForm() {
 
           {/* Footer */}
           <div className="text-center text-sm text-gray-500">
-            <p>© 2025 NewState Branding Co. All rights reserved.</p>
+            <p>© 2025 Newstate Branding Co. All rights reserved.</p>
           </div>
         </div>
       </div>
@@ -192,7 +192,7 @@ function ForgotPasswordForm() {
 
         {/* Footer */}
         <div className="text-center text-sm text-gray-500">
-          <p>© 2025 NewState Branding Co. All rights reserved.</p>
+          <p>© 2025 Newstate Branding Co. All rights reserved.</p>
         </div>
       </div>
     </div>

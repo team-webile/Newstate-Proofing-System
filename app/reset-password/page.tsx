@@ -131,7 +131,7 @@ function ResetPasswordForm() {
 
           {/* Footer */}
           <div className="text-center text-sm text-gray-500">
-            <p>© 2025 NewState Branding Co. All rights reserved.</p>
+            <p>© 2025 Newstate Branding Co. All rights reserved.</p>
           </div>
         </div>
       </div>
@@ -264,7 +264,7 @@ function ResetPasswordForm() {
 
         {/* Footer */}
         <div className="text-center text-sm text-gray-500">
-          <p>© 2025 NewState Branding Co. All rights reserved.</p>
+          <p>© 2025 Newstate Branding Co. All rights reserved.</p>
         </div>
       </div>
     </div>

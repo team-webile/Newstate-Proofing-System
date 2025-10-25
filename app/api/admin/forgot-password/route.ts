@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     const resetUrl = `${process.env.NEXTAUTH_URL || 'https://preview.devnstage.xyz'}/reset-password?token=${resetToken}`
 
     // Send email
-    const emailSubject = 'Password Reset Request - NewState Branding'
+    const emailSubject = 'Password Reset Request - Newstate Branding'
     const emailHtml = `
       <!DOCTYPE html>
       <html>
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
       <body>
         <div class="container">
           <div class="header">
-            <h1>NewState Branding</h1>
+            <h1>Newstate Branding</h1>
             <h2>Password Reset Request</h2>
           </div>
           <div class="content">
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
             <p>If you didn't request this password reset, please ignore this email.</p>
           </div>
           <div class="footer">
-            <p>© 2025 NewState Branding Co. All rights reserved.</p>
+            <p>© 2025 Newstate Branding Co. All rights reserved.</p>
             <p>This is an automated message, please do not reply.</p>
           </div>
         </div>
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
     `
 
     const emailText = `
-      Password Reset Request - NewState Branding
+      Password Reset Request - Newstate Branding
       
       Hello ${user.firstName},
       
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
       
       If you didn't request this password reset, please ignore this email.
       
-      © 2025 NewState Branding Co. All rights reserved.
+      © 2025 Newstate Branding Co. All rights reserved.
     `
 
     try {
