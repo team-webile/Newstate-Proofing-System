@@ -165,16 +165,19 @@ function LoginForm() {
                   "Sign In"
                 )}
               </Button>
+
+              <div className="text-center">
+                <Button
+                  type="button"
+                  variant="link"
+                  className="text-gray-400 hover:text-yellow-400 text-sm"
+                  onClick={() => router.push('/forgot-password')}
+                >
+                  Forgot your password?
+                </Button>
+              </div>
             </form>
-            {/* <div className="text-center mt-6">
-          <p className="text-sm text-gray-300">
-            Default admin credentials:
-          </p>
-          <p className="text-xs text-gray-400 mt-1">
-            Email: admin@proofing-system.com<br />
-            Password: AdminPass123!
-          </p>
-        </div> */}
+          
           </CardContent>
         </Card>
 

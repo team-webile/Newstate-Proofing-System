@@ -19,9 +19,12 @@ import {
   FileText,
   MoreHorizontal,
   ArchiveX,
-  Save
+  Save,
+  Trash2,
+  Loader2
 } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import toast from 'react-hot-toast'
 
 interface Project {
@@ -51,7 +54,9 @@ export default function AllProjectsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showArchived, setShowArchived] = useState(false)
   const router = useRouter()
-
+  const [isDeleteLoading, setIsDeleteLoading] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [projectToDelete, setProjectToDelete] = useState<{ id: number; name: string } | null>(null)
   useEffect(() => {
     loadProjects()
   }, [])
@@ -136,6 +141,42 @@ export default function AllProjectsPage() {
     } catch (error) {
       console.error('Error updating project archive status:', error)
       toast.error('Failed to update project status')
+    }
+  }
+
+  const openDeleteDialog = (projectId: number, projectName: string) => {
+    setProjectToDelete({ id: projectId, name: projectName })
+    setDeleteDialogOpen(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!projectToDelete) return
+
+    try {
+      setIsDeleteLoading(true)
+      const response = await fetch(`/api/projects/${projectToDelete.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+      console.log(response,'delete')
+      if (response.ok) {
+        // Reload projects to reflect changes
+        await loadProjects()
+        toast.success('Project deleted successfully!')
+        setDeleteDialogOpen(false)
+        setProjectToDelete(null)
+      } else {
+        const errorData = await response.json()
+        console.error('Failed to delete project:', errorData.error)
+        toast.error(errorData.error || 'Failed to delete project')
+      }
+    } catch (error) {
+      console.error('Error deleting project:', error)
+      toast.error('Failed to delete project')
+    } finally {
+      setIsDeleteLoading(false)
     }
   }
 
@@ -228,6 +269,13 @@ export default function AllProjectsPage() {
                           </>
                         )}
                       </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => openDeleteDialog(project.id, project.name)}
+                        className="text-red-400 hover:bg-red-900/20 hover:text-red-300 focus:bg-red-900/20 focus:text-red-300"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete Project
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -302,6 +350,25 @@ export default function AllProjectsPage() {
                       </>
                     )}
                   </Button>
+                   <Button
+                     variant="outline"
+                     size="sm"
+                     onClick={() => openDeleteDialog(project.id, project.name)}
+                     className="flex-1 border-neutral-600 text-neutral-400 hover:bg-red-600 hover:text-white transition-colors bg-neutral-900"
+                     disabled={isDeleteLoading}
+                   >
+                    {isDeleteLoading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Deleting...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </>
+                    )}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -326,6 +393,55 @@ export default function AllProjectsPage() {
             </div>
           </div>
         )}
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent className="bg-neutral-900 border-neutral-700">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-white text-xl flex items-center gap-2">
+                <Trash2 className="h-5 w-5 text-red-400" />
+                Delete Project
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-neutral-300 text-base">
+                Are you sure you want to delete <span className="font-semibold text-white">"{projectToDelete?.name}"</span>?
+                <br /><br />
+                <span className="text-red-400 font-medium">This action cannot be undone</span> and will permanently delete:
+                <ul className="mt-2 ml-4 space-y-1 text-sm">
+                  <li>• All project files and designs</li>
+                  <li>• All review sessions</li>
+                  <li>• All client comments and annotations</li>
+                  <li>• All approval records</li>
+                  <li>• All activity logs</li>
+                </ul>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-3">
+              <AlertDialogCancel 
+                className="bg-gray-600 text-white hover:bg-gray-700 hover:text-white"
+                disabled={isDeleteLoading}
+              >
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDelete}
+                disabled={isDeleteLoading}
+                className="bg-red-600 hover:bg-red-700 text-white font-semibold"
+              >
+                {isDeleteLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Project
+                  </>
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AdminLayout>
   )
