@@ -8,19 +8,8 @@ export const dynamic = 'force-dynamic'
 
 // Validation schema
 const updateProfileSchema = z.object({
-  email: z.string().email('Invalid email address').optional(),
-  currentPassword: z.string().min(1, 'Current password is required'),
-  newPassword: z.string().min(8, 'New password must be at least 8 characters').optional(),
-  confirmPassword: z.string().optional(),
-}).refine((data) => {
-  // If new password is provided, confirm password must match
-  if (data.newPassword && data.newPassword !== data.confirmPassword) {
-    return false
-  }
-  return true
-}, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
 })
 
 // GET - Get current admin profile
@@ -76,7 +65,7 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const { email, currentPassword, newPassword } = result.data
+    const { email, password } = result.data
 
     // Get user from database
     const user = await prisma.user.findUnique({
@@ -87,21 +76,8 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Verify current password
-    const isValidPassword = await bcrypt.compare(currentPassword, user.password)
-    if (!isValidPassword) {
-      return NextResponse.json(
-        { error: 'Current password is incorrect' },
-        { status: 401 }
-      )
-    }
-
-    // Prepare update data
-    const updateData: any = {}
-
-    // Update email if provided
-    if (email && email !== user.email) {
-      // Check if email is already taken by another user
+    // Check if email is already taken by another user
+    if (email !== user.email) {
       const existingUser = await prisma.user.findUnique({
         where: { email },
       })
@@ -112,21 +88,15 @@ export async function PUT(request: NextRequest) {
           { status: 400 }
         )
       }
-
-      updateData.email = email
     }
 
-    // Update password if provided
-    if (newPassword) {
-      updateData.password = await bcrypt.hash(newPassword, 12)
-    }
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(password, 12)
 
-    // If nothing to update
-    if (Object.keys(updateData).length === 0) {
-      return NextResponse.json(
-        { error: 'No changes to update' },
-        { status: 400 }
-      )
+    // Prepare update data
+    const updateData = {
+      email,
+      password: hashedPassword,
     }
 
     // Update user in database
@@ -142,34 +112,27 @@ export async function PUT(request: NextRequest) {
       }
     })
 
-    // If email was updated, generate new JWT token
-    let newToken = null
-    if (updateData.email) {
-      newToken = signToken({
-        userId: updatedUser.id,
-        email: updatedUser.email,
-        role: updatedUser.role,
-      })
-    }
+    // Generate new JWT token since both email and password are being updated
+    const newToken = signToken({
+      userId: updatedUser.id,
+      email: updatedUser.email,
+      role: updatedUser.role,
+    })
 
     const response = NextResponse.json({
       success: true,
       message: 'Profile updated successfully',
       user: updatedUser,
-      emailChanged: !!updateData.email,
-      passwordChanged: !!updateData.password,
     })
 
-    // Update auth cookie if email changed
-    if (newToken) {
-      response.cookies.set('admin-token', newToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24, // 24 hours
-        path: '/',
-      })
-    }
+    // Update auth cookie with new token
+    response.cookies.set('admin-token', newToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24, // 24 hours
+      path: '/',
+    })
 
     return response
   } catch (error) {
