@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { Upload, Settings, Save, X, Image as ImageIcon, ArrowLeft, Trash } from "lucide-react"
+import { Upload, Settings, Save, X, Image as ImageIcon, ArrowLeft, Trash, Star, StarOff } from "lucide-react"
 import { CopyLinkButton } from "@/components/copy-link-button"
 import AdminLayout from "../../components/AdminLayout"
 import toast from 'react-hot-toast'
@@ -49,6 +49,8 @@ export default function ProjectDetailsPage() {
   const [deletingFileId, setDeletingFileId] = useState<number | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
   const [isLoadingFiles, setIsLoadingFiles] = useState(true)
+  const [previewFileId, setPreviewFileId] = useState<number | null>(null)
+  const [settingPreview, setSettingPreview] = useState<number | null>(null)
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -103,11 +105,29 @@ export default function ProjectDetailsPage() {
       if (response.ok) {
         const data = await response.json()
         setDesignItems(data.data.files || [])
+        // Load preview after files are loaded
+        await loadCurrentPreview(data.data.files || [])
       }
     } catch (error) {
       console.error('Error loading files:', error)
     } finally {
       setIsLoadingFiles(false)
+    }
+  }
+
+  const loadCurrentPreview = async (files: DesignItem[] = designItems) => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/preview`)
+      if (response.ok) {
+        const data = await response.json()
+        // Find the file ID that matches the preview URL
+        const previewFile = files.find(item => item.url === data.preview?.url)
+        if (previewFile) {
+          setPreviewFileId(previewFile.id)
+        }
+      }
+    } catch (error) {
+      console.error('Error loading current preview:', error)
     }
   }
 
@@ -214,6 +234,32 @@ export default function ProjectDetailsPage() {
       toast.error('Failed to delete file')
     } finally {
       setDeletingFileId(null)
+    }
+  }
+
+  const handleSetPreview = async (fileId: number) => {
+    setSettingPreview(fileId)
+    try {
+      const response = await fetch(`/api/projects/${projectId}/set-preview`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ fileId }),
+      })
+
+      if (response.ok) {
+        setPreviewFileId(fileId)
+        toast.success('Preview image set successfully!')
+      } else {
+        const errorData = await response.json()
+        toast.error(errorData.error || 'Failed to set preview image')
+      }
+    } catch (error) {
+      console.error('Error setting preview:', error)
+      toast.error('Failed to set preview image')
+    } finally {
+      setSettingPreview(null)
     }
   }
 
@@ -436,10 +482,37 @@ export default function ProjectDetailsPage() {
                         {isPdf && (
                           <p className="text-red-400 text-xs mt-1">PDF Document</p>
                         )}
+                        {!isPdf && previewFileId === item.id && (
+                          <div className="flex items-center gap-1 mt-1">
+                            <Star className="w-3 h-3 text-yellow-400" />
+                            <p className="text-yellow-400 text-xs">Preview Image</p>
+                          </div>
+                        )}
                       </div>
                 {/* Mobile: Always visible buttons, Desktop: Show on hover */}
                 <div className="absolute top-2 right-2 sm:inset-0 sm:bg-black/60 sm:opacity-0 sm:group-hover:opacity-100 sm:transition-all duration-200 flex flex-row sm:flex-col items-start sm:items-center justify-end sm:justify-center gap-2 p-2 sm:p-3 z-10">
                         <div className="flex flex-row gap-2">
+                          {/* Preview Button - Only show for image files */}
+                          {!isPdf && (
+                            <button
+                              onClick={() => handleSetPreview(item.id)}
+                              disabled={settingPreview === item.id || previewFileId === item.id}
+                              className={`px-2 py-1.5 sm:px-3 sm:py-2 rounded font-semibold transition-colors flex items-center justify-center gap-1 shadow-lg ${
+                                previewFileId === item.id 
+                                  ? 'bg-yellow-600 text-white cursor-default' 
+                                  : 'bg-blue-600 text-white hover:bg-blue-700'
+                              } ${settingPreview === item.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              title={previewFileId === item.id ? "Current preview image" : "Set as preview image"}
+                            >
+                              {settingPreview === item.id ? (
+                                <div className="animate-spin rounded-full h-3.5 w-3.5 sm:h-4 sm:w-4 border-2 border-white border-t-transparent"></div>
+                              ) : previewFileId === item.id ? (
+                                <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                              ) : (
+                                <StarOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                              )}
+                            </button>
+                          )}
                           {reviews.length > 0 && (
                             <Link
                               href={`/admin/review/${reviews[0].shareLink}`}

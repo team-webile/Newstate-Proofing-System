@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { CardLoading } from '@/components/ui/loading'
 import AdminLayout from '../components/AdminLayout'
+import Image from 'next/image'
 import { 
   Plus, 
   Search, 
@@ -38,6 +39,7 @@ interface Project {
   createdAt: string
   updatedAt: string
   reviews?: Review[]
+  previewImage?: string
 }
 
 interface Review {
@@ -57,6 +59,7 @@ export default function AllProjectsPage() {
   const [isDeleteLoading, setIsDeleteLoading] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [projectToDelete, setProjectToDelete] = useState<{ id: number; name: string } | null>(null)
+  const [isLoadingPreviews, setIsLoadingPreviews] = useState(false)
   useEffect(() => {
     loadProjects()
   }, [])
@@ -71,11 +74,37 @@ export default function AllProjectsPage() {
       if (response.ok) {
         const data = await response.json()
         setProjects(data)
+        
+        // Load preview images for each project
+        loadPreviewImages(data)
       }
     } catch (error) {
       console.error('Error loading projects:', error)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const loadPreviewImages = async (projects: Project[]) => {
+    setIsLoadingPreviews(true)
+    try {
+      const projectsWithPreviews = await Promise.all(
+        projects.map(async (project) => {
+          try {
+            const previewResponse = await fetch(`/api/projects/${project.id}/preview`)
+            if (previewResponse.ok) {
+              const previewData = await previewResponse.json()
+              return { ...project, previewImage: previewData.preview?.url }
+            }
+          } catch (error) {
+            console.error(`Error loading preview for project ${project.id}:`, error)
+          }
+          return project
+        })
+      )
+      setProjects(projectsWithPreviews)
+    } finally {
+      setIsLoadingPreviews(false)
     }
   }
 
@@ -182,14 +211,14 @@ export default function AllProjectsPage() {
 
   if (isLoading) {
     return (
-      <AdminLayout title="Project Details" description="View project details and files" icon={<Save className="h-8 w-8 text-brand-yellow" />}>
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-brand-yellow border-t-transparent mx-auto"></div>
-          <p className="mt-4 text-xl text-gray-300">Loading project...</p>
+      <AdminLayout title="All Projects" description="Manage and view all projects" icon={<FileText className="h-8 w-8 text-brand-yellow" />}>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-brand-yellow border-t-transparent mx-auto"></div>
+            <p className="mt-4 text-xl text-gray-300">Loading projects...</p>
+          </div>
         </div>
-      </div>
-    </AdminLayout>
+      </AdminLayout>
     )
   }
 
@@ -229,57 +258,89 @@ export default function AllProjectsPage() {
 
         {/* Projects Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProjects.map((project) => (
-            <Card key={project.id} className="bg-neutral-900 border-neutral-800 hover:border-brand-yellow/30 hover:shadow-lg hover:shadow-brand-yellow/10 transition-all duration-300 group">
-              <CardHeader className="pb-4">
+          {isLoadingPreviews ? (
+            // Skeleton loading for preview images
+            Array.from({ length: 6 }).map((_, index) => (
+              <Card key={`skeleton-${index}`} className="bg-neutral-900 border-neutral-800">
+                <CardHeader className='mb-0 py-3'>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="h-6 bg-neutral-700 rounded animate-pulse mb-2"></div>
+                      <div className="h-4 bg-neutral-800 rounded animate-pulse w-24"></div>
+                    </div>
+                  </div>
+                </CardHeader>
+                <div className="px-4 w-full border-t border-b border-neutral-700">
+                  <div className="w-full h-48 bg-neutral-800 rounded animate-pulse"></div>
+                </div>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="h-4 bg-neutral-700 rounded animate-pulse"></div>
+                    <div className="h-4 bg-neutral-700 rounded animate-pulse w-3/4"></div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <div className="h-4 w-4 bg-neutral-700 rounded animate-pulse"></div>
+                    <div className="h-4 bg-neutral-700 rounded animate-pulse w-32"></div>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <div className="h-4 w-4 bg-neutral-700 rounded animate-pulse"></div>
+                    <div className="h-4 bg-neutral-700 rounded animate-pulse w-24"></div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex space-x-2">
+                      <div className="h-6 bg-neutral-700 rounded animate-pulse w-16"></div>
+                      <div className="h-6 bg-neutral-700 rounded animate-pulse w-20"></div>
+                    </div>
+                  </div>
+
+                  <div className="flex space-x-2 pt-2">
+                    <div className="h-8 bg-neutral-700 rounded animate-pulse flex-1"></div>
+                    <div className="h-8 bg-neutral-700 rounded animate-pulse flex-1"></div>
+                    <div className="h-8 bg-neutral-700 rounded animate-pulse flex-1"></div>
+                    <div className="h-8 bg-neutral-700 rounded animate-pulse flex-1"></div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            filteredProjects.map((project) => (
+            <Card key={project.id} className="bg-neutral-900 border-neutral-800 hover:border-yellow/30 hover:shadow-lg hover:shadow-brand-yellow/10 transition-all duration-300 group">
+              <CardHeader className='mb-0 py-3'> {/* Reduced padding */}
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <CardTitle className="text-white text-lg group-hover:text-brand-yellow transition-colors">{project.name}</CardTitle>
                     <CardDescription className="text-neutral-400 font-mono text-sm">{project.projectNumber}</CardDescription>
                   </div>
-                  <DropdownMenu>
-                    <DropdownMenuContent className="bg-neutral-900 border-neutral-700">
-                      <DropdownMenuItem 
-                        onClick={() => router.push(`/admin/project/${project.id}`)}
-                        className="text-neutral-300 hover:bg-neutral-800 hover:text-brand-yellow focus:bg-neutral-800 focus:text-brand-yellow"
-                      >
-                        <Eye className="h-4 w-4 mr-2" />      
-                        View Details
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onClick={() => router.push(`/admin/project/${project.id}/edit`)}
-                        className="text-neutral-300 hover:bg-neutral-800 hover:text-brand-yellow focus:bg-neutral-800 focus:text-brand-yellow"
-                      >
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit Project
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onClick={() => toggleArchiveStatus(project.id, project.archived)}
-                        className="text-neutral-300 hover:bg-neutral-800 hover:text-brand-yellow focus:bg-neutral-800 focus:text-brand-yellow"
-                      >
-                        {project.archived ? (
-                          <>
-                            <ArchiveX className="h-4 w-4 mr-2" />
-                            Unarchive Project
-                          </>
-                        ) : (
-                          <>
-                            <Archive className="h-4 w-4 mr-2" />
-                            Archive Project
-                          </>
-                        )}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onClick={() => openDeleteDialog(project.id, project.name)}
-                        className="text-red-400 hover:bg-red-900/20 hover:text-red-300 focus:bg-red-900/20 focus:text-red-300"
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete Project
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
                 </div>
               </CardHeader>
+               {isLoadingPreviews ? (
+                 <div className="px-4 w-full border-t border-b border-neutral-700">
+                   <div className="w-full h-48 bg-neutral-800 rounded animate-pulse"></div>
+                 </div>
+               ) : project.previewImage ? (
+                 <div className="px-4 w-full border-t border-b border-neutral-700">
+                   <Image
+                     src={project.previewImage}
+                     alt={`${project.name} preview`}
+                     width={800}
+                     height={400}
+                     className="w-full hover:scale-105 transition-transform duration-300"
+                   />
+                 </div>
+               ) : (
+                 <div className="px-4 w-full border-t border-b border-neutral-700">
+                   <Image
+                     src="/images/placeholder.png" 
+                     alt="Project preview placeholder"
+                     width={800}
+                     height={400}
+                     className="w-full hover:scale-105 transition-transform duration-300 opacity-50"
+                   />
+                 </div>
+               )}
               <CardContent className="space-y-4">
                 <p className="text-neutral-300 text-sm line-clamp-2 leading-relaxed">{project.description}</p>
                 
@@ -314,11 +375,14 @@ export default function AllProjectsPage() {
                     variant="outline" 
                     size="sm"
                     onClick={() => router.push(`/admin/project/${project.id}`)}
-                    className="flex-1 border-neutral-600 text-neutral-300 hover:bg-brand-yellow hover:text-black hover:border-brand-yellow transition-colors bg-neutral-900"
+                    className="flex-1 border-neutral-600 text-neutral-300 hover:bg-brand-yellow hover:text-black hover:border-brand-yellow transition-colors bg-neutral-900 relative overflow-hidden"
                   >
-                    <Eye className="h-4 w-4 mr-2" />
-                    Preview
+                    <div className="relative z-10 flex items-center">
+                      <Eye className="h-4 w-4 mr-2" />
+                      Preview
+                    </div>
                   </Button>
+                  
                   <Button 
                     variant="outline" 
                     size="sm"
@@ -328,6 +392,7 @@ export default function AllProjectsPage() {
                     <Edit className="h-4 w-4 mr-2" />
                     Edit
                   </Button>
+                  
                   <Button 
                     variant="outline" 
                     size="sm"
@@ -350,13 +415,14 @@ export default function AllProjectsPage() {
                       </>
                     )}
                   </Button>
-                   <Button
-                     variant="outline"
-                     size="sm"
-                     onClick={() => openDeleteDialog(project.id, project.name)}
-                     className="flex-1 border-neutral-600 text-neutral-400 hover:bg-red-600 hover:text-white transition-colors bg-neutral-900"
-                     disabled={isDeleteLoading}
-                   >
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openDeleteDialog(project.id, project.name)}
+                    className="flex-1 border-neutral-600 text-neutral-400 hover:bg-red-600 hover:text-white transition-colors bg-neutral-900"
+                    disabled={isDeleteLoading}
+                  >
                     {isDeleteLoading ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -372,7 +438,8 @@ export default function AllProjectsPage() {
                 </div>
               </CardContent>
             </Card>
-          ))}
+            ))
+          )}
         </div>
 
         {filteredProjects.length === 0 && (
